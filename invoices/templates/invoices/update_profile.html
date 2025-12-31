@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4" style="font-family: 'Calibri', sans-serif;">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">Update Business & Banking Profile</h4>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <h5 class="text-muted">Business Details</h5>
+                <div class="row mb-3">
+                    <div class="col-md-12">{{ form.company_name.label_tag }}{{ form.company_name }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-12">{{ form.address.label_tag }}{{ form.address }}</div>
+                </div>
+
+                <h5 class="text-muted mt-4">Tax & Banking</h5>
+                <div class="row mb-3">
+                    <div class="col-md-4">{{ form.vat_number.label_tag }}{{ form.vat_number }}</div>
+                    <div class="col-md-4">{{ form.tax_number.label_tag }}{{ form.tax_number }}</div>
+                    <div class="col-md-4">{{ form.tax_rate.label_tag }}{{ form.tax_rate }}</div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">{{ form.bank_name.label_tag }}{{ form.bank_name }}</div>
+                    <div class="col-md-6">{{ form.account_holder.label_tag }}{{ form.account_holder }}</div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">{{ form.account_number.label_tag }}{{ form.account_number }}</div>
+                    <div class="col-md-6">{{ form.branch_code.label_tag }}{{ form.branch_code }}</div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-success btn-lg">Update Profile</button>
+                    <a href="{% url 'invoices:list' %}" class="btn btn-secondary btn-lg">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

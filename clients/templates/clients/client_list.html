@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4" style="font-family: 'Calibri', sans-serif;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Client Billing Overview</h2>
+        <a href="{% url 'clients:create' %}" class="btn btn-primary">+ Add New Client</a>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <table class="table align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Client Name</th>
+                    <th>Contact</th>
+                    <th>Outstanding Balance</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for client in clients %}
+                <tr>
+                    <td>
+                        <span class="fw-bold">{{ client.name }}</span>
+                    </td>
+                    <td>{{ client.email }}</td>
+                    <td>
+                        {% if client.outstanding_balance > 0 %}
+                            <span class="text-danger fw-bold">R {{ client.outstanding_balance|floatformat:2 }}</span>
+                        {% else %}
+                            <span class="text-success small">Settled</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'invoices:create' %}?client_id={{ client.id }}" 
+                           class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-file-earmark-plus"></i> Bill Client
+                        </a>
+                        <a href="{% url 'clients:detail' client.id %}" 
+                           class="btn btn-sm btn-outline-secondary">View History</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

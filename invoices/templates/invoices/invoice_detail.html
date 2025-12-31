@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Invoice #{{ invoice.number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Invoice #{{ invoice.number }}</h2>
+        <div>
+            <a href="{% url 'invoices:pdf' invoice.pk %}" class="btn btn-primary" target="_blank">
+                <i class="bi bi-file-pdf"></i> View PDF
+            </a>
+            <a href="{% url 'invoices:create' %}" class="btn btn-outline-secondary">
+                Create New
+            </a>
+        </div>
+    </div>
+
+
+
+<div class="sticky-top bg-white border-bottom shadow-sm mb-4 d-print-none">
+    <div class="container py-3 d-flex justify-content-between align-items-center">
+        <h4 class="mb-0 text-muted">Invoice #{{ invoice.invoice_number }}</h4>
+        <div>
+            <a href="{% url 'invoices:edit' invoice.pk %}" class="btn btn-primary me-2">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="{% url 'invoices:pdf' invoice.pk %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-download"></i> Download PDF
+            </a>
+            {% if invoice.status == 'PAID' %}
+            <span class="badge rounded-pill bg-success">Paid</span>
+            {% elif invoice.status == 'PENDING' %}
+            <span class="badge rounded-pill bg-warning text-dark">Pending</span>
+            {% elif invoice.status == 'OVERDUE' %}
+            <span class="badge rounded-pill bg-danger">Overdue</span>
+            {% else %}
+            <span class="badge rounded-pill bg-secondary">{{ invoice.get_status_display }}</span>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<div class="container my-5">
+    <div class="invoice-box p-5 border shadow-sm bg-white">
+        </div>
+</div>
+
+
+
+
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">Client Information</div>
+                <div class="card-body">
+                    <h5>{{ invoice.client.name }}</h5>
+                    <p class="text-muted">{{ invoice.client.address|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">Invoice Details</div>
+                <div class="card-body">
+                    <p><strong>Status:</strong> <span class="badge bg-info">{{ invoice.get_status_display }}</span></p>
+                    <p><strong>Issued:</strong> {{ invoice.date_issued }}</p>
+                    <p><strong>Due Date:</strong> {{ invoice.due_date }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Description</th>
+                        <th class="text-end">Qty</th>
+                        <th class="text-end">Unit Price</th>
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in invoice.items.all %}
+                    <tr>
+                        <td>{{ item.description }}</td>
+                        <td class="text-end">{{ item.quantity }}</td>
+                        <td class="text-end">R{{ item.unit_price }}</td>
+                        <td class="text-end">R {{ item.total|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+<tfoot>
+    <tr>
+        <th colspan="3" class="text-end">Subtotal</th>
+        <td class="text-end">R {{ invoice.subtotal|floatformat:2|intcomma }}</td>
+    </tr>
+    <tr class="table-primary">
+        <th colspan="3" class="text-end">Total (inc. VAT)</th>
+        <td class="text-end"><strong>R {{ invoice.total_amount|floatformat:2|intcomma }}</strong></td>
+    </tr>
+</tfoot>
+
+
+</table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
