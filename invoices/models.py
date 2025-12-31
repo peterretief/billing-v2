@@ -5,6 +5,9 @@ from core.models import TenantModel
 from clients.models import Client
 from decimal import Decimal
 
+from .managers import InvoiceManager  # Import it here
+from decimal import Decimal, ROUND_HALF_UP
+
 
 class Invoice(TenantModel):
     class Status(models.TextChoices):
@@ -48,6 +51,8 @@ class Invoice(TenantModel):
 
     tax_exempt = models.BooleanField(default=False, help_text="Check if this invoice should not include VAT")
 
+    objects = InvoiceManager()  # Assign the custom manager
+
     @property
     def subtotal(self):
         # We sum up the 'total' property of all linked items
@@ -56,9 +61,46 @@ class Invoice(TenantModel):
 
     @property
     def total_amount(self):
+        if self.tax_exempt:
+            amount = Decimal(self.subtotal)
+        else:
+            tax_rate = getattr(self.user.profile, 'tax_rate', 15)
+            amount = Decimal(self.subtotal) * (1 + (Decimal(tax_rate) / 100))
+    
+        # This rounds to exactly 2 decimal places (0.01)
+        return amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    @property
+    def total_amount(self):
         # Defaulting to 15% VAT for South Africa
         tax_rate = getattr(self.user.profile, 'tax_rate', 15)
         return Decimal(self.subtotal) * (1 + (tax_rate / 100))
+
+    @property
+    def taxable_subtotal(self):
+        """Sums up only items where is_taxable=True"""
+        # We use .all() and filter in Python to avoid extra database hits
+        return sum((item.row_subtotal for item in self.items.all() if item.is_taxable), Decimal('0.00'))
+
+    @property
+    def non_taxable_subtotal(self):
+        """Sums up items where is_taxable=False"""
+        return sum((item.row_subtotal for item in self.items.all() if not item.is_taxable), Decimal('0.00'))
+
+    @property
+    def vat_amount(self):
+        """Calculates VAT only on the taxable portion"""
+        if self.tax_exempt:
+            return Decimal('0.00')
+        
+        # Pulls tax rate from UserProfile (default to 0 if not set)
+        tax_rate = getattr(self.user.profile, 'tax_rate', Decimal('0.00'))
+        return (self.taxable_subtotal * (tax_rate / 100)).quantize(Decimal('0.01'))
+
+    @property
+    def total_amount(self):
+        """The final Grand Total"""
+        return (self.taxable_subtotal + self.vat_amount + self.non_taxable_subtotal).quantize(Decimal('0.01'))
 
     class Meta:
         unique_together = ('user', 'number') # Prevents a user from reusing invoice numbers
@@ -84,7 +126,13 @@ class InvoiceItem(models.Model):
     description = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
+    is_taxable = models.BooleanField(default=True)
+
+    @property
+    def row_subtotal(self):
+        return (self.quantity * self.unit_price).quantize(Decimal('0.01'))
+
     @property
     def total(self):
         return self.quantity * self.unit_price

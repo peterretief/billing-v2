@@ -7,7 +7,8 @@ from django.template.loader import render_to_string
 from .models import Invoice
 from .forms import InvoiceForm, InvoiceItemFormSet
 from .utils import generate_invoice_pdf
-
+from django.db.models import Sum
+from decimal import Decimal
 
 @login_required
 def dashboard(request):
@@ -15,14 +16,56 @@ def dashboard(request):
     invoices = Invoice.objects.filter(user=request.user).order_by('-date_issued')[:5]
     return render(request, 'invoices/dashboard.html', {'invoices': invoices})
 
+
+from django.core.paginator import Paginator
+
 @login_required
 def invoice_list(request):
-    """List of all invoices for the user."""
-    invoices = Invoice.objects.filter(user=request.user).order_by('-date_issued')
-    return render(request, 'invoices/invoice_list.html', {'invoices': invoices})
+    # 1. Get the stats from your new manager
+    stats = Invoice.objects.get_dashboard_stats(request.user)
+    
+    # 2. Get the full list of invoices
+    invoice_list = Invoice.objects.filter(user=request.user).order_by('-date_issued')
+    
+    # 3. Set up Pagination (e.g., 10 invoices per page)
+    paginator = Paginator(invoice_list, 10) 
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'invoices/invoice_list.html', {
+        'invoices': page_obj,  # This replaces the full list with the paged list
+        'stats': stats
+    })
+
 
 # --- INVOICE CRUD VIEWS ---
 
+@login_required
+def invoice_create(request):
+    if request.method == 'POST':
+        form = InvoiceForm(request.POST)
+        formset = InvoiceItemFormSet(request.POST)
+        
+        if form.is_valid() and formset.is_valid():
+            invoice = form.save(commit=False)
+            invoice.user = request.user
+            invoice.save()
+            
+            # This links the items to the invoice automatically
+            formset.instance = invoice
+            formset.save()
+            return redirect('invoices:list')
+    else:
+        form = InvoiceForm()
+        formset = InvoiceItemFormSet()
+
+    return render(request, 'invoices/invoice_form.html', {
+        'form': form,
+        'formset': formset
+    })
+
+
+"""
 @login_required
 def invoice_create(request):
     client_id = request.GET.get('client_id')
@@ -44,6 +87,8 @@ def invoice_create(request):
         formset = InvoiceItemFormSet()
     
     return render(request, 'invoices/invoice_form.html', {'form': form, 'formset': formset})
+"""
+    
 
 @login_required
 def invoice_edit(request, pk):

@@ -131,3 +131,5 @@ SESSION_COOKIE_SECURE = False
 # Add this at the bottom of settings.py
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+USE_THOUSAND_SEPARATOR = True

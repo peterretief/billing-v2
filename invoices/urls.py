@@ -17,4 +17,6 @@ urlpatterns = [
     # HTMX / Dynamic Row Helper
     path('add-item-row/', views.add_item_row, name='add_item_row'),
 
+    path('<int:pk>/pdf/', views.generate_invoice_pdf_view, name='invoice_pdf'),
+
 ]
