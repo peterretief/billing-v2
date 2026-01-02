@@ -21,6 +21,7 @@
                         <td>{{ invoice.client.name }}</td>
                         <td>{{ invoice.date_issued }}</td>
                         <td>R {{ invoice.total_amount }}</td>
+                        
                         <td class="text-end">
                             <a href="{% url 'invoices:invoice_pdf' invoice.id %}" class="btn btn-sm btn-primary">PDF</a>
                         </td>

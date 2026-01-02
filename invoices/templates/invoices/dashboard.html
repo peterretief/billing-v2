@@ -5,29 +5,43 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Dashboard</h1>
-    <a href="{% url 'invoices:create' %}" class="btn btn-success">
+    <a href="{% url 'invoices:invoice_create' %}" class="btn btn-success">
         <i class="bi bi-plus-lg"></i> Create New Invoice
     </a>
 </div>
 
 <div class="row mb-4">
     <div class="col-md-4">
-        <div class="card bg-primary text-white">
+        <div class="card bg-primary text-white shadow-sm border-0">
             <div class="card-body">
-                <h5 class="card-title">Total Invoices</h5>
-                <h2 class="display-4">{{ total_invoiced }}</h2>
+                <h6 class="text-uppercase small fw-bold">Total Revenue</h6>
+                <h2 class="display-6 fw-bold">R {{ stats.total_invoiced|default:"0.00" }}</h2>
+                <p class="mb-0 opacity-75">{{ stats.invoice_count }} Invoices Total</p>
             </div>
         </div>
     </div>
+
     <div class="col-md-4">
-        <div class="card bg-warning text-dark">
+        <div class="card bg-danger text-white shadow-sm border-0">
             <div class="card-body">
-                <h5 class="card-title">Unpaid Invoices</h5>
-                <h2 class="display-4">{{ pending_count }}</h2>
+                <h6 class="text-uppercase small fw-bold">Total Unpaid</h6>
+                <h2 class="display-6 fw-bold">R {{ stats.unpaid_amount|default:"0.00" }}</h2>
+                <p class="mb-0 opacity-75">Awaiting Payment</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-success text-white shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="text-uppercase small fw-bold">Total Collected</h6>
+                <h2 class="display-6 fw-bold">R {{ stats.paid_amount|default:"0.00" }}</h2>
+                <p class="mb-0 opacity-75">Successfully Settled</p>
             </div>
         </div>
     </div>
 </div>
+
 
 <div class="card shadow-sm">
     <div class="card-header bg-white">
@@ -56,8 +70,8 @@
                         </span>
                     </td>
                     <td class="text-end">
-                        <a href="{% url 'invoices:detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a>
-                        <a href="{% url 'invoices:pdf' inv.pk %}" class="btn btn-sm btn-outline-dark" target="_blank">PDF</a>
+                        <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+                        <a href="{% url 'invoices:invoice_pdf' inv.pk %}" class="btn btn-sm btn-outline-dark" target="_blank">PDF</a>
                     </td>
                 </tr>
                 {% empty %}

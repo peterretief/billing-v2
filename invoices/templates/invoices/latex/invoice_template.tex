@@ -29,9 +29,10 @@
     {\Huge \textbf{ {{ company_name }} }} \par \vspace{0.4cm}
     \begin{tabular}{r@{}}
         {{ profile_address_safe }} \\
-        \textbf{VAT:} {{ vat_number }} \\
-        \textbf{Tax Ref:} {{ tax_number }} \\
-        \textbf{Vendor:} {{ vendor_number }}
+        % Only show VAT/Tax numbers if the user has them
+        {% if vat_number %}\textbf{VAT:} {{ vat_number }} \\{% endif %}
+        {% if tax_number %}\textbf{Tax Ref:} {{ tax_number }} \\{% endif %}
+        {% if vendor_number %}\textbf{Vendor:} {{ vendor_number }}{% endif %}
     \end{tabular}
 \end{flushright}
 
@@ -61,11 +62,18 @@
     \textbf{Description} & \textbf{ {{ label_qty }} } & \textbf{ {{ label_rate }} } & \textbf{Total} \\
     \midrule
     {% for item in items %}
-    {{ item.description }} & {{ item.quantity }} & R {{ item.unit_price }} & R {{ item.total }} \\
+    {{ item.description }} & {{ item.quantity }} & R {{ item.unit_price }} & R {{ item.row_subtotal }} \\
     {% endfor %}
     \midrule
     \multicolumn{3}{r}{Subtotal} & R {{ subtotal }} \\
+    
+    {# Logic to handle Exempt vs VAT invoices #}
+    {% if invoice.tax_mode != 'NONE' %}
     \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & R {{ vat_total }} \\
+    {% else %}
+    \multicolumn{3}{r}{\lightheader{VAT (Exempt)}} & \lightheader{R 0.00} \\
+    {% endif %}
+    
     \midrule
     \multicolumn{3}{r}{\textbf{\Large Total Due}} & \textbf{\Large R {{ grand_total }} } \\
 \end{tabularx}

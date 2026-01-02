@@ -4,7 +4,7 @@
 <div class="container mt-4" style="font-family: 'Calibri', sans-serif;">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Client Billing Overview</h2>
-        <a href="{% url 'clients:create' %}" class="btn btn-primary">+ Add New Client</a>
+        <a href="{% url 'clients:client_create' %}" class="btn btn-primary">+ Add New Client</a>
     </div>
 
     <div class="card shadow-sm border-0">
@@ -32,11 +32,11 @@
                         {% endif %}
                     </td>
                     <td class="text-end">
-                        <a href="{% url 'invoices:create' %}?client_id={{ client.id }}" 
+                        <a href="{% url 'invoices:invoice_create' %}?client_id={{ client.id }}" 
                            class="btn btn-sm btn-outline-success">
                             <i class="bi bi-file-earmark-plus"></i> Bill Client
                         </a>
-                        <a href="{% url 'clients:detail' client.id %}" 
+                        <a href="{% url 'clients:client_detail' client.id %}" 
                            class="btn btn-sm btn-outline-secondary">View History</a>
                     </td>
                 </tr>

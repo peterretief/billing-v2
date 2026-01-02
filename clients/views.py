@@ -18,7 +18,7 @@ class ClientCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse('clients:list')
+        return reverse('clients:client_list')
 
 # Helper for calculation to keep the code DRY (Don't Repeat Yourself)
 def get_total_calculation():

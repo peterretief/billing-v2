@@ -24,22 +24,34 @@ def tex_safe(text):
         '}': r'\}',
         '~': r'\textasciitilde{}',
         '^': r'\textasciicircum{}',
+        '\\': r'\textbackslash{}',
     }
     return "".join(mapping.get(c, c) for c in text)
 
 def generate_invoice_pdf(invoice):
+    """
+    Generates a PDF using xelatex by pulling calculated totals 
+    directly from the Invoice database fields.
+    """
     # Access the profile from the custom User model
     profile = invoice.user.profile
     
-    # 1. Basic Header Context
+    # Ensure totals are accurate before generating (Safety Check)
+    # This prevents the PDF from showing 0 if the save signal hasn't finished
+    from .models import Invoice
+    Invoice.objects.update_totals(invoice)
+    invoice.refresh_from_db()
+
+    # 1. Header & Client Context
     context = {
+        'invoice': invoice, # Passed to handle {% if invoice.tax_mode %}
         'company_name': tex_safe(profile.company_name),
         'vat_number': tex_safe(profile.vat_number),
         'tax_number': tex_safe(profile.tax_number),
         'vendor_number': tex_safe(profile.vendor_number),
         'invoice_number': tex_safe(invoice.number),
-        'date_issued': tex_safe(invoice.date_issued),
-        'due_date': tex_safe(invoice.due_date),
+        'date_issued': invoice.date_issued,
+        'due_date': invoice.due_date,
         'client_name': tex_safe(invoice.client.name),
         'bank_name': tex_safe(profile.bank_name),
         'account_holder': tex_safe(profile.account_holder),
@@ -48,41 +60,31 @@ def generate_invoice_pdf(invoice):
     }
 
     # Billing Mode Setup (Service vs Product)
-    is_service = invoice.billing_type == 'service'
+    is_service = invoice.billing_type == 'SERVICE'
     context['label_qty'] = "Hours" if is_service else "Qty"
     context['label_rate'] = "Rate" if is_service else "Unit Price"
 
-    # Address Handling
+    # Address Handling (Replaces newlines with LaTeX line breaks)
     context['profile_address_safe'] = tex_safe(profile.address).replace('\n', r' \\ ')
     context['client_address_safe'] = tex_safe(invoice.client.address).replace('\n', r' \\ ')
 
-    # 2. Financial Calculations with Tax Exempt Logic
-    subtotal = sum(item.quantity * item.unit_price for item in invoice.items.all())
+    # 2. Financial Context
+    # We pull these directly from the DB fields populated by your Manager
+    context['subtotal'] = f"{invoice.subtotal_amount:,.2f}"
+    context['vat_total'] = f"{invoice.tax_amount:,.2f}"
+    context['grand_total'] = f"{invoice.total_amount:,.2f}"
     
-    # Logic: If tax_exempt is checked on the invoice, rate is 0. 
-    # Otherwise, use the rate from the user profile.
-    if getattr(invoice, 'tax_exempt', False):
-        tax_perc = Decimal('0.00')
-        context['tax_display_label'] = "VAT Exempt"
-    else:
-        tax_perc = profile.tax_rate if profile.tax_rate is not None else Decimal('15.00')
-        context['tax_display_label'] = f"VAT ({tax_perc:.0f}%)"
+    # Get tax rate as a simple integer for the label (e.g., "15")
+    raw_tax_rate = profile.tax_rate if profile.tax_rate is not None else Decimal('15.00')
+    context['tax_rate'] = f"{raw_tax_rate:.0f}"
 
-    vat_total = subtotal * (tax_perc / Decimal('100.0'))
-    grand_total = subtotal + vat_total
-
-    # Formatting Totals for the PDF (Fixed format strings)
-    context['subtotal'] = f"{subtotal:,.2f}"
-    context['vat_total'] = f"{vat_total:,.2f}"
-    context['grand_total'] = f"{grand_total:,.2f}"
-
-    # 3. Handle Items List
+    # 3. Items List
     context['items'] = [
         {
             'description': tex_safe(item.description),
             'quantity': f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
             'unit_price': f"{item.unit_price:,.2f}",
-            'total': f"{(item.quantity * item.unit_price):,.2f}"
+            'row_subtotal': f"{(item.quantity * item.unit_price):,.2f}"
         } for item in invoice.items.all()
     ]
 
@@ -95,6 +97,7 @@ def generate_invoice_pdf(invoice):
             f.write(latex_content)
 
         # Run xelatex
+        # -interaction=nonstopmode prevents the process from hanging on errors
         result = subprocess.run(
             ['xelatex', '-interaction=nonstopmode', '-output-directory', tempdir, tex_file_path],
             capture_output=True,
@@ -107,5 +110,7 @@ def generate_invoice_pdf(invoice):
             with open(pdf_path, 'rb') as f:
                 return f.read()
         else:
-            # If LaTeX fails, this helps you see why in the logs
-            raise Exception(f"LaTeX Error: {result.stdout}")
+            # Logs the LaTeX error output so you can debug formatting issues
+            print("LaTeX Output:", result.stdout)
+            print("LaTeX Error:", result.stderr)
+            raise Exception(f"LaTeX failed to generate PDF. Check logs.")

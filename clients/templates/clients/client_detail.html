@@ -4,7 +4,7 @@
 <div class="container mt-4" style="font-family: 'Calibri', sans-serif;">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'clients:list' %}">Clients</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'clients:client_list' %}">Clients</a></li>
             <li class="breadcrumb-item active">{{ client.name }}</li>
         </ol>
     </nav>
@@ -31,7 +31,7 @@
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Invoice History</h5>
-                    <a href="{% url 'invoices:create' %}?client_id={{ client.id }}" class="btn btn-sm btn-primary">+ New Invoice</a>
+                    <a href="{% url 'invoices:invoice_create' %}?client_id={{ client.id }}" class="btn btn-sm btn-primary">+ New Invoice</a>
                 </div>
                 <div class="card-body">
                     <table class="table table-hover">
@@ -46,7 +46,7 @@
                         <tbody>
                             {% for invoice in client.invoices.all %}
                             <tr>
-                                <td><a href="{% url 'invoices:detail' invoice.id %}">{{ invoice.invoice_number }}</a></td>
+                                <td><a href="{% url 'invoices:invoice_detail' invoice.id %}">{{ invoice.invoice_number }}</a></td>
                                 <td>{{ invoice.date }}</td>
                                 <td>
                                     <span class="badge {% if invoice.status == 'unpaid' %}bg-danger{% else %}bg-success{% endif %}">
