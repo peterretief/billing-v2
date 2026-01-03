@@ -1,13 +1,32 @@
 from django.db import models
 from core.models import TenantModel
 import re
+from django.db.models import Sum, Q, DecimalField
+from django.db.models.functions import Coalesce
+from decimal import Decimal
 
+
+class ClientQuerySet(models.QuerySet):
+    def with_balances(self):
+        """This makes .with_balances() available on the QuerySet"""
+        return self.annotate(
+            unpaid_total=Coalesce(
+                Sum(
+                    'invoices__total_amount', 
+                    filter=Q(invoices__status__in=['DRAFT', 'PENDING', 'OVERDUE'])
+                ),
+                Decimal('0.00'),
+                output_field=DecimalField()
+            )
+        )
 
 class Client(TenantModel):
     """
     Client model inheriting from TenantModel. 
     Automatically includes user, created_at, and updated_at.
-    """
+
+   """
+    objects = ClientQuerySet.as_manager()
     name = models.CharField(max_length=255)
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)

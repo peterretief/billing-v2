@@ -8,6 +8,62 @@ from .models import Invoice
 from .forms import InvoiceForm, InvoiceItemFormSet
 from .utils import generate_invoice_pdf
 
+# invoices/views.py
+from django.shortcuts import redirect, get_object_or_404
+from .models import Invoice
+
+from .utils import email_invoice_to_client # Import the function we built
+
+@login_required
+def resend_invoice(request, pk):
+    # Only allow the owner of the invoice to resend it
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    # We only resend if it's already been 'posted' (PENDING or PAID)
+    # This prevents accidentally sending out DRAFTS
+    if invoice.status != 'DRAFT':
+        success = email_invoice_to_client(invoice)
+        if success:
+            messages.success(request, f"Invoice {invoice.number} has been resent to {invoice.client.email}.")
+        else:
+            messages.error(request, "Failed to resend the email. Check your logs.")
+    else:
+        messages.warning(request, "You cannot send a Draft. Please Post the invoice first.")
+
+    return redirect(request.META.get('HTTP_REFERER', 'invoices:invoice_list'))
+
+
+
+@login_required
+def mark_status(request, pk, new_status):
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    old_status = invoice.status
+    
+    if new_status in [s[0] for s in Invoice.Status.choices]:
+        # 1. Update the status
+        invoice.status = new_status
+        invoice.save(update_fields=['status'])
+        
+        # 2. Trigger the dummy email if transitioning to PENDING
+        if old_status == 'DRAFT' and new_status == 'PENDING':
+            # This calls your generate_invoice_pdf logic internally
+            email_invoice_to_client(invoice)
+            messages.success(request, "Invoice posted! Check your terminal for the email output.")
+        else:
+            messages.success(request, f"Status updated to {new_status}.")
+            
+    return redirect(request.META.get('HTTP_REFERER', 'invoices:invoice_list'))
+
+@login_required
+def mark_invoice_paid(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    invoice.status = 'PAID'
+    invoice.save(update_fields=['status'])
+    
+    # Send them back to wherever they came from (Client Detail or Dashboard)
+    return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
+
+
 @login_required
 def dashboard(request):
     # Stats pulled from the custom Manager

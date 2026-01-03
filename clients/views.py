@@ -1,96 +1,72 @@
-from django.db.models import Sum, F, Q, ExpressionWrapper, DecimalField
-from django.urls import reverse
-from django.views.generic import ListView, DetailView
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import ListView, DetailView
+from django.contrib import messages
+from django.db.models import Sum, Q
+
 from .models import Client
+from .forms import ClientForm
+from invoices.models import Invoice
 
 
-from django.views.generic.edit import CreateView
-from .models import Client
-
-class ClientCreateView(LoginRequiredMixin, CreateView):
-    model = Client
-    fields = ['name', 'email', 'phone', 'address', 'vat_number']
-    template_name = 'clients/client_form.html'
-    
-    def form_valid(self, form):
-        form.instance.user = self.request.user
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('clients:client_list')
-
-# Helper for calculation to keep the code DRY (Don't Repeat Yourself)
-def get_total_calculation():
-    """Returns the logic to multiply qty by price across invoice items."""
-    return ExpressionWrapper(
-        F('invoice__items__quantity') * F('invoice__items__unit_price'),
-        output_field=DecimalField()
-    )
-
-# 1. CLIENT LIST VIEW
-# Shows all clients + their specific outstanding balances
+# --- 1. LIST VIEW (Using our new Manager) ---
 class ClientListView(LoginRequiredMixin, ListView):
     model = Client
     template_name = 'clients/client_list.html'
     context_object_name = 'clients'
 
+    def get_queryset(self):
+        # This uses the smart manager method we wrote earlier!
+        return Client.objects.filter(user=self.request.user).with_balances()
 
-# clients/views.py
+# --- 2. EDIT/ADD VIEW (Combined Function) ---
+@login_required
+def client_edit(request, pk=None):
+    if pk:
+        client = get_object_or_404(Client, pk=pk, user=request.user)
+    else:
+        client = Client(user=request.user)
 
-def get_queryset(self):
-    # Multi-tenancy: Only show clients belonging to the user
-    queryset = Client.objects.filter(user=self.request.user)
-
-    # Annotate: Use 'invoices' (plural) to match your model's relationship field
-    queryset = queryset.annotate(
-        outstanding_balance=Sum(
-            get_total_calculation(),
-            filter=Q(invoices__status='unpaid') # Change 'invoice' to 'invoices'
-        )
-    ).order_by('-outstanding_balance')
+    if request.method == 'POST':
+        form = ClientForm(request.POST, instance=client)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Client '{client.name}' saved.")
+            return redirect('clients:client_list')
+    else:
+        form = ClientForm(instance=client)
     
-    return queryset
+    return render(request, 'clients/client_form.html', {'form': form, 'is_edit': bool(pk)})
 
+# --- 3. STATEMENT VIEW (Ledger Style) ---
+@login_required
+def client_statement(request, pk):
+    client = get_object_or_404(Client, pk=pk, user=request.user)
+    invoices = Invoice.objects.filter(client=client).order_by('-date_issued')
+    
+    # We use the actual stored 'total_amount' instead of calculating qty * price again
+    stats = invoices.aggregate(
+        total_billed=Sum('total_amount'),
+        paid=Sum('total_amount', filter=Q(status='PAID')),
+        # Corrected status filters
+        unpaid=Sum('total_amount', filter=Q(status__in=['PENDING', 'OVERDUE', 'DRAFT']))
+    )
 
-# 2. CLIENT DETAIL VIEW
-# Shows one client's info + their full invoice history + lifetime stats
+    return render(request, 'clients/client_statement.html', {
+        'client': client,
+        'invoices': invoices,
+        'stats': stats,
+    })
+
+   
 class ClientDetailView(LoginRequiredMixin, DetailView):
     model = Client
     template_name = 'clients/client_detail.html'
     context_object_name = 'client'
 
-    def get_queryset(self):
-        # Security: Prevent users from viewing clients they don't own
-        return Client.objects.filter(user=self.request.user)
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        client = self.object
-
-        # Fetch all invoices for this client (newest first)
-        invoices = client.invoices.all().order_by('-date_issued')
-        
-        # Calculate summary totals for the top of the detail page
-        # Note: We use 'items__' here because we are starting from the client's invoices
-        stats = invoices.aggregate(
-            total_lifetime=Sum(
-                ExpressionWrapper(
-                    F('items__quantity') * F('items__unit_price'),
-                    output_field=DecimalField()
-                )
-            ),
-            total_outstanding=Sum(
-                ExpressionWrapper(
-                    F('items__quantity') * F('items__unit_price'),
-                    output_field=DecimalField()
-                ),
-                filter=Q(status='unpaid')
-            )
-        )
-
-        context['invoices'] = invoices
-        context['total_lifetime'] = stats['total_lifetime'] or 0
-        context['total_outstanding'] = stats['total_outstanding'] or 0
-        
-        return context
+        # Use the related name from your Invoice model's ForeignKey to Client
+        context['invoices'] = self.object.invoices.all().order_by('-date_issued')
+        return context    

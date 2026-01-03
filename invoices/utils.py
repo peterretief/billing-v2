@@ -7,6 +7,44 @@ from decimal import Decimal
 from django.conf import settings
 from django.template.loader import render_to_string
 
+from django.core.mail import EmailMessage
+from django.utils.timezone import now
+
+def email_invoice_to_client(invoice):
+    """
+    Calls the PDF generator and sends an email to the client.
+    """
+    try:
+        # 1. Generate the PDF bytes using your existing function
+        pdf_bytes = generate_invoice_pdf(invoice)
+        
+        # 2. Build the email
+        subject = f"Invoice {invoice.number} from {invoice.user.profile.company_name}"
+        body = f"Hi {invoice.client.name},\n\nPlease find attached invoice {invoice.number}.\n\nTotal Due: R {invoice.total_amount:,.2f}\nDue Date: {invoice.due_date}\n\nRegards,\n{invoice.user.profile.company_name}"
+        
+        email = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[invoice.client.email],
+        )
+        
+        # 3. Attach the PDF
+        filename = f"Invoice_{invoice.number or 'Draft'}.pdf"
+        email.attach(filename, pdf_bytes, 'application/pdf')
+        
+        email.send()
+        
+        # 4. Optional: Update the 'last_generated' timestamp
+        invoice.last_generated = now()
+        invoice.save(update_fields=['last_generated'])
+        
+        return True
+    except Exception as e:
+        print(f"Email Error: {e}")
+        return False
+
+
 def tex_safe(text):
     """
     Escapes LaTeX special characters so they don't crash the compiler.

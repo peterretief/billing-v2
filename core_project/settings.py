@@ -133,3 +133,11 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 USE_THOUSAND_SEPARATOR = True
+
+# settings.py
+
+# Use this for local development/testing
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# You can leave these blank for now
+DEFAULT_FROM_EMAIL = 'billing@example.com'
