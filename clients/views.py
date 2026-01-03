@@ -39,19 +39,30 @@ def client_edit(request, pk=None):
     
     return render(request, 'clients/client_form.html', {'form': form, 'is_edit': bool(pk)})
 
+
+
+# clients/views.py
+from invoices.utils import format_currency
+
 # --- 3. STATEMENT VIEW (Ledger Style) ---
+
 @login_required
 def client_statement(request, pk):
     client = get_object_or_404(Client, pk=pk, user=request.user)
     invoices = Invoice.objects.filter(client=client).order_by('-date_issued')
     
-    # We use the actual stored 'total_amount' instead of calculating qty * price again
-    stats = invoices.aggregate(
+    raw_stats = invoices.aggregate(
         total_billed=Sum('total_amount'),
         paid=Sum('total_amount', filter=Q(status='PAID')),
-        # Corrected status filters
         unpaid=Sum('total_amount', filter=Q(status__in=['PENDING', 'OVERDUE', 'DRAFT']))
     )
+
+    # Clean the decimals using the utility
+    stats = {
+        'total_billed': format_currency(raw_stats['total_billed']),
+        'paid': format_currency(raw_stats['paid']),
+        'unpaid': format_currency(raw_stats['unpaid']),
+    }
 
     return render(request, 'clients/client_statement.html', {
         'client': client,

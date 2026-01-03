@@ -10,6 +10,20 @@ from django.template.loader import render_to_string
 from django.core.mail import EmailMessage
 from django.utils.timezone import now
 
+# invoices/utils.py
+from decimal import Decimal, ROUND_HALF_UP
+
+def format_currency(value):
+    """
+    Consistently rounds any numerical value to 2 decimal places 
+    for display in templates or statements.
+    """
+    if value is None:
+        return Decimal('0.00')
+    # Standardize to 2 decimal places
+    return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
 def email_invoice_to_client(invoice):
     """
     Calls the PDF generator and sends an email to the client.
