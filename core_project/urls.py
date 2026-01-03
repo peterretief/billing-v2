@@ -12,4 +12,6 @@ urlpatterns = [
     path('invoices/', include('invoices.urls')),
     path('clients/', include('clients.urls')),
     path('core/', include('core.urls')),
+    path('timesheets/', include('timesheets.urls')), # Added the 's'
+    
 ]

@@ -4,6 +4,26 @@
 <div class="container mt-4">
     <div class="card shadow-sm">
         <div class="table-responsive">
+
+
+<form action="{% url 'invoices:bulk_post' %}" method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary mb-3">Post Selected Drafts</button>
+    
+    <table class="table">
+        {% for inv in invoices %}
+        <tr>
+            <td>
+                {% if inv.status == 'DRAFT' %}
+                    <input type="checkbox" name="invoice_ids" value="{{ inv.id }}">
+                {% endif %}
+            </td>
+            <td>{{ inv.number|default:"Draft" }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+</form>
+
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>

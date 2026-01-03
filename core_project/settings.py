@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'core',
     'clients',
     'invoices',
+    'timesheets',
     'crispy_forms',
     'crispy_bootstrap5',
     'django.contrib.admin',

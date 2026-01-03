@@ -14,6 +14,29 @@ from .models import Invoice
 
 from .utils import email_invoice_to_client # Import the function we built
 
+# invoices/views.py
+@login_required
+def bulk_post_invoices(request):
+    if request.method == 'POST':
+        invoice_ids = request.POST.getlist('invoice_ids')
+        invoices = Invoice.objects.filter(
+            id__in=invoice_ids, 
+            user=request.user, 
+            status='DRAFT'
+        )
+        
+        count = 0
+        for inv in invoices:
+            inv.status = 'PENDING'
+            inv.save()
+            # This triggers your xelatex PDF and dummy email
+            email_invoice_to_client(inv) 
+            count += 1
+            
+        messages.success(request, f"Successfully posted and emailed {count} invoices.")
+    return redirect('invoices:invoice_list')
+
+
 @login_required
 def resend_invoice(request, pk):
     # Only allow the owner of the invoice to resend it
@@ -31,7 +54,6 @@ def resend_invoice(request, pk):
         messages.warning(request, "You cannot send a Draft. Please Post the invoice first.")
 
     return redirect(request.META.get('HTTP_REFERER', 'invoices:invoice_list'))
-
 
 
 @login_required

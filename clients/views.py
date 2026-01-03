@@ -71,13 +71,18 @@ def client_statement(request, pk):
     })
 
    
+
+from timesheets.forms import TimesheetEntryForm
+
 class ClientDetailView(LoginRequiredMixin, DetailView):
     model = Client
     template_name = 'clients/client_detail.html'
-    context_object_name = 'client'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Use the related name from your Invoice model's ForeignKey to Client
-        context['invoices'] = self.object.invoices.all().order_by('-date_issued')
-        return context    
+        context['invoices'] = self.object.invoices.all()
+        # Add the empty form to the context
+        context['timesheet_form'] = TimesheetEntryForm(initial={'client': self.object})
+        # Add unbilled timesheets to show progress
+        context['unbilled_timesheets'] = self.object.timesheets.filter(is_billed=False)
+        return context

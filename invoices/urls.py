@@ -13,5 +13,5 @@ urlpatterns = [
     path('<int:pk>/mark-paid/', views.mark_invoice_paid, name='mark_paid'),
     path('<int:pk>/status/<str:new_status>/', views.mark_status, name='mark_status'),
     path('<int:pk>/resend/', views.resend_invoice, name='resend_invoice'),
-
+    path('bulk-post/', views.bulk_post_invoices, name='bulk_post'),
 ]
