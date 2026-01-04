@@ -9,6 +9,30 @@ from .models import Client
 from .forms import ClientForm
 from invoices.models import Invoice
 
+# ... (your existing imports) ...
+from timesheets.models import TimesheetEntry
+from timesheets.forms import TimesheetEntryForm
+
+class ClientDetailView(LoginRequiredMixin, DetailView):
+    model = Client
+    template_name = 'clients/client_detail.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        client = self.object
+        
+        # Pulling the related data for the specific client
+        context['invoices'] = client.invoices.all().order_by('-date_issued')
+        context['unbilled_timesheets'] = client.timesheets.filter(is_billed=False)
+        
+        # Pre-fill the form with this client and their default rate
+        context['timesheet_form'] = TimesheetEntryForm(initial={
+            'client': client,
+            'hourly_rate': client.default_hourly_rate  # Using the new field we added
+        })
+        return context
+
+
 
 # --- 1. LIST VIEW (Using our new Manager) ---
 class ClientListView(LoginRequiredMixin, ListView):
@@ -71,18 +95,3 @@ def client_statement(request, pk):
     })
 
    
-
-from timesheets.forms import TimesheetEntryForm
-
-class ClientDetailView(LoginRequiredMixin, DetailView):
-    model = Client
-    template_name = 'clients/client_detail.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['invoices'] = self.object.invoices.all()
-        # Add the empty form to the context
-        context['timesheet_form'] = TimesheetEntryForm(initial={'client': self.object})
-        # Add unbilled timesheets to show progress
-        context['unbilled_timesheets'] = self.object.timesheets.filter(is_billed=False)
-        return context

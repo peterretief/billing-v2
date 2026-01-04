@@ -6,6 +6,10 @@ from .models import Client
 class ClientForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.initial.get('client'):
+            client = self.initial.get('client')
+            self.fields['hourly_rate'].initial = client.default_hourly_rate
+
         self.helper = FormHelper()
         self.helper.layout = Layout(
             Row(
@@ -29,5 +33,3 @@ class ClientForm(forms.ModelForm):
         model = Client
         fields = '__all__'
         exclude = ['user', 'client_code'] # client_code is auto-generated in model.save()
-
-

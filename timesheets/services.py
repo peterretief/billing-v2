@@ -1,0 +1,42 @@
+from decimal import Decimal
+from django.db import transaction
+from invoices.models import Invoice, InvoiceItem
+from .models import TimesheetEntry
+
+def create_invoice_from_timesheets(user, client, timesheet_ids):
+    """
+    Business logic to convert specific timesheets into a single invoice.
+    Returns the created Invoice object.
+    """
+    with transaction.atomic():
+        # 1. Fetch and lock the entries
+        entries = TimesheetEntry.objects.select_for_update().filter(
+            id__in=timesheet_ids,
+            user=user,
+            is_billed=False
+        )
+
+        if not entries.exists():
+            return None
+
+        # 2. Create the Invoice
+        invoice = Invoice.objects.create(
+            user=user,
+            client=client,
+            status='DRAFT'
+        )
+
+        # 3. Create Line Items
+        for entry in entries:
+            InvoiceItem.objects.create(
+                invoice=invoice,
+                description=f"{entry.date}: {entry.description}",
+                quantity=entry.hours,
+                unit_price=entry.hourly_rate
+            )
+            # Link and Mark as billed
+            entry.is_billed = True
+            entry.invoice = invoice
+            entry.save()
+            
+        return invoice

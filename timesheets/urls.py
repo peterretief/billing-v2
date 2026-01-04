@@ -12,5 +12,9 @@ urlpatterns = [
     path('log/', views.log_time, name='log_time'),
     
     # (Optional) Delete or Edit paths
-    path('<int:pk>/delete/', views.delete_entry, name='timesheet_delete'),
+    path('<int:pk>/delete/', views.delete_entry, name='delete_entry'),
+
+    path('generate-invoice-bulk/', views.generate_invoice_bulk, name='generate_invoice_bulk'),
+
+    path('<int:pk>/edit/', views.edit_entry, name='edit_entry'),
 ]

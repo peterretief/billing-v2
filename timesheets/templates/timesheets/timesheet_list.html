@@ -3,49 +3,198 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Work Log / Timesheets</h2>
-        <a href="{% url 'timesheets:log_time' %}" class="btn btn-primary">
+        <div>
+            <h2 class="mb-1">Work Log</h2>
+            <p class="text-muted small">Manage your hours and generate invoices.</p>
+        </div>
+        <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#logTimeModal">
             <i class="bi bi-plus-lg"></i> Log New Hours
-        </a>
+        </button>
     </div>
 
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th class="ps-4">Date</th>
-                        <th>Client</th>
-                        <th>Description</th>
-                        <th>Hours</th>
-                        <th class="text-end pe-4">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for entry in entries %}
-                    <tr>
-                        <td class="ps-4">{{ entry.date }}</td>
-                        <td><strong>{{ entry.client.name }}</strong></td>
-                        <td>{{ entry.description }}</td>
-                        <td>{{ entry.hours }}</td>
-                        <td class="text-end pe-4">
-                            {% if entry.is_billed %}
-                                <span class="badge bg-success">Billed</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">Unbilled</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center py-5 text-muted">
-                            No work logged yet. Start by logging some hours!
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% include "timesheets/includes/log_time_modal.html" %}
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm bg-dark text-white h-100">
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <h6 class="text-uppercase small opacity-75">Total Logged (This Month)</h6>
+                    <h2 class="mb-0 fw-bold">{{ total_hours }} <small class="h6 opacity-75">hrs</small></h2>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-uppercase small mb-0 text-muted">Progress toward R {{ target_amount|floatformat:0 }} Target</h6>
+                        <span class="fw-bold text-primary">R {{ total_value|floatformat:2 }}</span>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated {% if progress_percent > 80 %}bg-success{% else %}bg-info{% endif %}" 
+                             role="progressbar" 
+                             style="width: {{ progress_percent }}%" 
+                             aria-valuenow="{{ progress_percent }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                             {{ progress_percent|floatformat:0 }}%
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <form action="{% url 'timesheets:generate_invoice_bulk' %}" method="post" id="bulkInvoiceForm">
+        {% csrf_token %}
+        
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0 fw-bold text-secondary">Recent Entries</h5>
+                
+                <div id="selectionActions" style="display: none;">
+                    <span class="me-3 text-muted small">
+                        <span id="selectedCount" class="badge bg-primary rounded-pill">0</span> items selected
+                    </span>
+                    <button type="submit" class="btn btn-success btn-sm px-3 shadow-sm">
+                        <i class="bi bi-receipt-cutoff"></i> Create Invoice(s)
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4" width="40"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                                <th>Date</th>
+                                <th>Client</th>
+                                <th>Description</th>
+                                <th>Hours</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Actions</th> 
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in entries %}
+                            <tr class="{% if entry.is_billed %}bg-light opacity-75{% endif %}">
+                                <td class="ps-4">
+                                    {% if not entry.is_billed %}
+                                        <input type="checkbox" name="selected_entries" value="{{ entry.id }}" class="form-check-input entry-checkbox">
+                                    {% else %}
+                                        <i class="bi bi-file-earmark-check-fill text-success"></i>
+                                    {% endif %}
+                                </td>
+                                <td>{{ entry.date|date:"d M Y" }}</td>
+                                <td><strong>{{ entry.client.name }}</strong></td>
+                                <td>{{ entry.description }}</td>
+                                <td>{{ entry.hours }}</td>
+                                <td>
+                                    {% if entry.is_billed %}
+                                        <span class="badge rounded-pill bg-light text-success border border-success small">Invoiced</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-warning text-dark small">Uninvoiced</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="btn-group">
+                                        {% if not entry.is_billed %}
+
+
+<button type="button" 
+        class="btn btn-outline-secondary btn-sm" 
+        data-bs-toggle="modal" 
+        data-bs-target="#logTimeModal"
+        data-is-edit="true"
+        data-id="{{ entry.id }}"
+        data-client="{{ entry.client.id }}"
+        data-date="{{ entry.date|date:'Y-m-d' }}"
+        data-hours="{{ entry.hours }}"
+        data-rate="{{ entry.hourly_rate }}"  {# Add this line #}
+        data-desc="{{ entry.description }}">
+    <i class="bi bi-pencil"></i>
+</button>
+
+
+                                            
+                                            <a href="{% url 'timesheets:delete_entry' entry.id %}" 
+                                               class="btn btn-outline-danger btn-sm" 
+                                               onclick="return confirm('Are you sure?');">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        {% else %}
+                                            <a href="{% url 'invoices:invoice_detail' entry.invoice.id %}" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="7" class="text-center py-5">No entries found.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 1. Bulk Selection Logic
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.entry-checkbox');
+    const actionsDiv = document.getElementById('selectionActions');
+    const countSpan = document.getElementById('selectedCount');
+
+    function updateSelectionUI() {
+        const checkedCount = document.querySelectorAll('.entry-checkbox:checked').length;
+        countSpan.innerText = checkedCount;
+        actionsDiv.style.display = checkedCount > 0 ? 'block' : 'none';
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateSelectionUI();
+        });
+    }
+
+    checkboxes.forEach(cb => cb.addEventListener('change', updateSelectionUI));
+
+    // 2. Modal Data Injection Logic
+    const logModal = document.getElementById('logTimeModal');
+    if (logModal) {
+        logModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget; 
+            const isEdit = button.getAttribute('data-is-edit');
+            const form = logModal.querySelector('form');
+
+            if (isEdit) {
+                const entryId = button.getAttribute('data-id');
+                // Fill fields
+                logModal.querySelector('.modal-title').textContent = 'Edit Work Log';
+                logModal.querySelector('[name="client"]').value = button.getAttribute('data-client');
+                logModal.querySelector('[name="date"]').value = button.getAttribute('data-date');
+                logModal.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
+                logModal.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate'); // Add this line
+                logModal.querySelector('[name="description"]').value = button.getAttribute('data-desc');
+                
+
+                // Set form action to the edit URL
+                form.action = `/timesheets/${entryId}/edit/`;
+            } else {
+                // Reset for new entries
+                logModal.querySelector('.modal-title').textContent = 'Log New Hours';
+                form.reset();
+                form.action = "{% url 'timesheets:log_time' %}";
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

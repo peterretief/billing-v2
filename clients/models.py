@@ -26,6 +26,13 @@ class Client(TenantModel):
     Automatically includes user, created_at, and updated_at.
 
    """
+    payment_terms = models.PositiveIntegerField(default=14, help_text="Days until invoice is due")
+    default_hourly_rate = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0.00,
+        help_text="Standard rate used for new timesheet entries."
+    )
     objects = ClientQuerySet.as_manager()
     name = models.CharField(max_length=255)
     email = models.EmailField()

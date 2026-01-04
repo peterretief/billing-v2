@@ -50,6 +50,16 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
 
+
+<a class="nav-link" href="{% url 'timesheets:timesheet_list' %}">
+    Timesheets 
+    {% if unbilled_count > 0 %}
+        <span class="badge rounded-pill bg-warning text-dark">{{ unbilled_count }}</span>
+    {% endif %}
+</a>
+
+
+
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
