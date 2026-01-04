@@ -43,13 +43,48 @@ def edit_entry(request, pk):
 
 # --- 1. LIST & DASHBOARD ---
 
+
 class TimesheetListView(LoginRequiredMixin, ListView):
     model = TimesheetEntry
     template_name = 'timesheets/timesheet_list.html'
     context_object_name = 'entries'
 
     def get_queryset(self):
-        """Only show work that hasn't been invoiced yet."""
+        # Only show uninvoiced items by default as we discussed
+        return TimesheetEntry.objects.filter(
+            user=self.request.user, 
+            is_billed=False
+        ).order_by('-date')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # ADD THIS LINE: Fetch clients so the Modal can see them
+        context['clients'] = Client.objects.filter(user=self.request.user).order_by('name')
+        
+        # Your existing totals logic...
+        qs = TimesheetEntry.objects.filter(user=self.request.user)
+        totals = qs.aggregate(
+            total_hours=Sum('hours'),
+            total_value=Sum(F('hours') * F('hourly_rate'))
+        )
+        
+        context.update({
+            'total_hours': totals['total_hours'] or 0,
+            'total_value': totals['total_value'] or Decimal('0.00'),
+            'target_amount': Decimal('50000.00'),
+            'timesheet_form': TimesheetEntryForm(),
+        })
+        return context
+
+
+"""
+class TimesheetListView(LoginRequiredMixin, ListView):
+    model = TimesheetEntry
+    template_name = 'timesheets/timesheet_list.html'
+    context_object_name = 'entries'
+
+    def get_queryset(self):
         return TimesheetEntry.objects.filter(
             user=self.request.user, 
             is_billed=False  # This hides the 'Invoiced' items
@@ -76,6 +111,8 @@ class TimesheetListView(LoginRequiredMixin, ListView):
             'timesheet_form': TimesheetEntryForm(),
         })
         return context
+"""
+
 
 # --- 2. LOGGING & DELETION ---
 
@@ -86,9 +123,18 @@ def log_time(request):
         if form.is_valid():
             entry = form.save(commit=False)
             entry.user = request.user
-            entry.save()
-            messages.success(request, f"Logged {entry.hours} hours for {entry.client.name}.")
+    
+            # Fallback: if user left rate at 0, use the client's default
+        if not entry.hourly_rate or entry.hourly_rate == 0:
+            entry.hourly_rate = entry.client.default_hourly_rate
+        entry.save()
+        messages.success(request, f"Logged {entry.hours} hours for {entry.client.name}.")
+
+
     return redirect(request.META.get('HTTP_REFERER', 'timesheets:timesheet_list'))
+
+
+
 
 @login_required
 def delete_entry(request, pk):
