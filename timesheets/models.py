@@ -11,7 +11,23 @@ def get_unbilled_total(self):
         is_billed=False
     ).aggregate(total=models.Sum(models.F('hours') * models.F('hourly_rate')))['total'] or 0
 
+
+
+class WorkCategory(models.Model):
+    user = models.ForeignKey('core.User', on_delete=models.CASCADE)
+    name = models.CharField(max_length=50) # e.g., "Meeting", "Development"
+    
+    # Example: ["Attendees", "Location"] or empty [] for simple comments
+    metadata_schema = models.JSONField(default=list, blank=True, help_text="List of extra field names")
+
+    def __str__(self):
+        return self.name
+
 class TimesheetEntry(TenantModel):
+    category = models.ForeignKey(WorkCategory, on_delete=models.SET_NULL, null=True, blank=True)
+    description = models.TextField() # This is your standard comment
+    metadata = models.JSONField(default=dict, blank=True) # Stores the actual answers
+
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='timesheets')
     date = models.DateField(default=timezone.now)
     description = models.CharField(max_length=255)
@@ -41,3 +57,5 @@ class TimesheetEntry(TenantModel):
     @property
     def total_value(self):
         return self.hours * self.hourly_rate
+    
+

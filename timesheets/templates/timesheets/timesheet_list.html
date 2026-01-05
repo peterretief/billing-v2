@@ -1,45 +1,42 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="alert alert-info py-2 small">
+    <strong>System Debug:</strong> {{ categories|length }} categories loaded into context.
+</div>
+
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1">Work Log</h2>
-            <p class="text-muted small">Manage your hours and generate invoices.</p>
+            <h2 class="mb-1 fw-bold">Work Log</h2>
+            <p class="text-muted small">Manage your hours and generate professional invoices.</p>
         </div>
-        <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#logTimeModal">
-            <i class="bi bi-plus-lg"></i> Log New Hours
+        <button type="button" class="btn btn-primary shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#logTimeModal">
+            <i class="bi bi-plus-lg me-2"></i>Log New Hours
         </button>
     </div>
 
     {% include "timesheets/includes/log_time_modal.html" %}
 
-    <div class="row mb-4">
+    <div class="row mb-4 g-3">
         <div class="col-md-4">
             <div class="card border-0 shadow-sm bg-dark text-white h-100">
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h6 class="text-uppercase small opacity-75">Total Logged (This Month)</h6>
-                    <h2 class="mb-0 fw-bold">{{ total_hours }} <small class="h6 opacity-75">hrs</small></h2>
+                <div class="card-body d-flex flex-column justify-content-center p-4">
+                    <h6 class="text-uppercase small opacity-75 mb-2">Total Logged (Month)</h6>
+                    <h2 class="mb-0 fw-bold">{{ total_hours|default:"0" }} <small class="h6 opacity-75">hrs</small></h2>
                 </div>
             </div>
         </div>
-        
         <div class="col-md-8">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="text-uppercase small mb-0 text-muted">Progress toward R {{ target_amount|floatformat:0 }} Target</h6>
-                        <span class="fw-bold text-primary">R {{ total_value|floatformat:2 }}</span>
-                    </div>
-                    <div class="progress" style="height: 25px;">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated {% if progress_percent > 80 %}bg-success{% else %}bg-info{% endif %}" 
-                             role="progressbar" 
-                             style="width: {{ progress_percent }}%" 
-                             aria-valuenow="{{ progress_percent }}" 
-                             aria-valuemin="0" 
-                             aria-valuemax="100">
-                             {{ progress_percent|floatformat:0 }}%
-                        </div>
+            <div class="card border-0 shadow-sm h-100 p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-uppercase small mb-0 text-muted fw-bold">Progress toward Target</h6>
+                    <span class="fw-bold text-primary">R {{ total_value|floatformat:2 }} / R {{ target_amount|floatformat:0 }}</span>
+                </div>
+                <div class="progress" style="height: 25px; border-radius: 8px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated {% if progress_percent > 80 %}bg-success{% else %}bg-info{% endif %}" 
+                         style="width: {{ progress_percent }}%">
+                         {{ progress_percent|floatformat:0 }}%
                     </div>
                 </div>
             </div>
@@ -48,94 +45,105 @@
 
     <form action="{% url 'timesheets:generate_invoice_bulk' %}" method="post" id="bulkInvoiceForm">
         {% csrf_token %}
-        
         <div class="card shadow-sm border-0">
-            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
-                <h5 class="mb-0 fw-bold text-secondary">Recent Entries</h5>
-                
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3 px-4">
+                <h5 class="mb-0 fw-bold text-secondary">Recent Work Entries</h5>
                 <div id="selectionActions" style="display: none;">
-                    <span class="me-3 text-muted small">
-                        <span id="selectedCount" class="badge bg-primary rounded-pill">0</span> items selected
-                    </span>
-                    <button type="submit" class="btn btn-success btn-sm px-3 shadow-sm">
-                        <i class="bi bi-receipt-cutoff"></i> Create Invoice(s)
+                    <span id="selectedCount" class="badge bg-primary rounded-pill me-2">0</span>
+                    <button type="submit" class="btn btn-success btn-sm fw-bold px-3">
+                        <i class="bi bi-receipt-cutoff me-1"></i> Create Invoices
                     </button>
                 </div>
             </div>
+
+
+
+
 
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-4" width="40">
-                                    <input type="checkbox" id="selectAll" class="form-check-input">
-                                </th>
+                                <th class="ps-4" width="40"><input type="checkbox" id="selectAll" class="form-check-input"></th>
                                 <th>Date</th>
                                 <th>Client</th>
                                 <th>Description</th>
+                                <th>Category</th>
                                 <th>Hours</th>
-                                <th>Status</th>
                                 <th class="text-end pe-4">Actions</th> 
                             </tr>
                         </thead>
                         <tbody>
                             {% for entry in entries %}
-                            <tr class="{% if entry.is_billed %}bg-light opacity-75{% endif %}">
+                            <tr class="{% if entry.is_billed %}bg-light text-muted{% endif %}">
                                 <td class="ps-4">
                                     {% if not entry.is_billed %}
                                         <input type="checkbox" name="selected_entries" value="{{ entry.id }}" class="form-check-input entry-checkbox">
                                     {% else %}
-                                        <i class="bi bi-file-earmark-check-fill text-success" title="Invoiced"></i>
+                                        <i class="bi bi-check-circle-fill text-success"></i>
                                     {% endif %}
                                 </td>
                                 <td>{{ entry.date|date:"d M Y" }}</td>
                                 <td><strong>{{ entry.client.name }}</strong></td>
-                                <td>{{ entry.description }}</td>
-                                <td>{{ entry.hours }}</td>
                                 <td>
-                                    {% if entry.is_billed %}
-                                        <span class="badge rounded-pill bg-light text-success border border-success small">Invoiced</span>
-                                    {% else %}
-                                        <span class="badge rounded-pill bg-warning text-dark small">Uninvoiced</span>
+                                    {{ entry.description }}
+                                    {% if entry.metadata %}
+                                        <div class="small text-muted mt-1">
+                                            {% for key, val in entry.metadata.items %}
+                                                <span class="me-2"><i class="bi bi-dot"></i> {{ key }}: {{ val }}</span>
+                                            {% endfor %}
+                                        </div>
                                     {% endif %}
                                 </td>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-secondary border small">{{ entry.category.name|default:"General" }}</span>
+                                </td>
+
+
+
+                                  <td>
+    <span class="badge bg-secondary-subtle text-secondary border small">
+        {{ entry.category.name|default:"General" }}
+    </span>
+    {% if entry.metadata %}
+        <div class="mt-1">
+            {% for key, value in entry.metadata.items %}
+                <span class="badge bg-light text-dark fw-normal border-0 ps-0" style="font-size: 0.75rem;">
+                    <i class="bi bi-dot text-primary"></i> <strong>{{ key }}:</strong> {{ value }}
+                </span>
+            {% endfor %}
+        </div>
+    {% endif %}
+</td>
+
+
+
+
+                                <td class="fw-bold">{{ entry.hours }}</td>
                                 <td class="text-end pe-4">
-                                    <div class="btn-group">
-                                        {% if not entry.is_billed %}
-                                            <button type="button" 
-                                                    class="btn btn-outline-secondary btn-sm" 
-                                                    data-bs-toggle="modal" 
-                                                    data-bs-target="#logTimeModal"
-                                                    data-is-edit="true"
-                                                    data-id="{{ entry.id }}"
-                                                    data-client="{{ entry.client.id }}"
-                                                    data-date="{{ entry.date|date:'Y-m-d' }}"
-                                                    data-hours="{{ entry.hours }}"
-                                                    data-rate="{{ entry.hourly_rate }}"
-                                                    data-desc="{{ entry.description }}">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                            
-                                            <a href="{% url 'timesheets:delete_entry' entry.id %}" 
-                                               class="btn btn-outline-danger btn-sm" 
-                                               onclick="return confirm('Are you sure you want to delete this log?');">
-                                                <i class="bi bi-trash"></i>
-                                            </a>
-                                        {% else %}
-                                            <a href="{% url 'invoices:invoice_detail' entry.invoice.id %}" class="btn btn-outline-primary btn-sm">
-                                                <i class="bi bi-eye"></i> View Invoice
-                                            </a>
-                                        {% endif %}
-                                    </div>
+                                    {% if not entry.is_billed %}
+<button type="button" 
+        class="btn btn-sm btn-outline-primary border-0" 
+        data-bs-toggle="modal" 
+        data-bs-target="#logTimeModal"
+        data-is-edit="true" 
+        data-id="{{ entry.id }}"
+        data-client="{{ entry.client.id }}" 
+        data-date="{{ entry.date|date:'Y-m-d' }}"
+        data-hours="{{ entry.hours }}" 
+        data-rate="{{ entry.hourly_rate }}"
+        data-category="{{ entry.category.id|default:'' }}" 
+        data-desc="{{ entry.description }}"
+        data-metadata='{{ entry.metadata|json_script:"meta-data" }}'>
+    <i class="bi bi-pencil"></i>
+</button>
+
+{% endif %}
                                 </td>
                             </tr>
                             {% empty %}
-                            <tr>
-                                <td colspan="7" class="text-center py-5 text-muted">
-                                    No entries found. Click "Log New Hours" to get started.
-                                </td>
-                            </tr>
+                            <tr><td colspan="7" class="text-center py-5 text-muted">No entries found.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -146,103 +154,112 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // 1. BULK SELECTION LOGIC
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.entry-checkbox');
-    const actionsDiv = document.getElementById('selectionActions');
-    const countSpan = document.getElementById('selectedCount');
-
-    function updateSelectionUI() {
-        const checkedCount = document.querySelectorAll('.entry-checkbox:checked').length;
-        countSpan.innerText = checkedCount;
-        actionsDiv.style.display = checkedCount > 0 ? 'block' : 'none';
-    }
-
-    if (selectAll) {
-        selectAll.addEventListener('change', function() {
-            checkboxes.forEach(cb => cb.checked = this.checked);
-            updateSelectionUI();
-        });
-    }
-
-    checkboxes.forEach(cb => cb.addEventListener('change', updateSelectionUI));
-
-    // 2. MODAL DATA INJECTION (LOG VS EDIT)
-    const logModal = document.getElementById('logTimeModal');
-    if (logModal) {
-        logModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget; 
-            const isEdit = button.getAttribute('data-is-edit');
-            const form = logModal.querySelector('form');
-
-            if (isEdit) {
-                const entryId = button.getAttribute('data-id');
-                // Set Header
-                logModal.querySelector('.modal-title').textContent = 'Edit Work Log';
-                
-                // Populate Fields
-                logModal.querySelector('[name="client"]').value = button.getAttribute('data-client');
-                logModal.querySelector('[name="date"]').value = button.getAttribute('data-date');
-                logModal.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
-                logModal.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate');
-                logModal.querySelector('[name="description"]').value = button.getAttribute('data-desc');
-                
-                // Update Form Action to Edit URL
-                form.action = `/timesheets/${entryId}/edit/`;
-            } else {
-                // Reset for New Entry
-                logModal.querySelector('.modal-title').textContent = 'Log New Hours';
-                form.reset();
-                form.action = "{% url 'timesheets:log_time' %}";
-            }
-        });
-    }
-});
 
 
-document.addEventListener('DOMContentLoaded', function() {
-    const logModal = document.getElementById('logTimeModal');
-    const clientSelect = logModal.querySelector('[name="client"]');
-    const rateInput = logModal.querySelector('[name="hourly_rate"]');
+logModal.addEventListener('show.bs.modal', function(event) {
+    const button = event.relatedTarget;
+    const isEdit = button.getAttribute('data-is-edit') === 'true';
+    const form = document.getElementById('logTimeForm');
 
-    // 1. Listen for Client Changes
-    clientSelect.addEventListener('change', function() {
-        // Only auto-fill if we are NOT in edit mode (or if rate is currently 0)
-        // This prevents overwriting a specific rate you've already typed in
-        const selectedOption = this.options[this.selectedIndex];
-        const defaultRate = selectedOption.getAttribute('data-rate');
+    if (isEdit) {
+        // 1. Fill standard fields
+        form.querySelector('[name="client"]').value = button.getAttribute('data-client');
+        form.querySelector('[name="date"]').value = button.getAttribute('data-date');
+        form.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
+        form.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate');
+        form.querySelector('[name="description"]').value = button.getAttribute('data-desc');
         
-        if (defaultRate && (rateInput.value == "" || rateInput.value == "0.00")) {
-            rateInput.value = defaultRate;
-        }
-    });
+        const categoryId = button.getAttribute('data-category');
+        const categorySelect = form.querySelector('[name="category"]');
+        categorySelect.value = categoryId;
 
-    // 2. Existing Modal Data Injection Logic
-    logModal.addEventListener('show.bs.modal', function (event) {
-        const button = event.relatedTarget; 
-        const isEdit = button.getAttribute('data-is-edit');
-        const form = logModal.querySelector('form');
-
-        if (isEdit) {
-            logModal.querySelector('.modal-title').textContent = 'Edit Work Log';
-            clientSelect.value = button.getAttribute('data-client');
-            logModal.querySelector('[name="date"]').value = button.getAttribute('data-date');
-            logModal.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
-            rateInput.value = button.getAttribute('data-rate');
-            logModal.querySelector('[name="description"]').value = button.getAttribute('data-desc');
-            form.action = `/timesheets/${button.getAttribute('data-id')}/edit/`;
-        } else {
-            logModal.querySelector('.modal-title').textContent = 'Log New Hours';
-            form.reset();
-            form.action = "{% url 'timesheets:log_time' %}";
-            // Set default date to today automatically
-            logModal.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
+        // 2. Fetch HTMX fields and then populate them
+        if (categoryId) {
+            // We manually trigger HTMX to load the fields
+            htmx.ajax('GET', `{% url "timesheets:get_category_fields" %}?category=${categoryId}`, {
+                target: '#dynamicFields',
+                swap: 'innerHTML'
+            }).then(() => {
+                // Once loaded, try to parse the metadata and fill inputs
+                try {
+                    const rawMeta = button.getAttribute('data-metadata');
+                    // Extracting the JSON from the script tag or attribute
+                    const metadata = JSON.parse(rawMeta); 
+                    
+                    Object.keys(metadata).forEach(key => {
+                        const input = form.querySelector(`[name="meta_${key}"]`);
+                        if (input) input.value = metadata[key];
+                    });
+                } catch (e) { console.log("No metadata to prepopulate"); }
+            });
         }
-    });
+        
+        form.action = `/timesheets/${button.getAttribute('data-id')}/edit/`;
+    } else {
+        // NEW ENTRY MODE
+        form.reset();
+        form.action = "{% url 'timesheets:log_time' %}";
+        document.getElementById('dynamicFields').innerHTML = '';
+        document.getElementById('dynamicFieldsContainer').style.display = 'none';
+    }
 });
 
 
 
+document.addEventListener('DOMContentLoaded', function() {
+    const logModal = document.getElementById('logTimeModal');
+    const logForm = document.getElementById('logTimeForm');
+    const dynamicFieldsContainer = document.getElementById('dynamicFieldsContainer');
+    const dynamicFields = document.getElementById('dynamicFields');
+
+    // 1. Rate Auto-fill Logic
+    document.body.addEventListener('change', function(e) {
+        if (e.target.id === 'id_client') {
+            const selected = e.target.options[e.target.selectedIndex];
+            const rate = selected.getAttribute('data-rate');
+            const rateInput = document.querySelector('[name="hourly_rate"]');
+            if (rate) {
+                rateInput.value = rate;
+            }
+        }
+    });
+
+    // 2. HTMX Visibility Toggle
+    // This shows the blue box if HTMX returns fields, hides it if not.
+    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+        if (evt.detail.target.id === "dynamicFields") {
+            const hasContent = dynamicFields.innerHTML.trim() !== "";
+            dynamicFieldsContainer.style.display = hasContent ? 'block' : 'none';
+        }
+    });
+
+    // 3. Modal Reset (For New vs Edit)
+    logModal.addEventListener('show.bs.modal', function(event) {
+        const button = event.relatedTarget;
+        const isEdit = button.getAttribute('data-is-edit') === 'true';
+
+        if (!isEdit) {
+            logForm.reset();
+            logForm.action = "{% url 'timesheets:log_time' %}";
+            logModal.querySelector('.modal-title span').textContent = 'Log New Hours';
+            dynamicFieldsContainer.style.display = 'none';
+            dynamicFields.innerHTML = '';
+        } else {
+            // Populate basic edit fields
+            logModal.querySelector('.modal-title span').textContent = 'Edit Work Log';
+            logForm.querySelector('[name="client"]').value = button.getAttribute('data-client');
+            logForm.querySelector('[name="date"]').value = button.getAttribute('data-date');
+            logForm.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
+            logForm.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate');
+            logForm.querySelector('[name="description"]').value = button.getAttribute('data-desc');
+            logForm.querySelector('[name="category"]').value = button.getAttribute('data-category');
+            
+            // Trigger HTMX manually to load metadata for edit mode
+            htmx.trigger("#categorySelect", "change");
+            logForm.action = `/timesheets/${button.getAttribute('data-id')}/edit/`;
+        }
+    });
+});
 </script>
+
 {% endblock %}

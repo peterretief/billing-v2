@@ -13,5 +13,6 @@ urlpatterns = [
     path('clients/', include('clients.urls')),
     path('core/', include('core.urls')),
     path('timesheets/', include('timesheets.urls')), # Added the 's'
+    path('__debug__/', include('debug_toolbar.urls')),
     
 ]

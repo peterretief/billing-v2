@@ -44,6 +44,20 @@ class Client(TenantModel):
 
     client_code = models.CharField(max_length=10, blank=True) 
 
+    weekly_target_hours = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=0.00,
+        help_text="Target hours per week for this client."
+    )
+    monthly_target_hours = models.DecimalField(
+        max_digits=6, 
+        decimal_places=2, 
+        default=0.00,
+        help_text="Target hours per month for this client."
+    )
+
+
     def save(self, *args, **kwargs):
         if not self.client_code:
             # 1. Strip non-alphanumeric characters (e.g., "A&B Corp" -> "ABC")

@@ -17,4 +17,5 @@ urlpatterns = [
     path('generate-invoice-bulk/', views.generate_invoice_bulk, name='generate_invoice_bulk'),
 
     path('<int:pk>/edit/', views.edit_entry, name='edit_entry'),
+    path('ajax/get-category-fields/', views.get_category_fields, name='get_category_fields'),
 ]

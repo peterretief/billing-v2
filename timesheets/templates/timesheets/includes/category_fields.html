@@ -1,0 +1,11 @@
+{% for field in schema %}
+<div class="col-md-6 mb-3">
+    <label class="form-label small mb-1 fw-bold text-secondary text-uppercase">
+        {{ field }}
+    </label>
+    <input type="text" 
+           name="meta_{{ field }}" 
+           class="form-control" 
+           placeholder="Enter {{ field }}...">
+</div>
+{% endfor %}
