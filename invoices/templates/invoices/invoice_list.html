@@ -41,7 +41,28 @@
                         <td>{{ invoice.client.name }}</td>
                         <td>{{ invoice.date_issued }}</td>
                         <td>R {{ invoice.total_amount }}</td>
+                    
                         
+
+<tr>
+    <td>{{ invoice.invoice_number }}</td>
+    <td>{{ invoice.client.name }}</td>
+    <td>R {{ invoice.total_amount }}</td>
+    <td class="text-end">
+        <a href="{% url 'timesheets:invoice_time_report' invoice.id %}" 
+           class="btn btn-sm btn-outline-info me-2" 
+           target="_blank">
+            <i class="bi bi-clock-history me-1"></i> Time Report
+        </a>
+        
+        <a href="{% url 'invoices:invoice_detail' invoice.id %}" class="btn btn-sm btn-primary">
+            View Invoice
+        </a>
+    </td>
+</tr>
+
+
+
                         <td class="text-end">
                             <a href="{% url 'invoices:invoice_pdf' invoice.id %}" class="btn btn-sm btn-primary">PDF</a>
                         </td>

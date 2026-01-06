@@ -18,4 +18,6 @@ urlpatterns = [
 
     path('<int:pk>/edit/', views.edit_entry, name='edit_entry'),
     path('ajax/get-category-fields/', views.get_category_fields, name='get_category_fields'),
+    path('categories/manage/', views.manage_categories, name='manage_categories'),
+    path('reports/invoice/<int:invoice_id>/', views.invoice_time_report, name='invoice_time_report'),
 ]

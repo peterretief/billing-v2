@@ -15,11 +15,79 @@ from django.utils import timezone
 
 # Internal App Imports
 from .models import TimesheetEntry, WorkCategory
-from .forms import TimesheetEntryForm
+from .forms import TimesheetEntryForm,WorkCategoryForm
 from clients.models import Client
 from invoices.models import Invoice, InvoiceItem
 
 # --- 1. LIST & DASHBOARD ---
+
+
+@login_required
+def manage_categories(request):
+    # Fetch all categories belonging to the user
+    categories = WorkCategory.objects.filter(user=request.user).order_by('name')
+    
+    if request.method == 'POST':
+        form = WorkCategoryForm(request.POST)
+        if form.is_valid():
+            category = form.save(commit=False)
+            category.user = request.user
+            category.save()
+            messages.success(request, f"Category '{category.name}' created successfully!")
+            return redirect('timesheets:manage_categories')
+    else:
+        form = WorkCategoryForm()
+
+    return render(request, 'timesheets/manage_categories.html', {
+        'categories': categories,
+        'form': form
+    })
+
+@login_required
+def invoice_time_report(request, invoice_id):
+    # Fetch the invoice
+    invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
+    
+    # Fetch all timesheet entries linked to THIS invoice
+    entries = TimesheetEntry.objects.filter(
+        invoice=invoice, 
+        user=request.user
+    ).select_related('category', 'client').order_by('date')
+
+    # Grouping by category for a cleaner report
+    report_data = defaultdict(list)
+    total_hours = 0
+    for entry in entries:
+        report_data[entry.category.name if entry.category else "Standard"].append(entry)
+        total_hours += entry.hours
+
+    return render(request, 'timesheets/reports/invoice_detail.html', {
+        'invoice': invoice,
+        'report_data': dict(report_data),
+        'total_hours': total_hours,
+        'entries': entries
+    })
+
+
+@login_required
+def manage_categories(request):
+    categories = WorkCategory.objects.filter(user=request.user)
+    if request.method == 'POST':
+        form = WorkCategoryForm(request.POST)
+        if form.is_valid():
+            category = form.save(commit=False)
+            category.user = request.user
+            category.save()
+            messages.success(request, "Category created!")
+            return redirect('timesheets:manage_categories')
+    else:
+        form = WorkCategoryForm()
+    
+    return render(request, 'timesheets/manage_categories.html', {
+        'categories': categories,
+        'form': form
+    })
+
 
 @login_required
 def get_category_fields(request):
@@ -108,17 +176,19 @@ def log_time(request):
             entry = form.save(commit=False)
             entry.user = request.user
             
-            # 1. Fallback for rate if not provided
+            # --- FIX: Capture the Category ID ---
+            category_id = request.POST.get('category')
+            if category_id:
+                entry.category_id = category_id
+            
             if not entry.hourly_rate or entry.hourly_rate == 0:
                 entry.hourly_rate = entry.client.default_hourly_rate
 
-            # 2. Capture HTMX Dynamic Metadata
-            # This loops through all POST data and grabs anything starting with 'meta_'
             meta_data = {}
             for key, value in request.POST.items():
                 if key.startswith('meta_'):
                     field_name = key.replace('meta_', '')
-                    if value.strip():  # Only save if not empty
+                    if value.strip():
                         meta_data[field_name] = value
             
             entry.metadata = meta_data
@@ -126,7 +196,6 @@ def log_time(request):
             messages.success(request, f"Logged {entry.hours}h for {entry.client.name}.")
         else:
             messages.error(request, "Please correct the errors below.")
-            # If form is invalid, we redirect back so the user can see error messages
     
     return redirect('timesheets:timesheet_list')
 
@@ -136,12 +205,15 @@ def log_time(request):
 def edit_entry(request, pk):
     entry = get_object_or_404(TimesheetEntry, pk=pk, user=request.user)
 
-
     if request.method == 'POST':
         form = TimesheetEntryForm(request.POST, instance=entry)
         if form.is_valid():
             entry = form.save(commit=False)
-            
+
+            category_id = request.POST.get('category')
+            if category_id:
+                entry.category_id = category_id
+
             # Re-capture metadata during edit
             meta_data = {}
             for key, value in request.POST.items():
