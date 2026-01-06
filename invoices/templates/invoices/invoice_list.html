@@ -43,6 +43,10 @@
                         <td>R {{ invoice.total_amount }}</td>
                     
                         
+<a href="{% url 'timesheets:export_metadata_pdf' invoice.id %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-file-earmark-pdf me-1"></i> Download Detailed Log (LaTeX)
+</a>
+
 
 <tr>
     <td>{{ invoice.invoice_number }}</td>

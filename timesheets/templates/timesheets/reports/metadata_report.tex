@@ -1,0 +1,45 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{longtable}
+
+\definecolor{primary}{RGB}{40, 40, 40}
+
+\begin{document}
+
+\begin{flushleft}
+    {\huge \textbf{Time Detail Report}} \\
+    \vspace{2mm}
+    \large \textcolor{primary}{Reference Invoice: \#{{ invoice_number }}} \\
+    \large Client: {{ client_name }} \\
+    \large Date Generated: {{ date_generated }}
+\end{flushleft}
+
+\vspace{10mm}
+
+\begin{longtable}{p{2.5cm} p{10cm} r}
+    \toprule
+    \textbf{Date} & \textbf{Work Description \& Metadata} & \textbf{Hours} \\
+    \midrule
+    {% for entry in entries %}
+    {{ entry.date }} & \textbf{{"{{"}} entry.description {{"}}"}} \\
+    & \small 
+    {% for key, val in entry.metadata.items %}
+        \textit{ {{ key }}: {{ val }} } \quad
+    {% endfor %}
+    & {{ entry.hours }}h \\
+    \addlinespace[2mm]
+    {% endfor %}
+    \midrule
+    \textbf{Total} & & \textbf{ {{ total_hours }}h} \\
+    \bottomrule
+\end{longtable}
+
+\vfill
+\begin{center}
+    \footnotesize This report is a detailed breakdown of the hours billed on Invoice \#{{ invoice_number }}.
+\end{center}
+
+\end{document}

@@ -21,6 +21,46 @@ from invoices.models import Invoice, InvoiceItem
 
 # --- 1. LIST & DASHBOARD ---
 
+import subprocess
+import os
+from django.template.loader import render_to_string
+from django.http import HttpResponse
+from django.conf import settings
+
+@login_required
+def export_metadata_pdf(request, invoice_id):
+    invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
+    entries = TimesheetEntry.objects.filter(invoice=invoice).order_by('date')
+    
+    context = {
+        'invoice_number': invoice.invoice_number,
+        'client_name': invoice.client.name,
+        'date_generated': timezone.now().strftime('%d %b %Y'),
+        'entries': entries,
+        'total_hours': sum(e.hours for e in entries),
+    }
+
+    # 1. Render the LaTeX string
+    tex_content = render_to_string('timesheets/reports/metadata_report.tex', context)
+    
+    # 2. Save to temporary file and compile
+    temp_dir = os.path.join(settings.BASE_DIR, 'tmp')
+    if not os.path.exists(temp_dir): os.makedirs(temp_dir)
+    
+    tex_file_path = os.path.join(temp_dir, f'report_{invoice.id}.tex')
+    with open(tex_file_path, 'w') as f:
+        f.write(tex_content)
+
+    # Run pdflatex (ensure pdflatex is installed on your server)
+    subprocess.run(['pdflatex', '-output-directory', temp_dir, tex_file_path])
+
+    # 3. Return the PDF
+    pdf_path = tex_file_path.replace('.tex', '.pdf')
+    with open(pdf_path, 'rb') as f:
+        response = HttpResponse(f.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Work_Log_{invoice.invoice_number}.pdf"'
+        return response
+
 
 @login_required
 def manage_categories(request):
