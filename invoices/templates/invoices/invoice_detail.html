@@ -18,6 +18,37 @@
 </a>
 
 
+<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
+    <i class="bi bi-cash-stack me-1"></i> Record Payment
+</button>
+
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form action="{% url 'invoices:record_payment' invoice.pk %}" method="post" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title">Record Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Amount (R)</label>
+                    <input type="number" name="amount" step="0.01" class="form-control" value="{{ invoice.balance_due }}" max="{{ invoice.balance_due }}">
+                    <div class="form-text">Balance remaining: R {{ invoice.balance_due }}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Reference</label>
+                    <input type="text" name="reference" class="form-control" placeholder="e.g. EFT / Check #">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary">Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
         <div>
             <a href="{% url 'invoices:invoice_edit' invoice.pk %}" class="btn btn-outline-primary me-2">
                 <i class="bi bi-pencil"></i> Edit

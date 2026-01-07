@@ -2,34 +2,6 @@ from django import forms
 from .models import UserProfile
 
 
-class UserProfileForm(forms.ModelForm):
-    class Meta:
-        model = UserProfile
-        fields = [
-            'company_name', 
-            'business_email', # The second optional email
-            'phone', 
-            'logo', 
-            'vat_number', 
-            'tax_number',
-            'vendor_number',
-            'address', 
-            'tax_rate',
-            'bank_name',
-            'account_holder',
-            'account_number',
-            'branch_code',
-        ]
-        widgets = {
-            # Standard Bootstrap classes for all fields
-            'business_email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'billing@yourcompany.com'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control'}),
-            'company_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            # ... apply 'form-control' to your bank widgets as well ...
-        }
-
-
 
 class UserProfileForm(forms.ModelForm):
     class Meta:
@@ -37,6 +9,7 @@ class UserProfileForm(forms.ModelForm):
         fields = [
             'company_name', 
             'business_email', # The second optional email
+            'is_vat_registered',
             'phone', 
             'logo', 
             'vat_number', 

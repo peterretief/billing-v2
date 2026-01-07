@@ -15,4 +15,5 @@ urlpatterns = [
     path('<int:pk>/resend/', views.resend_invoice, name='resend_invoice'),
     path('bulk-post/', views.bulk_post_invoices, name='bulk_post'),
     path('<int:pk>/duplicate/', views.duplicate_invoice, name='invoice_duplicate'),
+    path('<int:pk>/record-payment/', views.record_payment, name='record_payment'),
 ]

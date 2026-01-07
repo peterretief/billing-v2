@@ -320,6 +320,13 @@ def delete_entry(request, pk):
 
 @login_required
 def generate_invoice_bulk(request):
+    # 1. Get the user's business profile settings
+    try:
+        profile = request.user.profile 
+    except AttributeError: # Handles cases where profile isn't linked
+        messages.error(request, "Please set up your Business Profile before generating invoices.")
+        return redirect('core:edit_profile')
+
     if request.method != 'POST':
         return redirect('timesheets:timesheet_list')
 
@@ -329,48 +336,62 @@ def generate_invoice_bulk(request):
         return redirect('timesheets:timesheet_list')
 
     with transaction.atomic():
+        # Select for update prevents other processes from touching these entries during calculation
         entries = TimesheetEntry.objects.select_for_update().filter(
-            id__in=selected_ids, user=request.user, is_billed=False
+            id__in=selected_ids, 
+            user=request.user, 
+            is_billed=False
         ).select_related('client', 'category')
 
         if not entries.exists():
+            messages.info(request, "No unbilled entries found for the selection.")
             return redirect('timesheets:timesheet_list')
 
+        # Group entries by Client
         client_map = defaultdict(list)
         for entry in entries:
             client_map[entry.client].append(entry)
 
         for client, client_entries in client_map.items():
+            # Determine Tax Mode based on Business Profile
+            # We use FULL if registered, otherwise NONE
+            initial_tax_mode = Invoice.TaxMode.FULL if profile.is_vat_registered else Invoice.TaxMode.NONE
+
+            # 2. Create the Invoice Header
             invoice = Invoice.objects.create(
                 user=request.user,
                 client=client,
-                due_date=timezone.now().date() + timedelta(days=client.payment_terms or 14)
+                due_date=timezone.now().date() + timedelta(days=client.payment_terms or 14),
+                tax_mode=initial_tax_mode,
+                status=Invoice.Status.DRAFT
             )
 
-            # AGGREGATE BY: Description + Rate only
-            # Category and Metadata are ignored here to keep the invoice clean
+            # 3. Aggregate Work Logs into Line Items (Desc + Rate)
             line_items = defaultdict(Decimal) 
             for entry in client_entries:
-                # Key is now just the text description and the rate
                 key = (entry.description, entry.hourly_rate)
-                
                 line_items[key] += entry.hours
                 
-                # We still link the entry to the invoice so the 
-                # LaTeX report can find it later!
+                # Link the original entry to the invoice for the detailed LaTeX report
                 entry.is_billed = True
                 entry.invoice = invoice
                 entry.save()
 
+            # 4. Create the Invoice Items
             for (desc, rate), total_h in line_items.items():
                 InvoiceItem.objects.create(
                     invoice=invoice, 
                     description=desc, 
                     quantity=total_h, 
-                    unit_price=rate
+                    unit_price=rate,
+                    is_taxable=profile.is_vat_registered
                 )
 
-        messages.success(request, f"Generated {len(client_map)} invoice(s).")
+            # 5. FINAL STEP: Sync the Snapshots
+            # We must do this AFTER items are created so the math is not zero
+            invoice.sync_totals()
+            invoice.save()
+
+        messages.success(request, f"Generated {len(client_map)} invoice(s) as drafts.")
 
     return redirect('invoices:invoice_list')
-

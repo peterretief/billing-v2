@@ -10,7 +10,7 @@ from .utils import generate_invoice_pdf
 
 # invoices/views.py
 from django.shortcuts import redirect, get_object_or_404
-from .models import Invoice
+from .models import Invoice, Payment
 
 from .utils import email_invoice_to_client # Import the function we built
 
@@ -19,6 +19,25 @@ from django.contrib import messages
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
+
+@login_required
+def record_payment(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    if request.method == 'POST':
+        amount = request.POST.get('amount')
+        Payment.objects.create(
+            invoice=invoice,
+            amount=amount,
+            reference=request.POST.get('reference', '')
+        )
+        # Update status if fully paid
+        if invoice.balance_due <= 0:
+            invoice.status = 'PAID'
+            invoice.save()
+        
+        messages.success(request, f"Payment of R {amount} recorded.")
+    return redirect('invoices:invoice_detail', pk=invoice.pk)
+
 
 @login_required
 def duplicate_invoice(request, pk):

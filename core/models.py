@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -38,7 +39,7 @@ class UserProfile(models.Model):
     """The 'Settings' for each tenant."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     company_name = models.CharField(max_length=255, blank=True)
-
+    is_vat_registered = models.BooleanField(default=False)
     business_email = models.EmailField(blank=True, help_text="Email that appears on invoices")
     phone = models.CharField(max_length=20, blank=True)
     
@@ -46,12 +47,14 @@ class UserProfile(models.Model):
 
 
     address = models.TextField(blank=True)
-    tax_rate = models.DecimalField(
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    vat_rate = models.DecimalField(
         max_digits=5, 
         decimal_places=2, 
         default=15.00, 
-        help_text="Set to 0 for No VAT"
+        help_text="VAT rate for VAT regi"
     )
+
     logo = models.ImageField(upload_to='logos/', blank=True, null=True)
     vat_number = models.CharField(max_length=50, blank=True, verbose_name="VAT Number")
     
