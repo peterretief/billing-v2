@@ -5,57 +5,50 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col-md-8">
+    
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-7">
             <h2 class="fw-bold mb-0">Business Dashboard</h2>
             <p class="text-muted">Overview of your billing and tax liability.</p>
         </div>
-        <div class="col-md-4 text-md-end">
-            <a href="{% url 'invoices:invoice_create' %}" class="btn btn-primary">
+
+
+<a href="{% url 'invoices:generate_vat_report' %}" class="btn btn-outline-dark me-2">
+    <i class="bi bi-lightning-charge"></i> Generate VAT Report
+</a>
+
+        <div class="col-md-5 text-md-end">
+            <a href="{% url 'invoices:test_vat_report' %}" class="btn btn-outline-dark me-2">
+                <i class="bi bi- lightning-charge"></i> Generate VAT Report
+            </a>
+            <a href="{% url 'invoices:invoice_create' %}" class="btn btn-primary shadow-sm">
                 <i class="bi bi-plus-circle me-1"></i> New Invoice
             </a>
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-5">
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 border-start border-primary border-4">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-primary-subtle rounded-circle p-2 me-3">
-                            <i class="bi bi-wallet2 text-primary fs-4"></i>
-                        </div>
-                        <h6 class="card-subtitle text-muted mb-0 fw-bold small text-uppercase">Gross Revenue</h6>
-                    </div>
-                    <h2 class="display-6 fw-bold mb-0">R {{ total_billed|floatformat:2|intcomma }}</h2>
+                    <h6 class="text-muted small fw-bold text-uppercase">Gross Revenue</h6>
+                    <h2 class="fw-bold mb-0">R {{ total_billed|floatformat:2|intcomma }}</h2>
                 </div>
             </div>
         </div>
-
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100 border-start border-info border-4">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-info-subtle rounded-circle p-2 me-3">
-                            <i class="bi bi-percent text-info fs-4"></i>
-                        </div>
-                        <h6 class="card-subtitle text-muted mb-0 fw-bold small text-uppercase">VAT Liability</h6>
-                    </div>
-                    <h2 class="display-6 fw-bold mb-0">R {{ total_tax|floatformat:2|intcomma }}</h2>
+                    <h6 class="text-muted small fw-bold text-uppercase">VAT Liability</h6>
+                    <h2 class="fw-bold mb-0">R {{ total_tax|floatformat:2|intcomma }}</h2>
                 </div>
             </div>
         </div>
-
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 border-bottom border-danger border-4">
+            <div class="card border-0 shadow-sm h-100 border-start border-danger border-4">
                 <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-danger-subtle rounded-circle p-2 me-3">
-                            <i class="bi bi-clock-history text-danger fs-4"></i>
-                        </div>
-                        <h6 class="card-subtitle text-muted mb-0 fw-bold small text-uppercase">Outstanding</h6>
-                    </div>
-                    <h2 class="display-6 fw-bold mb-0 text-danger">R {{ total_outstanding|floatformat:2|intcomma }}</h2>
+                    <h6 class="text-muted small fw-bold text-uppercase">Total Outstanding</h6>
+                    <h2 class="fw-bold mb-0 text-danger">R {{ total_outstanding|floatformat:2|intcomma }}</h2>
                 </div>
             </div>
         </div>
@@ -94,9 +87,7 @@
                                 <td class="text-end pe-4 fw-bold">R {{ inv.total_amount|floatformat:2|intcomma }}</td>
                             </tr>
                             {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center py-4 text-muted">No recent invoices found.</td>
-                            </tr>
+                            <tr><td colspan="4" class="text-center py-4 text-muted">No recent invoices.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -105,20 +96,43 @@
         </div>
 
         <div class="col-lg-4">
-            <div class="card border-0 shadow-sm mb-4 bg-dark text-white">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-bottom-0">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-archive me-2"></i>VAT Archives</h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <tbody>
+                            {% for report in vat_reports %}
+                            <tr>
+                                <td class="ps-3 fw-bold">{{ report.year }}-{{ report.month|stringformat:"02d" }}</td>
+                                <td class="text-end pe-3">
+                                    <a href="{% url 'invoices:download_vat_latex' report.pk %}" class="btn btn-sm text-primary">
+                                        <i class="bi bi-download"></i> .tex
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="2" class="text-center py-3 text-muted small">No reports saved.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm bg-dark text-white">
                 <div class="card-body">
-                    <h5 class="fw-bold mb-3">Quick Actions</h5>
+                    <h6 class="fw-bold mb-3">Quick Actions</h6>
                     <div class="d-grid gap-2">
-                        <a href="{% url 'clients:client_list' %}" class="btn btn-outline-light text-start">
+                        <a href="{% url 'clients:client_list' %}" class="btn btn-sm btn-outline-light text-start">
                             <i class="bi bi-people me-2"></i> Manage Clients
                         </a>
-                        <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-outline-light text-start">
+                        <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-sm btn-outline-light text-start">
                             <i class="bi bi-calendar-check me-2"></i> Unbilled Entries
                         </a>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+        </div> </div>
 </div>
 {% endblock %}

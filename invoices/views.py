@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.contrib import messages
 from django.core.paginator import Paginator
 
-from .models import Invoice, InvoiceItem
+from .models import Invoice, InvoiceItem, VATReport
 from .forms import InvoiceForm, InvoiceItemFormSet
 from .utils import generate_invoice_pdf
 
@@ -171,9 +171,12 @@ def mark_invoice_paid(request, pk):
 from django.db.models import Sum
 from .models import Invoice
 
+
+
 @login_required
 def dashboard(request):
     invoices = Invoice.objects.filter(user=request.user)
+    vat_reports = VATReport.objects.filter(user=request.user).order_by('-year', '-month')
     
     # 1. Sum up the physical columns we have on the Invoice model
     stats = invoices.aggregate(
@@ -193,6 +196,7 @@ def dashboard(request):
     outstanding = billed - total_paid
 
     context = {
+        'vat_reports': vat_reports, 
         'total_billed': billed,
         'total_tax': tax,
         'total_outstanding': outstanding,
@@ -300,6 +304,16 @@ from django.template.loader import render_to_string
 from django.db.models import Sum
 from decimal import Decimal
 
+
+# In your export_vat_report view in views.py
+def export_vat_report(request):
+    # ... (the logic we wrote earlier to get invoices and totals) ...
+    
+    latex_content = render_to_string('invoices/reports/vat_report.tex', context)
+    
+    # For testing: just return the raw text to the browser
+    return HttpResponse(latex_content, content_type='text/plain')
+
 @login_required
 def export_vat_report(request):
     # Default to current month if not specified
@@ -333,6 +347,19 @@ def export_vat_report(request):
     # Render LaTeX
     latex_content = render_to_string('invoices/reports/vat_report.tex', context)
     
+
+# In your view
+    report, created = VATReport.objects.update_or_create(
+    user=request.user,  # TenantModel logic
+    month=month,
+    year=year,
+    defaults={
+        'latex_source': latex_content,
+        'net_total': totals['net'] or 0,
+        'vat_total': totals['vat'] or 0,
+    }
+)
+
     # Save as text file for audit trail
     file_path = os.path.join(settings.MEDIA_ROOT, f'vat_report_{year}_{month}.txt')
     with open(file_path, 'w') as f:
@@ -341,3 +368,68 @@ def export_vat_report(request):
     # Return as PDF (Reuse your existing PDF generation logic here)
     # ... (code to run pdflatex) ...
     return HttpResponse(latex_content, content_type='text/plain') # For now, view the code   
+
+
+from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
+
+@login_required
+def download_vat_latex(request, pk):
+    # Fetch the report ensuring it belongs to the logged-in user (TenantModel logic)
+    report = get_object_or_404(VATReport, pk=pk, user=request.user)
+    
+    filename = f"VAT_Report_{report.year}_{report.month}.tex"
+    response = HttpResponse(report.latex_source, content_type='text/plain')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
+
+
+from django.contrib import messages
+
+@login_required
+def generate_vat_report_action(request):
+    # 1. Determine period (defaulting to current month)
+    now = timezone.now()
+    month = int(request.GET.get('month', now.month))
+    year = int(request.GET.get('year', now.year))
+
+    # 2. Get the data
+    invoices = Invoice.objects.filter(
+        user=request.user, 
+        date_issued__month=month, 
+        date_issued__year=year,
+        tax_mode='FULL'
+    )
+    
+    totals = invoices.aggregate(
+        net=Sum('subtotal_amount'), 
+        vat=Sum('tax_amount')
+    )
+
+    # 3. Render the LaTeX
+    context = {
+        'invoices': invoices,
+        'month_name': now.strftime('%B'),
+        'year': year,
+        'profile': request.user.profile,
+        'net_total': totals['net'] or 0,
+        'vat_total': totals['vat'] or 0,
+    }
+    latex_content = render_to_string('invoices/reports/vat_report.tex', context)
+
+    # 4. Save/Update the record
+    VATReport.objects.update_or_create(
+        user=request.user,
+        month=month,
+        year=year,
+        defaults={
+            'latex_source': latex_content,
+            'net_total': totals['net'] or 0,
+            'vat_total': totals['vat'] or 0,
+        }
+    )
+
+    messages.success(request, f"VAT Report for {month}/{year} generated and archived.")
+    return redirect('invoices:dashboard')

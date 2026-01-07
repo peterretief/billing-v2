@@ -137,3 +137,26 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"R {self.amount} for {self.invoice.number}"  
+    
+
+# invoices/models.py
+from core.models import TenantModel  # Import where your TenantModel lives
+
+class VATReport(TenantModel):
+    month = models.IntegerField()
+    year = models.IntegerField()
+    
+    # Store the full LaTeX source code
+    latex_source = models.TextField()
+    
+    # Financial snapshots
+    net_total = models.DecimalField(max_digits=12, decimal_places=2)
+    vat_total = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        # Since TenantModel provides 'user', we use 'user' here
+        unique_together = ('user', 'month', 'year')
+        ordering = ['-year', '-month']
+
+    def __str__(self):
+        return f"VAT Report {self.year}-{self.month:02d} ({self.user.username})"
