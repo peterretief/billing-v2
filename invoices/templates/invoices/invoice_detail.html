@@ -1,26 +1,173 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Invoice #{{ invoice.number|default:invoice.number }}{% endblock %}
+{% block title %}Invoice #{{ invoice.number|default:invoice.id }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
         <div>
-            <h2 class="mb-0">Invoice #{{ invoice.number|default:invoice.number }}</h2>
-            <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'OVERDUE' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+            <h2 class="mb-0">Invoice #{{ invoice.number|default:invoice.id }}</h2>
+            <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'OVERDUE' %}bg-danger{% else %}bg-warning text-dark{% endif %} px-3 py-2 mt-2">
                 {{ invoice.get_status_display }}
             </span>
         </div>
+        <div class="btn-group">
+            <a href="{% url 'invoices:invoice_duplicate' invoice.pk %}" class="btn btn-outline-dark">
+                <i class="bi bi-files"></i> Duplicate
+            </a>
+            <a href="{% url 'invoices:invoice_edit' invoice.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                <i class="bi bi-cash-stack"></i> Record Payment
+            </button>
+            <div class="btn-group">
+                <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> Documents
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'invoices:invoice_pdf' invoice.pk %}" target="_blank">Download Tax Invoice (PDF)</a></li>
+                    <li><a class="dropdown-item" href="{% url 'timesheets:export_metadata_pdf' invoice.id %}">Download Work Log</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
 
-<a href="{% url 'invoices:invoice_duplicate' invoice.pk %}" class="btn btn-outline-dark me-2">
-    <i class="bi bi-files"></i> Duplicate
-</a>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body border-start border-primary border-4 rounded">
+                    <h6 class="text-muted text-uppercase small fw-bold">Total Invoiced</h6>
+                    <h3 class="mb-0">R {{ invoice.total_amount|floatformat:2|intcomma }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body border-start border-success border-4 rounded">
+                    <h6 class="text-muted text-uppercase small fw-bold">Total Paid</h6>
+                    <h3 class="mb-0 text-success">R {{ invoice.total_paid|floatformat:2|intcomma }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body border-start border-danger border-4 rounded">
+                    <h6 class="text-muted text-uppercase small fw-bold">Balance Outstanding</h6>
+                    <h3 class="mb-0 {% if invoice.balance_due > 0 %}text-danger{% endif %}">R {{ invoice.balance_due|floatformat:2|intcomma }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4 border-0">
+                <div class="card-header bg-white fw-bold border-bottom-0 pt-3">Billed To</div>
+                <div class="card-body">
+                    <h5 class="card-title text-primary">{{ invoice.client.name }}</h5>
+                    <p class="card-text text-muted">{{ invoice.client.address|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-4 border-0">
+                <div class="card-header bg-white fw-bold border-bottom-0 pt-3">Invoice Details</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Date Issued:</span>
+                        <span class="fw-bold">{{ invoice.date_issued|date:"d M Y" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-0">
+                        <span class="text-muted">Due Date:</span>
+                        <span class="fw-bold text-danger">{{ invoice.due_date|date:"d M Y" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
-    <i class="bi bi-cash-stack me-1"></i> Record Payment
-</button>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4 py-3">Description</th>
+                            <th class="text-end py-3">Qty / Hours</th>
+                            <th class="text-end py-3">Unit Price</th>
+                            <th class="text-end pe-4 py-3">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in invoice.items.all %}
+                        <tr class="align-middle">
+                            <td class="ps-4">{{ item.description }}</td>
+                            <td class="text-end">{{ item.quantity }}</td>
+                            <td class="text-end">R {{ item.unit_price|floatformat:2|intcomma }}</td>
+                            <td class="text-end pe-4 fw-bold">R {{ item.row_subtotal|floatformat:2|intcomma }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-group-divider">
+                        <tr>
+                            <th colspan="3" class="text-end pt-3 fw-normal text-muted">Subtotal</th>
+                            <td class="text-end pe-4 pt-3">R {{ invoice.subtotal_amount|floatformat:2|intcomma }}</td>
+                        </tr>
+                        {% if invoice.tax_amount > 0 %}
+                        <tr>
+                            <th colspan="3" class="text-end fw-normal text-muted">VAT ({{ invoice.user.profile.vat_rate }}%)</th>
+                            <td class="text-end pe-4 text-muted">R {{ invoice.tax_amount|floatformat:2|intcomma }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <th colspan="3" class="text-end fw-bold">Total Amount</th>
+                            <td class="text-end pe-4 fw-bold">R {{ invoice.total_amount|floatformat:2|intcomma }}</td>
+                        </tr>
+                        <tr>
+                            <th colspan="3" class="text-end text-success fw-normal small">Less Payments Received</th>
+                            <td class="text-end pe-4 text-success small">- R {{ invoice.total_paid|floatformat:2|intcomma }}</td>
+                        </tr>
+                        <tr class="table-light">
+                            <th colspan="3" class="text-end fs-5 text-primary pe-3">Balance Due</th>
+                            <td class="text-end pe-4 fs-5 text-primary"><strong>R {{ invoice.balance_due|floatformat:2|intcomma }}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 d-print-none">
+        <div class="card-header bg-white fw-bold pt-3 border-bottom-0">Payment History</div>
+        <div class="card-body p-0">
+            <table class="table table-sm mb-0">
+                <thead class="small text-muted">
+                    <tr>
+                        <th class="ps-4">Date</th>
+                        <th>Reference</th>
+                        <th class="text-end pe-4">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in invoice.payments.all %}
+                    <tr class="small">
+                        <td class="ps-4 text-muted">{{ payment.date_paid|date:"d M Y" }}</td>
+                        <td>{{ payment.reference }}</td>
+                        <td class="text-end pe-4 fw-bold">R {{ payment.amount|floatformat:2|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center py-3 text-muted small">No payments recorded yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="paymentModal" tabindex="-1">
     <div class="modal-dialog">
@@ -32,104 +179,20 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label">Amount (R)</label>
+                    <label class="form-label">Amount Received (R)</label>
                     <input type="number" name="amount" step="0.01" class="form-control" value="{{ invoice.balance_due }}" max="{{ invoice.balance_due }}">
-                    <div class="form-text">Balance remaining: R {{ invoice.balance_due }}</div>
+                    <div class="form-text">Balance remaining: <strong>R {{ invoice.balance_due }}</strong></div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Reference</label>
-                    <input type="text" name="reference" class="form-control" placeholder="e.g. EFT / Check #">
+                    <label class="form-label">Reference / Method</label>
+                    <input type="text" name="reference" class="form-control" placeholder="e.g. EFT, Cash, Check #123">
                 </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-link text-decoration-none" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Payment</button>
             </div>
         </form>
-    </div>
-</div>
-
-
-        <div>
-            <a href="{% url 'invoices:invoice_edit' invoice.pk %}" class="btn btn-outline-primary me-2">
-                <i class="bi bi-pencil"></i> Edit
-            </a>
-            <a href="{% url 'invoices:invoice_pdf' invoice.pk %}" class="btn btn-primary me-2" target="_blank">
-                <i class="bi bi-file-pdf"></i> Download PDF
-            </a>
-            <a href="{% url 'timesheets:export_metadata_pdf' invoice.id %}" class="btn btn-outline-secondary">
-                <i class="bi bi-clock-history"></i> Work Log
-            </a>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card shadow-sm mb-4 border-0">
-                <div class="card-header bg-light fw-bold">Billed To</div>
-                <div class="card-body">
-                    <h5 class="card-title text-primary">{{ invoice.client.name }}</h5>
-                    <p class="card-text text-muted">{{ invoice.client.address|linebreaks }}</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card shadow-sm mb-4 border-0">
-                <div class="card-header bg-light fw-bold">Invoice Details</div>
-                <div class="card-body">
-                    <div class="row mb-2">
-                        <div class="col-6 text-muted">Date Issued:</div>
-                        <div class="col-6 fw-bold">{{ invoice.date_issued|date:"d M Y" }}</div>
-                    </div>
-                    <div class="row mb-2">
-                        <div class="col-6 text-muted">Due Date:</div>
-                        <div class="col-6 fw-bold text-danger">{{ invoice.due_date|date:"d M Y" }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-4">Description</th>
-                            <th class="text-end">Qty / Hours</th>
-                            <th class="text-end">Unit Price</th>
-                            <th class="text-end pe-4">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in invoice.items.all %}
-                        <tr>
-                            <td class="ps-4">{{ item.description }}</td>
-                            <td class="text-end">{{ item.quantity }}</td>
-                            <td class="text-end">R {{ item.unit_price|floatformat:2|intcomma }}</td>
-
-                            <td class="text-end pe-4 fw-bold">
-                                R {{ item.row_subtotal|floatformat:2|intcomma }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot class="table-group-divider">
-                        <tr>
-                            <th colspan="3" class="text-end pt-3">Subtotal</th>
-                            <td class="text-end pe-4 pt-3">R {{ invoice.subtotal|floatformat:2|intcomma }}</td>
-                        </tr>
-                        <tr class="border-bottom-0">
-                            <th colspan="3" class="text-end pb-4 fs-5 text-primary">Total (inc. VAT)</th>
-                            <td class="text-end pe-4 pb-4 fs-5 text-primary">
-                                <strong>R {{ invoice.total_amount|floatformat:2|intcomma }}</strong>
-                            </td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}

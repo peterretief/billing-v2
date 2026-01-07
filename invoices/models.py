@@ -127,5 +127,13 @@ class Payment(models.Model):
     date_paid = models.DateField(default=timezone.now)
     reference = models.CharField(max_length=100, blank=True)
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Auto-update invoice status if balance is now zero
+        inv = self.invoice
+        if inv.balance_due <= 0:
+            inv.status = 'PAID'
+            inv.save()
+
     def __str__(self):
         return f"R {self.amount} for {self.invoice.number}"  

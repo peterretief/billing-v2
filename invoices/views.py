@@ -20,6 +20,33 @@ from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
 
+from django.db import transaction
+
+@login_required
+def mark_invoice_paid_full(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    # Only process if there is actually money owed
+    if invoice.balance_due > 0:
+        with transaction.atomic():
+            # Create a payment record to balance the books
+            Payment.objects.create(
+                invoice=invoice,
+                amount=invoice.balance_due,
+                reference="Full Payment (Quick Action)",
+                date_paid=timezone.now().date()
+            )
+            
+            # Update status
+            invoice.status = Invoice.Status.PAID
+            invoice.save()
+            
+        messages.success(request, f"Invoice {invoice.number} marked as fully paid.")
+    else:
+        messages.info(request, "This invoice is already settled.")
+        
+    return redirect('invoices:invoice_list')
+
 @login_required
 def record_payment(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
@@ -140,15 +167,38 @@ def mark_invoice_paid(request, pk):
     return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
 
 
+
+from django.db.models import Sum
+from .models import Invoice
+
 @login_required
 def dashboard(request):
-    # Stats pulled from the custom Manager
-    stats = Invoice.objects.get_dashboard_stats(request.user)
-    invoices = Invoice.objects.filter(user=request.user).order_by('-date_issued', '-id')[:10]
-    return render(request, 'invoices/dashboard.html', {
-        'stats': stats, 
-        'invoices': invoices
-    })
+    invoices = Invoice.objects.filter(user=request.user)
+    
+    # 1. Sum up the physical columns we have on the Invoice model
+    stats = invoices.aggregate(
+        billed=Sum('total_amount'),
+        tax=Sum('tax_amount')
+    )
+    
+    # 2. Sum up all payments linked to these invoices
+    # We follow the relationship from Invoice -> Payments
+    total_paid = invoices.aggregate(
+        paid=Sum('payments__amount')
+    )['paid'] or 0
+
+    # 3. Calculate the totals for the context
+    billed = stats['billed'] or 0
+    tax = stats['tax'] or 0
+    outstanding = billed - total_paid
+
+    context = {
+        'total_billed': billed,
+        'total_tax': tax,
+        'total_outstanding': outstanding,
+        'recent_invoices': invoices.order_by('-date_issued')[:5],
+    }
+    return render(request, 'invoices/dashboard.html', context)
 
 @login_required
 def invoice_list(request):
@@ -240,3 +290,54 @@ def generate_invoice_pdf_view(request, pk):
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('invoices:invoice_detail', pk=pk)
+    
+
+import os
+import subprocess
+from django.conf import settings
+from django.utils import timezone
+from django.template.loader import render_to_string
+from django.db.models import Sum
+from decimal import Decimal
+
+@login_required
+def export_vat_report(request):
+    # Default to current month if not specified
+    month = int(request.GET.get('month', timezone.now().month))
+    year = int(request.GET.get('year', timezone.now().year))
+    
+    invoices = Invoice.objects.filter(
+        user=request.user,
+        date_issued__month=month,
+        date_issued__year=year,
+        tax_mode=Invoice.TaxMode.FULL
+    ).select_related('client')
+
+    # Aggregates for the report header
+    totals = invoices.aggregate(
+        net=Sum('subtotal_amount'),
+        vat=Sum('tax_amount'),
+        gross=Sum('total_amount')
+    )
+
+    context = {
+        'invoices': invoices,
+        'month_name': timezone.datetime(year, month, 1).strftime('%B'),
+        'year': year,
+        'profile': request.user.profile,
+        'net_total': totals['net'] or 0,
+        'vat_total': totals['vat'] or 0,
+        'gross_total': totals['gross'] or 0,
+    }
+
+    # Render LaTeX
+    latex_content = render_to_string('invoices/reports/vat_report.tex', context)
+    
+    # Save as text file for audit trail
+    file_path = os.path.join(settings.MEDIA_ROOT, f'vat_report_{year}_{month}.txt')
+    with open(file_path, 'w') as f:
+        f.write(latex_content)
+
+    # Return as PDF (Reuse your existing PDF generation logic here)
+    # ... (code to run pdflatex) ...
+    return HttpResponse(latex_content, content_type='text/plain') # For now, view the code   

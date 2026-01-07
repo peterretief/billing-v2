@@ -1,0 +1,40 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\begin{titlepage}
+    \centering
+    \Huge \textbf{VAT Output Report} \\
+    \large {{ month_name }} {{ year }} \\
+    \vspace{1cm}
+    \normalsize \textbf{Entity:} {{ profile.business_name }} \\
+    \textbf{VAT Number:} {{ profile.tax_number|default:"N/A" }} \\
+\end{titlepage}
+
+\begin{document}
+
+\section*{Summary of VAT Collected}
+\begin{tabular}{ll}
+    Total Net (Excl. VAT): & R {{ net_total }} \\
+    Total VAT: & R {{ vat_total }} \\
+    \textbf{Total Gross:} & \textbf{R {{ gross_total }}} \\
+\end{tabular}
+
+\vspace{1cm}
+
+\section*{Transaction Detail}
+\begin{tabular}{llrrr}
+    \toprule
+    \textbf{Date} & \textbf{Invoice \#} & \textbf{Net} & \textbf{VAT} & \textbf{Total} \\
+    \midrule
+    {% for inv in invoices %}
+    {{ inv.date_issued|date:"Y-m-d" }} & {{ inv.number }} & {{ inv.subtotal_amount }} & {{ inv.tax_amount }} & {{ inv.total_amount }} \\
+    {% endfor %}
+    \midrule
+    \textbf{TOTAL} & & \textbf{{{ net_total }}} & \textbf{{{ vat_total }}} & \textbf{{{ gross_total }}} \\
+    \bottomrule
+\end{tabular}
+
+\end{document}

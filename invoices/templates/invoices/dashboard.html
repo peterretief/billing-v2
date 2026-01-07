@@ -1,86 +1,124 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Dashboard</h1>
-    <a href="{% url 'invoices:invoice_create' %}" class="btn btn-success">
-        <i class="bi bi-plus-lg"></i> Create New Invoice
-    </a>
-</div>
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2 class="fw-bold mb-0">Business Dashboard</h2>
+            <p class="text-muted">Overview of your billing and tax liability.</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <a href="{% url 'invoices:invoice_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i> New Invoice
+            </a>
+        </div>
+    </div>
 
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card bg-primary text-white shadow-sm border-0">
-            <div class="card-body">
-                <h6 class="text-uppercase small fw-bold">Total Revenue</h6>
-                <h2 class="display-6 fw-bold">R {{ stats.total_invoiced|default:"0.00" }}</h2>
-                <p class="mb-0 opacity-75">{{ stats.invoice_count }} Invoices Total</p>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-primary-subtle rounded-circle p-2 me-3">
+                            <i class="bi bi-wallet2 text-primary fs-4"></i>
+                        </div>
+                        <h6 class="card-subtitle text-muted mb-0 fw-bold small text-uppercase">Gross Revenue</h6>
+                    </div>
+                    <h2 class="display-6 fw-bold mb-0">R {{ total_billed|floatformat:2|intcomma }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-info-subtle rounded-circle p-2 me-3">
+                            <i class="bi bi-percent text-info fs-4"></i>
+                        </div>
+                        <h6 class="card-subtitle text-muted mb-0 fw-bold small text-uppercase">VAT Liability</h6>
+                    </div>
+                    <h2 class="display-6 fw-bold mb-0">R {{ total_tax|floatformat:2|intcomma }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100 border-bottom border-danger border-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-danger-subtle rounded-circle p-2 me-3">
+                            <i class="bi bi-clock-history text-danger fs-4"></i>
+                        </div>
+                        <h6 class="card-subtitle text-muted mb-0 fw-bold small text-uppercase">Outstanding</h6>
+                    </div>
+                    <h2 class="display-6 fw-bold mb-0 text-danger">R {{ total_outstanding|floatformat:2|intcomma }}</h2>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-4">
-        <div class="card bg-danger text-white shadow-sm border-0">
-            <div class="card-body">
-                <h6 class="text-uppercase small fw-bold">Total Unpaid</h6>
-                <h2 class="display-6 fw-bold">R {{ stats.unpaid_amount|default:"0.00" }}</h2>
-                <p class="mb-0 opacity-75">Awaiting Payment</p>
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-bottom-0">
+                    <h5 class="mb-0 fw-bold">Recent Invoices</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Invoice #</th>
+                                <th>Client</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in recent_invoices %}
+                            <tr>
+                                <td class="ps-4">
+                                    <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="text-decoration-none fw-bold">
+                                        {{ inv.number|default:inv.id }}
+                                    </a>
+                                </td>
+                                <td>{{ inv.client.name }}</td>
+                                <td>
+                                    <span class="badge {% if inv.status == 'PAID' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                        {{ inv.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4 fw-bold">R {{ inv.total_amount|floatformat:2|intcomma }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted">No recent invoices found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-md-4">
-        <div class="card bg-success text-white shadow-sm border-0">
-            <div class="card-body">
-                <h6 class="text-uppercase small fw-bold">Total Collected</h6>
-                <h2 class="display-6 fw-bold">R {{ stats.paid_amount|default:"0.00" }}</h2>
-                <p class="mb-0 opacity-75">Successfully Settled</p>
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-4 bg-dark text-white">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-3">Quick Actions</h5>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'clients:client_list' %}" class="btn btn-outline-light text-start">
+                            <i class="bi bi-people me-2"></i> Manage Clients
+                        </a>
+                        <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-outline-light text-start">
+                            <i class="bi bi-calendar-check me-2"></i> Unbilled Entries
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
-
-
-<div class="card shadow-sm">
-    <div class="card-header bg-white">
-        <h5 class="mb-0">Recent Invoices</h5>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>Number</th>
-                    <th>Client</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for inv in invoices %}
-                <tr>
-                    <td><strong>#{{ inv.number }}</strong></td>
-                    <td>{{ inv.client.name }}</td>
-                    <td>{{ inv.date_issued|date:"M d, Y" }}</td>
-                    <td>
-                        <span class="badge {% if inv.status == 'paid' %}bg-success{% else %}bg-secondary{% endif %}">
-                            {{ inv.get_status_display }}
-                        </span>
-                    </td>
-                    <td class="text-end">
-                        <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary">View</a>
-                        <a href="{% url 'invoices:invoice_pdf' inv.pk %}" class="btn btn-sm btn-outline-dark" target="_blank">PDF</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="text-center py-4 text-muted">No invoices found. Create your first one!</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
     </div>
 </div>
 {% endblock %}

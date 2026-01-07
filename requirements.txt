@@ -2,8 +2,11 @@ asgiref==3.11.0
 crispy-bootstrap5==2025.6
 Django==6.0
 django-crispy-forms==2.5
+django-debug-toolbar==6.1.0
 django-extensions==4.1
 django-htmx==1.27.0
 phonenumbers==9.0.21
 pillow==12.0.0
+python-dateutil==2.9.0.post0
+six==1.17.0
 sqlparse==0.5.5
