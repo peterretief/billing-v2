@@ -12,6 +12,12 @@
                 {{ invoice.get_status_display }}
             </span>
         </div>
+
+<a href="{% url 'invoices:invoice_duplicate' invoice.pk %}" class="btn btn-outline-dark me-2">
+    <i class="bi bi-files"></i> Duplicate
+</a>
+
+
         <div>
             <a href="{% url 'invoices:invoice_edit' invoice.pk %}" class="btn btn-outline-primary me-2">
                 <i class="bi bi-pencil"></i> Edit

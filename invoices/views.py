@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.contrib import messages
 from django.core.paginator import Paginator
 
-from .models import Invoice
+from .models import Invoice, InvoiceItem
 from .forms import InvoiceForm, InvoiceItemFormSet
 from .utils import generate_invoice_pdf
 
@@ -13,6 +13,41 @@ from django.shortcuts import redirect, get_object_or_404
 from .models import Invoice
 
 from .utils import email_invoice_to_client # Import the function we built
+
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib import messages
+from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta
+
+@login_required
+def duplicate_invoice(request, pk):
+    original_invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    with transaction.atomic():
+        # 1. Create the new Invoice object
+        new_invoice = Invoice.objects.create(
+            user=request.user,
+            client=original_invoice.client,
+            status='DRAFT',  # Always start as draft
+            date_issued=timezone.now().date(),
+            due_date=timezone.now().date() + timedelta(days=14),
+            # Leave invoice_number empty if your model auto-generates it on post
+        )
+        
+        # 2. Duplicate the line items
+        for item in original_invoice.items.all():
+            InvoiceItem.objects.create(
+                invoice=new_invoice,
+                description=item.description,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                is_taxable=item.is_taxable
+            )
+            
+    messages.success(request, f"Invoice duplicated. New Draft: #{new_invoice.id}")
+    return redirect('invoices:invoice_edit', pk=new_invoice.pk)
+
 
 # invoices/views.py
 @login_required
