@@ -19,23 +19,31 @@
 
 \vspace{10mm}
 
-\begin{longtable}{p{2.5cm} p{10cm} r}
-    \toprule
-    \textbf{Date} & \textbf{Work Description \& Metadata} & \textbf{Hours} \\
-    \midrule
-    {% for entry in entries %}
-    {{ entry.date }} & \textbf{{"{{"}} entry.description {{"}}"}} \\
-    & \small 
-    {% for key, val in entry.metadata.items %}
-        \textit{ {{ key }}: {{ val }} } \quad
-    {% endfor %}
-    & {{ entry.hours }}h \\
-    \addlinespace[2mm]
-    {% endfor %}
-    \midrule
-    \textbf{Total} & & \textbf{ {{ total_hours }}h} \\
-    \bottomrule
-\end{longtable}
+{% for category, entries in grouped_data.items %}
+    % This creates the category header
+    \section*{ {{ category|escape }} }
+    \nopagebreak
+    \begin{longtable}{p{2.5cm} p{10cm} r}
+        \toprule
+        \textbf{Date} & \textbf{Work Description \& Metadata} & \textbf{Hours} \\
+        \midrule
+        {% for entry in entries %}
+            {{ entry.date|date:"d M Y" }} & \textbf{ {{ entry.description|escape }} } \\
+            & \small 
+            {% for key, val in entry.metadata.items %}
+                \textit{ {{ key|escape }}: {{ val|escape }} } \quad
+            {% endfor %}
+            & {{ entry.hours }}h \\
+            \addlinespace[2mm]
+        {% endfor %}
+        \bottomrule
+    \end{longtable}
+    \vspace{5mm}
+{% endfor %}
+
+\begin{flushright}
+    \textbf{Grand Total Hours: {{ total_hours }}h}
+\end{flushright}
 
 \vfill
 \begin{center}

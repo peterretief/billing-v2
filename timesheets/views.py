@@ -27,18 +27,29 @@ from django.template.loader import render_to_string
 from django.http import HttpResponse
 from django.conf import settings
 
+
+from collections import defaultdict
+
 @login_required
 def export_metadata_pdf(request, invoice_id):
     invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
-    entries = TimesheetEntry.objects.filter(invoice=invoice).order_by('date')
+    # Fetch entries linked to this invoice
+    entries = TimesheetEntry.objects.filter(invoice=invoice).select_related('category').order_by('date')
     
+    # Group by Category Name
+    grouped_entries = defaultdict(list)
+    for entry in entries:
+        cat_name = entry.category.name if entry.category else "General"
+        grouped_entries[cat_name].append(entry)
+
     context = {
-        'invoice_number': invoice.invoice_number,
+        'invoice_number': invoice.number,
         'client_name': invoice.client.name,
         'date_generated': timezone.now().strftime('%d %b %Y'),
-        'entries': entries,
+        'grouped_data': dict(grouped_entries), # Pass the dictionary
         'total_hours': sum(e.hours for e in entries),
     }
+
 
     # 1. Render the LaTeX string
     tex_content = render_to_string('timesheets/reports/metadata_report.tex', context)
@@ -58,9 +69,8 @@ def export_metadata_pdf(request, invoice_id):
     pdf_path = tex_file_path.replace('.tex', '.pdf')
     with open(pdf_path, 'rb') as f:
         response = HttpResponse(f.read(), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Work_Log_{invoice.invoice_number}.pdf"'
+        response['Content-Disposition'] = f'attachment; filename="Work_Log_{invoice.number}.pdf"'
         return response
-
 
 @login_required
 def manage_categories(request):
@@ -306,6 +316,8 @@ def delete_entry(request, pk):
 
 # --- 3. CONSOLIDATED INVOICE GENERATOR ---
 
+
+
 @login_required
 def generate_invoice_bulk(request):
     if request.method != 'POST':
@@ -335,29 +347,30 @@ def generate_invoice_bulk(request):
                 due_date=timezone.now().date() + timedelta(days=client.payment_terms or 14)
             )
 
-            # WE AGGREGATE BY: Description + Rate + Metadata
-            # This ensures that specific meetings stay detailed
+            # AGGREGATE BY: Description + Rate only
+            # Category and Metadata are ignored here to keep the invoice clean
             line_items = defaultdict(Decimal) 
             for entry in client_entries:
-                # We build a unique key that includes the specific detail
-                detail_str = ""
-                if entry.metadata:
-                    detail_str = "\n" + "\n".join([f"{k}: {v}" for k, v in entry.metadata.items()])
-                
-                full_desc = f"{entry.description}{detail_str}"
-                key = (full_desc, entry.hourly_rate)
+                # Key is now just the text description and the rate
+                key = (entry.description, entry.hourly_rate)
                 
                 line_items[key] += entry.hours
                 
+                # We still link the entry to the invoice so the 
+                # LaTeX report can find it later!
                 entry.is_billed = True
                 entry.invoice = invoice
                 entry.save()
 
             for (desc, rate), total_h in line_items.items():
                 InvoiceItem.objects.create(
-                    invoice=invoice, description=desc, quantity=total_h, unit_price=rate
+                    invoice=invoice, 
+                    description=desc, 
+                    quantity=total_h, 
+                    unit_price=rate
                 )
 
         messages.success(request, f"Generated {len(client_map)} invoice(s).")
 
     return redirect('invoices:invoice_list')
+
