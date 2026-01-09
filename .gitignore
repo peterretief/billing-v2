@@ -13,3 +13,11 @@ staticfiles/
 
 # OS
 .DS_Store
+
+# LaTeX/PDF Temporary files
+/tmp/
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
