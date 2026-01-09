@@ -13,7 +13,7 @@
             </span>
         </div>
         <div class="btn-group">
-            <a href="{% url 'invoices:invoice_duplicate' invoice.pk %}" class="btn btn-outline-dark">
+            <a href="{% url 'invoices:duplicate_invoice' invoice.pk %}" class="btn btn-outline-dark">
                 <i class="bi bi-files"></i> Duplicate
             </a>
             <a href="{% url 'invoices:invoice_edit' invoice.pk %}" class="btn btn-outline-primary">

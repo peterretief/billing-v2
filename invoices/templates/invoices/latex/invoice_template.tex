@@ -6,6 +6,7 @@
 \usepackage{tabularx}   
 \usepackage{xcolor}     
 \usepackage{fontspec}
+\usepackage{tikz} % Added for the PAID stamp
 
 % --- Font Setup ---
 {% verbatim %}
@@ -24,12 +25,24 @@
 
 \begin{document}
 
+% --- PAID WATERMARK STAMP ---
+{% if invoice.status == 'PAID' %}
+\begin{tikzpicture}[remember picture, overlay]
+    \node[rotate=30, scale=6, text opacity=0.2, red] at (current page.center) {
+        \begin{tabular}{|c|}
+            \hline
+            \textbf{PAID} \\
+            \hline
+        \end{tabular}
+    };
+\end{tikzpicture}
+{% endif %}
+
 % 1. HEADER
 \begin{flushright}
     {\Huge \textbf{ {{ company_name }} }} \par \vspace{0.4cm}
     \begin{tabular}{r@{}}
         {{ profile_address_safe }} \\
-        % Only show VAT/Tax numbers if the user has them
         {% if vat_number %}\textbf{VAT:} {{ vat_number }} \\{% endif %}
         {% if tax_number %}\textbf{Tax Ref:} {{ tax_number }} \\{% endif %}
         {% if vendor_number %}\textbf{Vendor:} {{ vendor_number }}{% endif %}
@@ -67,7 +80,6 @@
     \midrule
     \multicolumn{3}{r}{Subtotal} & R {{ subtotal }} \\
     
-    {# Logic to handle Exempt vs VAT invoices #}
     {% if invoice.tax_mode != 'NONE' %}
     \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & R {{ vat_total }} \\
     {% else %}
@@ -75,7 +87,14 @@
     {% endif %}
     
     \midrule
-    \multicolumn{3}{r}{\textbf{\Large Total Due}} & \textbf{\Large R {{ grand_total }} } \\
+    \multicolumn{3}{r}{\textbf{\Large Total Amount}} & \textbf{\Large R {{ grand_total }} } \\
+    
+    {# Show Amount Paid and Balance if a payment has been made #}
+    {% if invoice.total_paid > 0 %}
+    \multicolumn{3}{r}{Amount Paid} & R {{ invoice.total_paid|floatformat:2 }} \\
+    \midrule
+    \multicolumn{3}{r}{\textbf{Balance Due}} & \textbf{R {{ invoice.balance_due|floatformat:2 }} } \\
+    {% endif %}
 \end{tabularx}
 
 \vspace{1.5cm}

@@ -1,9 +1,14 @@
+from email.mime import text
 from django.db import models
 from django.utils import timezone
 from core.models import TenantModel
 from clients.models import Client
 from invoices.models import Invoice
 import json
+
+# timesheets/models.py
+from .managers import TimesheetManager # Import your new file
+  
 
 
 def get_unbilled_total(self):
@@ -46,8 +51,31 @@ class TimesheetEntry(TenantModel):
         related_name='billed_timesheets'
     )
 
+    objects = TimesheetManager() # Attach it here
+
+    class Meta:
+        ordering = ['-date']
+
     # Defined only once
     metadata = models.JSONField(default=dict, blank=True)
+
+
+    @property   
+    def formatted_metadata(self):
+        """
+        Returns a string of metadata for the Timesheet Report or Template.
+        Accessed as: {{ entry.formatted_metadata }}
+        """
+        if not self.metadata:
+            return ""
+    
+        # Create the string
+        text = ", ".join([f"{k}: {v}" for k, v in self.metadata.items() if v])
+    
+        # Safety fix for your LaTeX PDFs:
+        # Escape characters that break LaTeX if they appear in your metadata
+        return text.replace('&', r'\&').replace('$', r'\$').replace('%', r'\%')
+
 
     @property
     def metadata_json(self):

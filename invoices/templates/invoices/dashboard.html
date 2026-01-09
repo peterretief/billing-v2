@@ -3,62 +3,83 @@
 
 {% block title %}Dashboard{% endblock %}
 
+{% block extra_css %}
+<style>
+    .dashboard-card-hover {
+        transition: transform 0.2s, box-shadow 0.2s;
+        text-decoration: none !important;
+    }
+    .dashboard-card-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
+    }
+    .badge-paid { background-color: #d1e7dd; color: #0f5132; }
+    .badge-unpaid { background-color: #fff3cd; color: #856404; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container mt-4">
     
     <div class="row mb-4 align-items-center">
         <div class="col-md-7">
             <h2 class="fw-bold mb-0">Business Dashboard</h2>
-            <p class="text-muted">Overview of your billing and tax liability.</p>
+            <p class="text-muted">Overview of your billing, unbilled work, and tax liability.</p>
         </div>
-
-
-<a href="{% url 'invoices:generate_vat_report' %}" class="btn btn-outline-dark me-2">
-    <i class="bi bi-lightning-charge"></i> Generate VAT Report
-</a>
-
         <div class="col-md-5 text-md-end">
-            <a href="{% url 'invoices:test_vat_report' %}" class="btn btn-outline-dark me-2">
-                <i class="bi bi- lightning-charge"></i> Generate VAT Report
-            </a>
-            <a href="{% url 'invoices:invoice_create' %}" class="btn btn-primary shadow-sm">
-                <i class="bi bi-plus-circle me-1"></i> New Invoice
+            <a href="{% url 'invoices:generate_vat_report' %}" class="btn btn-outline-dark shadow-sm">
+                <i class="bi bi-file-earmark-pdf me-1"></i> Generate VAT Report
             </a>
         </div>
     </div>
 
     <div class="row g-3 mb-5">
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100 border-start border-warning border-4">
+                <div class="card-body">
+                    <h6 class="text-muted small fw-bold text-uppercase">Unbilled (WIP)</h6>
+                    <h2 class="fw-bold mb-0">R {{ unbilled_value|default:"0.00"|floatformat:2|intcomma }}</h2>
+                    <small class="text-muted">Logged but not invoiced</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100 border-start border-primary border-4">
                 <div class="card-body">
                     <h6 class="text-muted small fw-bold text-uppercase">Gross Revenue</h6>
-                    <h2 class="fw-bold mb-0">R {{ total_billed|floatformat:2|intcomma }}</h2>
+                    <h2 class="fw-bold mb-0">R {{ total_billed|default:"0.00"|floatformat:2|intcomma }}</h2>
+                    <small class="text-muted">Total all-time sales</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100 border-start border-info border-4">
                 <div class="card-body">
                     <h6 class="text-muted small fw-bold text-uppercase">VAT Liability</h6>
-                    <h2 class="fw-bold mb-0">R {{ total_tax|floatformat:2|intcomma }}</h2>
+                    <h2 class="fw-bold mb-0">R {{ total_tax|default:"0.00"|floatformat:2|intcomma }}</h2>
+                    <small class="text-muted">Tax due to SARS</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100 border-start border-danger border-4">
-                <div class="card-body">
-                    <h6 class="text-muted small fw-bold text-uppercase">Total Outstanding</h6>
-                    <h2 class="fw-bold mb-0 text-danger">R {{ total_outstanding|floatformat:2|intcomma }}</h2>
+        <div class="col-md-3">
+            <a href="{% url 'invoices:invoice_list' %}?status=UNPAID" class="dashboard-card-hover h-100 d-block">
+                <div class="card border-0 shadow-sm h-100 border-start border-danger border-4">
+                    <div class="card-body">
+                        <h6 class="text-muted small fw-bold text-uppercase">Outstanding</h6>
+                        <h2 class="fw-bold mb-0 text-danger">R {{ total_outstanding|default:"0.00"|floatformat:2|intcomma }}</h2>
+                        <small class="text-primary fw-bold">View & Pay <i class="bi bi-arrow-right"></i></small>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
 
     <div class="row">
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 border-bottom-0">
+                <div class="card-header bg-white py-3 border-bottom-0 d-flex justify-content-between align-items-center">
                     <h5 class="mb-0 fw-bold">Recent Invoices</h5>
+                    <a href="{% url 'invoices:invoice_list' %}" class="btn btn-sm btn-link text-decoration-none">View All</a>
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle table-hover mb-0">
@@ -67,27 +88,73 @@
                                 <th class="ps-4">Invoice #</th>
                                 <th>Client</th>
                                 <th>Status</th>
-                                <th class="text-end pe-4">Total</th>
+                                <th class="text-end pe-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for inv in recent_invoices %}
                             <tr>
                                 <td class="ps-4">
-                                    <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="text-decoration-none fw-bold">
-                                        {{ inv.number|default:inv.id }}
+                                    <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="fw-bold text-dark text-decoration-none">
+                                        #{{ inv.number|default:inv.id }}
                                     </a>
+                                    <div class="small text-muted">R {{ inv.total_amount|floatformat:2|intcomma }}</div>
                                 </td>
                                 <td>{{ inv.client.name }}</td>
                                 <td>
-                                    <span class="badge {% if inv.status == 'PAID' %}bg-success{% else %}bg-warning text-dark{% endif %}">
-                                        {{ inv.get_status_display }}
-                                    </span>
+                                    {% if inv.status == 'PAID' %}
+                                        <span class="badge rounded-pill bg-success">Paid</span>
+                                    {% else %}
+                                        <span class="badge rounded-pill bg-warning text-dark">{{ inv.get_status_display }}</span>
+                                    {% endif %}
                                 </td>
-                                <td class="text-end pe-4 fw-bold">R {{ inv.total_amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end pe-4">
+                                    <div class="btn-group shadow-sm">
+                                        <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-primary" title="View Detail">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% if inv.status != 'PAID' %}
+                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#paymentModal{{ inv.pk }}" title="Record Payment">
+                                            <i class="bi bi-cash-stack"></i>
+                                        </button>
+                                        
+                                        <div class="modal fade" id="paymentModal{{ inv.pk }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <form action="{% url 'invoices:record_payment' inv.pk %}" method="post" class="modal-content bg-dark text-white border border-secondary shadow-lg">
+                                                    {% csrf_token %}
+                                                    <div class="modal-header border-bottom border-secondary">
+                                                        <h5 class="modal-title fw-bold">Record Payment: #{{ inv.number|default:inv.id }}</h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body text-start">
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold">Amount Received (R)</label>
+                                                            <div class="input-group">
+                                                                <span class="input-group-text bg-secondary text-white border-secondary">R</span>
+                                                                <input type="number" name="amount" step="0.01" class="form-control bg-dark text-white border-secondary" 
+                                                                       value="{{ inv.balance_due|stringformat:'.2f' }}" 
+                                                                       max="{{ inv.balance_due }}" required>
+                                                            </div>
+                                                            <div class="form-text text-muted">Full balance due: R {{ inv.balance_due|floatformat:2|intcomma }}</div>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold">Reference / Method</label>
+                                                            <input type="text" name="reference" class="form-control bg-dark text-white border-secondary" placeholder="e.g. EFT, Cash">
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-top border-secondary">
+                                                        <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-success px-4">Save Payment</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="4" class="text-center py-4 text-muted">No recent invoices.</td></tr>
+                            <tr><td colspan="4" class="text-center py-5 text-muted">No recent invoices found.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -96,43 +163,38 @@
         </div>
 
         <div class="col-lg-4">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-white border-bottom-0">
-                    <h6 class="mb-0 fw-bold"><i class="bi bi-archive me-2"></i>VAT Archives</h6>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-sm align-middle mb-0">
-                        <tbody>
-                            {% for report in vat_reports %}
-                            <tr>
-                                <td class="ps-3 fw-bold">{{ report.year }}-{{ report.month|stringformat:"02d" }}</td>
-                                <td class="text-end pe-3">
-                                    <a href="{% url 'invoices:download_vat_latex' report.pk %}" class="btn btn-sm text-primary">
-                                        <i class="bi bi-download"></i> .tex
-                                    </a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr><td colspan="2" class="text-center py-3 text-muted small">No reports saved.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="card border-0 shadow-sm bg-dark text-white">
+            <div class="card border-0 shadow-sm bg-dark text-white mb-4">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-3">Quick Actions</h6>
+                    <h6 class="fw-bold mb-3 text-warning">Workflow Hub</h6>
                     <div class="d-grid gap-2">
-                        <a href="{% url 'clients:client_list' %}" class="btn btn-sm btn-outline-light text-start">
-                            <i class="bi bi-people me-2"></i> Manage Clients
+                        <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-warning btn-sm fw-bold">
+                            <i class="bi bi-clock-history me-2"></i> Unbilled Timesheets
                         </a>
-                        <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-sm btn-outline-light text-start">
-                            <i class="bi bi-calendar-check me-2"></i> Unbilled Entries
+                        <a href="{% url 'clients:client_list' %}" class="btn btn-sm btn-outline-light text-start border-0">
+                            <i class="bi bi-people me-2"></i> Manage Clients
                         </a>
                     </div>
                 </div>
             </div>
-        </div> </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom-0 pt-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-archive me-2 text-primary"></i>VAT Archives</h6>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for report in vat_reports %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                        <span class="small fw-bold">{{ report.year }}-{{ report.month|stringformat:"02d" }}</span>
+                        <a href="{% url 'invoices:download_vat_latex' report.pk %}" class="btn btn-sm btn-link text-primary p-0">
+                            <i class="bi bi-download"></i>
+                        </a>
+                    </div>
+                    {% empty %}
+                    <div class="p-3 text-center text-muted small">No reports yet.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div> 
+    </div>
 </div>
 {% endblock %}

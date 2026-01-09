@@ -3,103 +3,24 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.contrib import messages
 from django.core.paginator import Paginator
-
-from .models import Invoice, InvoiceItem, VATReport
-from .forms import InvoiceForm, InvoiceItemFormSet
-from .utils import generate_invoice_pdf
-
-# invoices/views.py
-from django.shortcuts import redirect, get_object_or_404
-from .models import Invoice, Payment
-
-from .utils import email_invoice_to_client # Import the function we built
-
-from django.shortcuts import get_object_or_404, redirect
-from django.contrib import messages
 from django.db import transaction
 from django.utils import timezone
-from datetime import timedelta
+from django.db.models import Sum
+from decimal import Decimal
 
-from django.db import transaction
+from .models import Invoice, InvoiceItem, VATReport, Payment
+from .forms import InvoiceForm, InvoiceItemFormSet
+from .utils import generate_invoice_pdf, email_invoice_to_client
 
-@login_required
-def mark_invoice_paid_full(request, pk):
-    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    
-    # Only process if there is actually money owed
-    if invoice.balance_due > 0:
-        with transaction.atomic():
-            # Create a payment record to balance the books
-            Payment.objects.create(
-                invoice=invoice,
-                amount=invoice.balance_due,
-                reference="Full Payment (Quick Action)",
-                date_paid=timezone.now().date()
-            )
-            
-            # Update status
-            invoice.status = Invoice.Status.PAID
-            invoice.save()
-            
-        messages.success(request, f"Invoice {invoice.number} marked as fully paid.")
-    else:
-        messages.info(request, "This invoice is already settled.")
-        
-    return redirect('invoices:invoice_list')
+from django.template.loader import render_to_string
 
 @login_required
-def record_payment(request, pk):
-    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+def bulk_post(request):
     if request.method == 'POST':
-        amount = request.POST.get('amount')
-        Payment.objects.create(
-            invoice=invoice,
-            amount=amount,
-            reference=request.POST.get('reference', '')
-        )
-        # Update status if fully paid
-        if invoice.balance_due <= 0:
-            invoice.status = 'PAID'
-            invoice.save()
-        
-        messages.success(request, f"Payment of R {amount} recorded.")
-    return redirect('invoices:invoice_detail', pk=invoice.pk)
-
-
-@login_required
-def duplicate_invoice(request, pk):
-    original_invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    
-    with transaction.atomic():
-        # 1. Create the new Invoice object
-        new_invoice = Invoice.objects.create(
-            user=request.user,
-            client=original_invoice.client,
-            status='DRAFT',  # Always start as draft
-            date_issued=timezone.now().date(),
-            due_date=timezone.now().date() + timedelta(days=14),
-            # Leave invoice_number empty if your model auto-generates it on post
-        )
-        
-        # 2. Duplicate the line items
-        for item in original_invoice.items.all():
-            InvoiceItem.objects.create(
-                invoice=new_invoice,
-                description=item.description,
-                quantity=item.quantity,
-                unit_price=item.unit_price,
-                is_taxable=item.is_taxable
-            )
-            
-    messages.success(request, f"Invoice duplicated. New Draft: #{new_invoice.id}")
-    return redirect('invoices:invoice_edit', pk=new_invoice.pk)
-
-
-# invoices/views.py
-@login_required
-def bulk_post_invoices(request):
-    if request.method == 'POST':
+        # 1. Get the list of IDs from the checkboxes in the template
         invoice_ids = request.POST.getlist('invoice_ids')
+        
+        # 2. Filter: Must belong to Peter (tenant) AND be in DRAFT status
         invoices = Invoice.objects.filter(
             id__in=invoice_ids, 
             user=request.user, 
@@ -107,329 +28,360 @@ def bulk_post_invoices(request):
         )
         
         count = 0
+        from .utils import email_invoice_to_client
+        
         for inv in invoices:
+            # Update status to PENDING (Posted)
             inv.status = 'PENDING'
             inv.save()
-            # This triggers your xelatex PDF and dummy email
-            email_invoice_to_client(inv) 
-            count += 1
             
-        messages.success(request, f"Successfully posted and emailed {count} invoices.")
+            # This is what used to work - it triggers the XeLaTeX PDF generation 
+            # and sends the email to inv.client.email
+            try:
+                email_invoice_to_client(inv)
+                count += 1
+            except Exception as e:
+                messages.error(request, f"Error emailing invoice {inv.number}: {str(e)}")
+        
+        if count > 0:
+            messages.success(request, f"Successfully posted and emailed {count} invoices.")
+        else:
+            messages.warning(request, "No draft invoices were processed. Ensure you selected drafts.")
+
     return redirect('invoices:invoice_list')
 
 
+
+@login_required
+def invoice_create(request):
+    # If coming from the client list, pre-fill the client
+    initial_data = {}
+    client_id = request.GET.get('client_id')
+    if client_id:
+        initial_data['client'] = get_object_or_404(Client, id=client_id, user=request.user)
+
+    if request.method == 'POST':
+        form = InvoiceForm(request.POST)
+        formset = InvoiceItemFormSet(request.POST)
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                invoice = form.save(commit=False)
+                invoice.user = request.user  # Set the tenant
+                invoice.save()
+                
+                formset.instance = invoice
+                formset.save()
+                
+                # Calculate totals immediately
+                Invoice.objects.update_totals(invoice)
+                
+            messages.success(request, "Invoice created successfully.")
+            return redirect('invoices:invoice_detail', pk=invoice.pk)
+    else:
+        form = InvoiceForm(initial=initial_data)
+        formset = InvoiceItemFormSet()
+
+    return render(request, 'invoices/invoice_form.html', {
+        'form': form,
+        'formset': formset,
+        'is_edit': False
+    })
+
+@login_required
+def download_vat_latex(request, pk):
+    """
+    Downloads the raw LaTeX source code for a specific VAT Report.
+    """
+    report = get_object_or_404(VATReport, pk=pk, user=request.user)
+    
+    # Create the text-based response
+    response = HttpResponse(report.latex_source, content_type='text/plain')
+    
+    # Format the filename: VAT_2026_01.tex
+    filename = f"VAT_Report_{report.year}_{report.month:02d}.tex"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    
+    return response
+
 @login_required
 def resend_invoice(request, pk):
-    # Only allow the owner of the invoice to resend it
+    """
+    Manually triggers the email utility for an existing invoice.
+    Useful for reminders or if the client lost the first one.
+    """
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     
-    # We only resend if it's already been 'posted' (PENDING or PAID)
-    # This prevents accidentally sending out DRAFTS
-    if invoice.status != 'DRAFT':
-        success = email_invoice_to_client(invoice)
-        if success:
-            messages.success(request, f"Invoice {invoice.number} has been resent to {invoice.client.email}.")
-        else:
-            messages.error(request, "Failed to resend the email. Check your logs.")
-    else:
-        messages.warning(request, "You cannot send a Draft. Please Post the invoice first.")
+    # Safety Check: Don't send drafts
+    if invoice.status == 'DRAFT':
+        messages.warning(request, "Cannot email a DRAFT invoice. Please mark it as 'Pending/Sent' first.")
+        return redirect('invoices:invoice_detail', pk=pk)
 
-    return redirect(request.META.get('HTTP_REFERER', 'invoices:invoice_list'))
-
-
-@login_required
-def mark_status(request, pk, new_status):
-    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    old_status = invoice.status
-    
-    if new_status in [s[0] for s in Invoice.Status.choices]:
-        # 1. Update the status
-        invoice.status = new_status
-        invoice.save(update_fields=['status'])
-        
-        # 2. Trigger the dummy email if transitioning to PENDING
-        if old_status == 'DRAFT' and new_status == 'PENDING':
-            # This calls your generate_invoice_pdf logic internally
-            email_invoice_to_client(invoice)
-            messages.success(request, "Invoice posted! Check your terminal for the email output.")
-        else:
-            messages.success(request, f"Status updated to {new_status}.")
+    try:
+        from .utils import email_invoice_to_client
+        if email_invoice_to_client(invoice):
+            # Update the last_generated timestamp if you want to track activity
+            invoice.last_generated = timezone.now()
+            invoice.save(update_fields=['last_generated'])
             
-    return redirect(request.META.get('HTTP_REFERER', 'invoices:invoice_list'))
+            messages.success(request, f"Invoice #{invoice.number} has been resent to {invoice.client.email}.")
+        else:
+            messages.error(request, "Failed to send email. Please check your SMTP settings in settings.py.")
+            
+    except Exception as e:
+        messages.error(request, f"Email system error: {str(e)}")
+
+    return redirect(request.META.get('HTTP_REFERER', 'invoices:invoice_detail'))
+
 
 @login_required
-def mark_invoice_paid(request, pk):
+def generate_invoice_pdf_view(request, pk):
+    """
+    Fetches the invoice, ensures it belongs to the user, 
+    and generates/returns the PDF response.
+    """
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    invoice.status = 'PAID'
-    invoice.save(update_fields=['status'])
     
-    # Send them back to wherever they came from (Client Detail or Dashboard)
-    return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
+    try:
+        # 1. Check if we need to regenerate the LaTeX source
+        # (The manager clears latex_content when totals change)
+        if not invoice.latex_content:
+            # This is where your LaTeX utility lives
+            from .utils import generate_invoice_pdf
+            pdf_content = generate_invoice_pdf(invoice)
+        else:
+            # If we already have the PDF content/source, we use it
+            from .utils import generate_invoice_pdf
+            pdf_content = generate_invoice_pdf(invoice)
+
+        # 2. Build the HTTP Response
+        response = HttpResponse(pdf_content, content_type='application/pdf')
+        
+        # 'inline' opens in browser, 'attachment' forces download
+        filename = f"Invoice_{invoice.number or invoice.pk}.pdf"
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        
+        return response
+
+    except Exception as e:
+        messages.error(request, f"Could not generate PDF: {str(e)}")
+        return redirect('invoices:invoice_detail', pk=pk)
 
 
+@login_required
+@transaction.atomic
+def duplicate_invoice(request, pk):
+    """
+    Takes an existing invoice, clones it as a DRAFT, 
+    and copies all its line items.
+    """
+    original = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    # Create the new invoice header
+    new_invoice = Invoice.objects.create(
+        user=request.user,
+        client=original.client,
+        status='DRAFT',
+        tax_mode=original.tax_mode,
+        billing_type=original.billing_type,
+        due_date=timezone.now().date() + timedelta(days=30), # Default to 30 days from now
+        # We don't copy the totals yet; the manager will sync them
+    )
 
-from django.db.models import Sum
-from .models import Invoice
+    # Clone the items
+    for item in original.items.all():
+        InvoiceItem.objects.create(
+            invoice=new_invoice,
+            description=item.description,
+            quantity=item.quantity,
+            unit_price=item.unit_price,
+            is_taxable=item.is_taxable
+        )
+    
+    # Run the manager math to set subtotal/tax/total
+    Invoice.objects.update_totals(new_invoice)
+
+    messages.success(request, f"Invoice duplicated as Draft #{new_invoice.id}.")
+    return redirect('invoices:invoice_edit', pk=new_invoice.pk)
+
+@login_required
+def invoice_detail(request, pk):
+    """View the details of a specific invoice."""
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    # This will include the related 'items' and 'payments' 
+    # because of the related_names in your models.
+    return render(request, 'invoices/invoice_detail.html', {
+        'invoice': invoice,
+    })
+
+
+@login_required
+def invoice_edit(request, pk):
+    """Edit an existing invoice and its line items."""
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    # Safety Check: Don't allow editing if already Sent/Paid
+    if invoice.status != 'DRAFT':
+        messages.warning(request, "Only Draft invoices can be edited. Duplicate this invoice to make changes.")
+        return redirect('invoices:invoice_detail', pk=invoice.pk)
+
+    if request.method == 'POST':
+        form = InvoiceForm(request.POST, instance=invoice)
+        formset = InvoiceItemFormSet(request.POST, instance=invoice)
+        
+        if form.is_valid() and formset.is_valid():
+            with transaction.atomic():
+                form.save()
+                formset.save()
+                # Use your manager to recalculate tax/totals based on new items
+                Invoice.objects.update_totals(invoice)
+            
+            messages.success(request, f"Invoice #{invoice.id} updated successfully.")
+            return redirect('invoices:invoice_detail', pk=invoice.pk)
+    else:
+        form = InvoiceForm(instance=invoice)
+        formset = InvoiceItemFormSet(instance=invoice)
+
+    return render(request, 'invoices/invoice_form.html', {
+        'form': form,
+        'formset': formset,
+        'invoice': invoice,
+        'is_edit': True
+    })
+
+# --- CORE DASHBOARD & LIST VIEWS ---
 
 
 
 @login_required
 def dashboard(request):
+    # Filter by tenant
     invoices = Invoice.objects.filter(user=request.user)
     vat_reports = VATReport.objects.filter(user=request.user).order_by('-year', '-month')
     
-    # 1. Sum up the physical columns we have on the Invoice model
+    # Corrected Math: Use payments__amount because amount_paid field doesn't exist in DB
     stats = invoices.aggregate(
         billed=Sum('total_amount'),
-        tax=Sum('tax_amount')
+        tax=Sum('tax_amount'),
+        paid=Sum('payments__amount')  
     )
     
-    # 2. Sum up all payments linked to these invoices
-    # We follow the relationship from Invoice -> Payments
-    total_paid = invoices.aggregate(
-        paid=Sum('payments__amount')
-    )['paid'] or 0
-
-    # 3. Calculate the totals for the context
-    billed = stats['billed'] or 0
-    tax = stats['tax'] or 0
-    outstanding = billed - total_paid
+    billed = stats['billed'] or Decimal('0.00')
+    tax = stats['tax'] or Decimal('0.00')
+    paid = stats['paid'] or Decimal('0.00')
+    outstanding = billed - paid
 
     context = {
         'vat_reports': vat_reports, 
         'total_billed': billed,
         'total_tax': tax,
         'total_outstanding': outstanding,
-        'recent_invoices': invoices.order_by('-date_issued')[:5],
+        # Corrected: Use date_issued instead of date
+        'recent_invoices': invoices.order_by('-date_issued', '-id')[:5],
     }
     return render(request, 'invoices/dashboard.html', context)
 
 @login_required
 def invoice_list(request):
-    stats = Invoice.objects.get_dashboard_stats(request.user)
+    # Corrected: Use date_issued instead of date
     invoice_queryset = Invoice.objects.filter(user=request.user).order_by('-date_issued', '-id')
     
+    status_filter = request.GET.get('status')
+    if status_filter == 'UNPAID':
+        invoice_queryset = invoice_queryset.exclude(status='PAID')
+
     paginator = Paginator(invoice_queryset, 10) 
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
-    return render(request, 'invoices/invoice_list.html', {
-        'invoices': page_obj,
-        'stats': stats
-    })
+    return render(request, 'invoices/invoice_list.html', {'invoices': page_obj})
+
+# --- INVOICE ACTION VIEWS ---
+
+
 
 @login_required
-def invoice_create(request):
-    client_id = request.GET.get('client_id')
-    initial_data = {'client': client_id} if client_id else {}
-
+def record_payment(request, pk):
     if request.method == 'POST':
-        form = InvoiceForm(request.POST)
-        formset = InvoiceItemFormSet(request.POST)
-        
-        if form.is_valid() and formset.is_valid():
-            invoice = form.save(commit=False)
-            invoice.user = request.user
-            invoice.latex_content = "" # Clear cache
+        invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+        amount = Decimal(request.POST.get('amount', '0'))
+
+        if amount > 0:
+            # 1. Auto-Post Logic
+            if invoice.status == 'DRAFT':
+                invoice.status = 'SENT' # Or 'POSTED' based on your status choices
+                # If you have a method to generate the invoice number on post, call it here
+                if not invoice.number:
+                    invoice.generate_number() 
+                invoice.save()
+            
+            # 2. Record the payment
+            Payment.objects.create(
+                invoice=invoice,
+                amount=amount,
+                reference=request.POST.get('reference', 'Payment received')
+            )
+
+            # 3. Final Status Check
+            # Re-fetch or calculate to see if it's now fully paid
+            if invoice.balance_due <= 0:
+                invoice.status = 'PAID'
+                invoice.save()
+
+            messages.success(request, f"Invoice #{invoice.number} updated and payment recorded.")
+            
+    return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
+
+
+@login_required
+def mark_invoice_paid(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    balance = invoice.balance_due
+    
+    if balance > 0:
+        with transaction.atomic():
+            Payment.objects.create(
+                user=request.user,
+                invoice=invoice,
+                amount=balance,
+                reference="Marked Paid (Full)"
+            )
+            invoice.status = 'PAID'
             invoice.save()
-            
-            formset.instance = invoice
-            formset.save()
-            
-            # Recalculate totals immediately
-            Invoice.objects.update_totals(invoice)
-            
-            messages.success(request, f"Invoice {invoice.number or 'Draft'} created.")
-            return redirect('invoices:invoice_list')
-    else:
-        form = InvoiceForm(initial=initial_data)
-        formset = InvoiceItemFormSet()
+        messages.success(request, f"Invoice #{invoice.id} fully settled.")
+    return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
 
-    return render(request, 'invoices/invoice_form.html', {'form': form, 'formset': formset, 'is_edit': False})
+# ... [Duplicate, PDF, and resend views remain the same, just ensure they use date_issued if needed] ...
 
 @login_required
-def invoice_edit(request, pk):
-    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    
-    if request.method == 'POST':
-        form = InvoiceForm(request.POST, instance=invoice)
-        formset = InvoiceItemFormSet(request.POST, instance=invoice)
-        
-        if form.is_valid() and formset.is_valid():
-            invoice = form.save(commit=False)
-            invoice.latex_content = "" # Clear old PDF source
-            invoice.save()
-            
-            formset.save()
-            
-            # Recalculate totals
-            Invoice.objects.update_totals(invoice)
-            
-            messages.success(request, f"Invoice {invoice.number} updated.")
-            return redirect('invoices:invoice_list')
-    else:
-        form = InvoiceForm(instance=invoice)
-        formset = InvoiceItemFormSet(instance=invoice)
-    
-    return render(request, 'invoices/invoice_form.html', {
-        'form': form, 
-        'formset': formset, 
-        'invoice': invoice, 
-        'is_edit': True
-    })
-
-@login_required
-def invoice_detail(request, pk):
-    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    return render(request, 'invoices/invoice_detail.html', {'invoice': invoice})
-
-@login_required
-def generate_invoice_pdf_view(request, pk):
-    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    try:
-        pdf_content = generate_invoice_pdf(invoice)
-        response = HttpResponse(pdf_content, content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="Invoice_{invoice.number}.pdf"'
-        return response
-    except Exception as e:
-        messages.error(request, f"Error: {str(e)}")
-        return redirect('invoices:invoice_detail', pk=pk)
-    
-
-import os
-import subprocess
-from django.conf import settings
-from django.utils import timezone
-from django.template.loader import render_to_string
-from django.db.models import Sum
-from decimal import Decimal
-
-
-# In your export_vat_report view in views.py
-def export_vat_report(request):
-    # ... (the logic we wrote earlier to get invoices and totals) ...
-    
-    latex_content = render_to_string('invoices/reports/vat_report.tex', context)
-    
-    # For testing: just return the raw text to the browser
-    return HttpResponse(latex_content, content_type='text/plain')
-
-@login_required
-def export_vat_report(request):
-    # Default to current month if not specified
+def generate_vat_report(request):
     month = int(request.GET.get('month', timezone.now().month))
     year = int(request.GET.get('year', timezone.now().year))
     
+    # Corrected: Use date_issued__month and date_issued__year
     invoices = Invoice.objects.filter(
-        user=request.user,
-        date_issued__month=month,
-        date_issued__year=year,
-        tax_mode=Invoice.TaxMode.FULL
-    ).select_related('client')
-
-    # Aggregates for the report header
-    totals = invoices.aggregate(
-        net=Sum('subtotal_amount'),
-        vat=Sum('tax_amount'),
-        gross=Sum('total_amount')
+        user=request.user, 
+        date_issued__month=month, 
+        date_issued__year=year
     )
-
+    totals = invoices.aggregate(net=Sum('subtotal_amount'), vat=Sum('tax_amount'))
+    
     context = {
         'invoices': invoices,
         'month_name': timezone.datetime(year, month, 1).strftime('%B'),
         'year': year,
-        'profile': request.user.profile,
         'net_total': totals['net'] or 0,
         'vat_total': totals['vat'] or 0,
-        'gross_total': totals['gross'] or 0,
     }
-
-    # Render LaTeX
+    
     latex_content = render_to_string('invoices/reports/vat_report.tex', context)
     
-
-# In your view
-    report, created = VATReport.objects.update_or_create(
-    user=request.user,  # TenantModel logic
-    month=month,
-    year=year,
-    defaults={
-        'latex_source': latex_content,
-        'net_total': totals['net'] or 0,
-        'vat_total': totals['vat'] or 0,
-    }
-)
-
-    # Save as text file for audit trail
-    file_path = os.path.join(settings.MEDIA_ROOT, f'vat_report_{year}_{month}.txt')
-    with open(file_path, 'w') as f:
-        f.write(latex_content)
-
-    # Return as PDF (Reuse your existing PDF generation logic here)
-    # ... (code to run pdflatex) ...
-    return HttpResponse(latex_content, content_type='text/plain') # For now, view the code   
-
-
-from django.shortcuts import get_object_or_404
-from django.http import HttpResponse
-
-@login_required
-def download_vat_latex(request, pk):
-    # Fetch the report ensuring it belongs to the logged-in user (TenantModel logic)
-    report = get_object_or_404(VATReport, pk=pk, user=request.user)
-    
-    filename = f"VAT_Report_{report.year}_{report.month}.tex"
-    response = HttpResponse(report.latex_source, content_type='text/plain')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    return response
-
-
-
-from django.contrib import messages
-
-@login_required
-def generate_vat_report_action(request):
-    # 1. Determine period (defaulting to current month)
-    now = timezone.now()
-    month = int(request.GET.get('month', now.month))
-    year = int(request.GET.get('year', now.year))
-
-    # 2. Get the data
-    invoices = Invoice.objects.filter(
-        user=request.user, 
-        date_issued__month=month, 
-        date_issued__year=year,
-        tax_mode='FULL'
-    )
-    
-    totals = invoices.aggregate(
-        net=Sum('subtotal_amount'), 
-        vat=Sum('tax_amount')
-    )
-
-    # 3. Render the LaTeX
-    context = {
-        'invoices': invoices,
-        'month_name': now.strftime('%B'),
-        'year': year,
-        'profile': request.user.profile,
-        'net_total': totals['net'] or 0,
-        'vat_total': totals['vat'] or 0,
-    }
-    latex_content = render_to_string('invoices/reports/vat_report.tex', context)
-
-    # 4. Save/Update the record
     VATReport.objects.update_or_create(
-        user=request.user,
-        month=month,
-        year=year,
+        user=request.user, month=month, year=year,
         defaults={
-            'latex_source': latex_content,
-            'net_total': totals['net'] or 0,
-            'vat_total': totals['vat'] or 0,
+            'latex_source': latex_content, 
+            'net_total': totals['net'] or 0, 
+            'vat_total': totals['vat'] or 0
         }
     )
-
-    messages.success(request, f"VAT Report for {month}/{year} generated and archived.")
+    
+    messages.success(request, f"VAT Report for {month}/{year} generated.")
     return redirect('invoices:dashboard')
