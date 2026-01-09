@@ -2,7 +2,71 @@ from django.db import models
 from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Sum, Q
 
+
+class InvoiceManager__(models.Manager):
+    def get_total_outstanding(self, user):
+        """
+        Calculates the actual debt owed to the tenant.
+        Sum of (Total Invoice) - Sum of (Payments) for all issued invoices.
+        """
+        # 1. Grab invoices that are NOT Drafts, NOT Paid, and NOT Cancelled
+        # This automatically includes 'SENT', 'POSTED', 'OVERDUE', etc.
+        active_invoices = self.filter(user=user).exclude(
+            status__in=['DRAFT', 'PAID', 'CANCELLED']
+        )
+        
+        # 2. Sum up the 'total_amount' on those invoices
+        total_billed = active_invoices.aggregate(
+            res=models.Sum('total_amount')
+        )['res'] or Decimal('0.00')
+        
+        # 3. Import Payment locally to avoid circular imports
+        from .models import Payment 
+        
+        # 4. Sum up all payments linked to those active invoices
+        total_paid = Payment.objects.filter(
+            invoice__in=active_invoices
+        ).aggregate(
+            res=models.Sum('amount')
+        )['res'] or Decimal('0.00')
+        
+        # 5. Return the net difference
+        return total_billed - total_paid
+
+
+
 class InvoiceManager(models.Manager):
+    def get_total_outstanding(self, user):
+        """
+        Calculates the actual debt owed to the tenant.
+        Sum of (Total Invoice) - Sum of (Payments) for all issued invoices.
+        """
+        # 1. Grab invoices that are NOT Drafts, NOT Paid, and NOT Cancelled
+        # This automatically includes 'SENT', 'POSTED', 'OVERDUE', etc.
+        active_invoices = self.filter(user=user).exclude(
+            status__in=['DRAFT', 'PAID', 'CANCELLED']
+        )
+        
+        # 2. Sum up the 'total_amount' on those invoices
+        total_billed = active_invoices.aggregate(
+            res=models.Sum('total_amount')
+        )['res'] or Decimal('0.00')
+        
+        # 3. Import Payment locally to avoid circular imports
+        from .models import Payment 
+        
+        # 4. Sum up all payments linked to those active invoices
+        total_paid = Payment.objects.filter(
+            invoice__in=active_invoices
+        ).aggregate(
+            res=models.Sum('amount')
+        )['res'] or Decimal('0.00')
+        
+        # 5. Return the net difference
+        return total_billed - total_paid
+
+
+
     def update_totals(self, invoice):
         if invoice.status != 'DRAFT':
             return

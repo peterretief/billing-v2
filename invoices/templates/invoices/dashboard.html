@@ -62,16 +62,12 @@
             </div>
         </div>
         <div class="col-md-3">
-            <a href="{% url 'invoices:invoice_list' %}?status=UNPAID" class="dashboard-card-hover h-100 d-block">
                 <div class="card border-0 shadow-sm h-100 border-start border-danger border-4">
                     <div class="card-body">
                         <h6 class="text-muted small fw-bold text-uppercase">Outstanding</h6>
                         <h2 class="fw-bold mb-0 text-danger">R {{ total_outstanding|default:"0.00"|floatformat:2|intcomma }}</h2>
-                        <small class="text-primary fw-bold">View & Pay <i class="bi bi-arrow-right"></i></small>
+                       </div>
                     </div>
-                </div>
-            </a>
-        </div>
     </div>
 
     <div class="row">

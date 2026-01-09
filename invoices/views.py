@@ -268,7 +268,8 @@ def dashboard(request):
     billed = stats['billed'] or Decimal('0.00')
     tax = stats['tax'] or Decimal('0.00')
     paid = stats['paid'] or Decimal('0.00')
-    outstanding = billed - paid
+    #outstanding = billed - paid
+    outstanding = Invoice.objects.get_total_outstanding(request.user)
 
     context = {
         'vat_reports': vat_reports, 
