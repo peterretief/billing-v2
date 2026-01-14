@@ -13,12 +13,6 @@
             </span>
         </div>
         <div class="btn-group">
-            <a href="{% url 'invoices:duplicate_invoice' invoice.pk %}" class="btn btn-outline-dark">
-                <i class="bi bi-files"></i> Duplicate
-            </a>
-            <a href="{% url 'invoices:invoice_edit' invoice.pk %}" class="btn btn-outline-primary">
-                <i class="bi bi-pencil"></i> Edit
-            </a>
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">
                 <i class="bi bi-cash-stack"></i> Record Payment
             </button>

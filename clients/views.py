@@ -13,6 +13,18 @@ from invoices.models import Invoice
 from timesheets.models import TimesheetEntry
 from timesheets.forms import TimesheetEntryForm
 
+
+# views.py
+from .services import BrevoSenderService
+
+def onboard_tenant(request):
+    # ... validation ...
+    service = BrevoSenderService()
+    sender_id = service.create_tenant_sender(tenant.name, tenant.email)
+    # ... return response ...
+
+    
+
 class ClientDetailView(LoginRequiredMixin, DetailView):
     model = Client
     template_name = 'clients/client_detail.html'

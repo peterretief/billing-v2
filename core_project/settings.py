@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
+import os
 
 from pathlib import Path
 
@@ -25,13 +26,30 @@ SECRET_KEY = 'django-insecure-b9=kayw#kvdwn!5mo=7#tsyxph)6j2&gu$nswyx(20deuyt5wl
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'peterretief.org',     # For the Cloudflare tunnel
+    'www.peterretief.org', 
+    '127.0.0.1',           # For local testing
+    'localhost',           # For local testing
+    '0.0.0.0',             # Allows access via network IP
+    '192.168.0.101',
+]
+
+
+
+CSRF_TRUSTED_ORIGINS = ['https://peterretief.org']
+
+# 3. Handle the 'https' part
+# Since Cloudflare provides the SSL but the tunnel talks to Django via HTTP,
+# Django needs to know it's actually secure.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
 
 INSTALLED_APPS = [
     'core',
+    'anymail',
     'clients',
     'invoices',
     'timesheets',
@@ -47,7 +65,21 @@ INSTALLED_APPS = [
     'debug_toolbar',
 ]
 
+EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"  # or "anymail.backends.sendinblue.EmailBackend" for older versions
+ANYMAIL = {
+    "BREVO_API_KEY": "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",
+}
+DEFAULT_FROM_EMAIL = "info@peterretief.org"  # Must be an authenticated domain email
+SERVER_EMAIL = "info@peterretief.org"
+
 AUTH_USER_MODEL = 'core.User'
+
+
+#    "BREVO_API_KEY": "TJWQxXqa390jIyKb",
+
+CELERY_TASK_ALWAYS_EAGER = True
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -133,6 +165,13 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+
+
 # In core_project/settings.py
 CSRF_COOKIE_SECURE = False 
 SESSION_COOKIE_SECURE = False
@@ -146,7 +185,7 @@ USE_THOUSAND_SEPARATOR = True
 # settings.py
 
 # Use this for local development/testing
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # You can leave these blank for now
-DEFAULT_FROM_EMAIL = 'billing@example.com'
+DEFAULT_FROM_EMAIL = 'info@peterretief.org'
