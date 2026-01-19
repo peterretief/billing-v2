@@ -125,25 +125,38 @@ def generate_invoice_pdf(invoice):
 
 # --- Email Functions ---
 
+
+
 def email_invoice_to_client(invoice):
     """
     Standard email for sending out a new invoice.
+    Uses a Static From (system verified) and Dynamic Reply-To (tenant's business email).
     """
     try:
         pdf_bytes = generate_invoice_pdf(invoice)
+        profile = invoice.user.profile
         
-        subject = f"Invoice {invoice.number} from {invoice.user.profile.company_name}"
+        # 1. Setup Sender Identity
+        # This makes the email show as "Company Name <your-verified@email.com>"
+        friendly_from = f'"{profile.company_name}" <{settings.DEFAULT_FROM_EMAIL}>'
+        
+        # 2. Setup Reply-To
+        # Fallback to the user's login email if business_email is empty
+        reply_address = profile.business_email if profile.business_email else invoice.user.email
+        
+        subject = f"Invoice {invoice.number} from {profile.company_name}"
         body = (f"Hi {invoice.client.name},\n\n"
                 f"Please find attached invoice {invoice.number}.\n\n"
                 f"Total Due: R {invoice.total_amount:,.2f}\n"
                 f"Due Date: {invoice.due_date}\n\n"
-                f"Regards,\n{invoice.user.profile.company_name}")
+                f"Regards,\n{profile.company_name}")
         
         email = EmailMessage(
             subject=subject,
             body=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=friendly_from,
             to=[invoice.client.email],
+            reply_to=[reply_address],
         )
         
         filename = f"Invoice_{invoice.number or 'Draft'}.pdf"
@@ -162,8 +175,11 @@ def email_receipt_to_client(invoice, amount_paid):
     Sends a receipt email after a payment is recorded.
     """
     try:
-        # Re-generate PDF which now includes the "PAID" stamp if balance is 0
         pdf_bytes = generate_invoice_pdf(invoice)
+        profile = invoice.user.profile
+        
+        friendly_from = f'"{profile.company_name}" <{settings.DEFAULT_FROM_EMAIL}>'
+        reply_address = profile.business_email if profile.business_email else invoice.user.email
         
         subject = f"Payment Receipt: Invoice {invoice.number}"
         body = (
@@ -172,14 +188,15 @@ def email_receipt_to_client(invoice, amount_paid):
             f"Your payment has been recorded against Invoice {invoice.number}. "
             f"Balance remaining: R {invoice.balance_due:,.2f}.\n\n"
             f"Please find the updated Tax Invoice attached.\n\n"
-            f"Regards,\n{invoice.user.profile.company_name}"
+            f"Regards,\n{profile.company_name}"
         )
         
         email = EmailMessage(
             subject=subject,
             body=body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=friendly_from,
             to=[invoice.client.email],
+            reply_to=[reply_address],
         )
         
         filename = f"Receipt_{invoice.number}.pdf"
