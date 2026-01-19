@@ -3,7 +3,7 @@ from django.urls import path, include
 from invoices import views
 
 urlpatterns = [
-    path('', views.dashboard, name='dashboard'), # Base invoices/ URL
+    path('', include('core.urls')), # Set landing page as the entry point
 
     path('admin/', admin.site.urls),
     # This includes all built-in login/logout views
@@ -11,8 +11,8 @@ urlpatterns = [
     # Our feature apps
     path('invoices/', include('invoices.urls')),
     path('clients/', include('clients.urls')),
-    path('core/', include('core.urls')),
-    path('timesheets/', include('timesheets.urls')), # Added the 's'
+    #path('core/', include('core.urls')), # This is now the root
+    path('timesheets/', include('timesheets.urls')), 
     path('__debug__/', include('debug_toolbar.urls')),
     
 ]

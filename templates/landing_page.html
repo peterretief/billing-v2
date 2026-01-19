@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to Billing v2{% endblock %}
+
+{% block content %}
+<div class="container text-center" style="margin-top: 10vh;">
+    <i class="bi bi-receipt-cutoff" style="font-size: 6rem; color: var(--primary-blue);"></i>
+    <h1 class="display-4 fw-bold mt-3">Billing V2</h1>
+    <p class="lead text-muted">A simple, yet powerful invoicing and time-tracking tool.</p>
+    <div class="mt-5">
+        <a href="{% url 'login' %}" class="btn btn-primary btn-lg mx-2">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Get Started
+        </a>
+        <button type="button" class="btn btn-secondary btn-lg mx-2" data-bs-toggle="modal" data-bs-target="#learnMoreModal">
+            <i class="bi bi-info-circle me-2"></i>Learn More
+        </button>
+    </div>
+</div>
+
+<!-- Learn More Modal -->
+<div class="modal fade" id="learnMoreModal" tabindex="-1" aria-labelledby="learnMoreModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="learnMoreModalLabel">About Billing v2</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Billing v2 is a comprehensive, multi-tenant application designed to help freelancers and small businesses streamline their invoicing and time-tracking processes.</p>
+                
+                <h6 class="mt-4">Key Features:</h6>
+                <ul>
+                    <li><strong>Client Management:</strong> Keep all your client information organized in one place.</li>
+                    <li><strong>Time Tracking:</strong> Log hours spent on projects and categorize your work.</li>
+                    <li><strong>Invoicing:</strong> Generate professional invoices from your timesheet entries with ease.</li>
+                    <li><strong>Payment Tracking:</strong> Record payments and keep track of outstanding balances.</li>
+                    <li><strong>VAT Support:</strong> Configure VAT rates and generate VAT reports.</li>
+                    <li><strong>Customizable Profiles:</strong> Set up your business profile with your company details and logo.</li>
+                </ul>
+
+                <p class="mt-4">This application is built with Django, a high-level Python web framework, and utilizes Bootstrap 5 for a clean, modern user interface.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

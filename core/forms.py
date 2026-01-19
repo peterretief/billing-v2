@@ -1,6 +1,16 @@
 from django import forms
-from .models import UserProfile
+from .models import UserProfile, User
 from decimal import Decimal
+from django.contrib.auth.forms import UserCreationForm
+
+class AdminUserCreationForm(forms.Form):
+    username = forms.CharField(max_length=150)
+    email = forms.EmailField()
+
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ('username', 'email')
 
 class UserProfileForm(forms.ModelForm):
     class Meta:

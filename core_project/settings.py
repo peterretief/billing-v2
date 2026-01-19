@@ -12,10 +12,12 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 
 from pathlib import Path
+from dotenv import load_dotenv  # Add this
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+load_dotenv(BASE_DIR / '.env')  # Add this
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -33,6 +35,7 @@ ALLOWED_HOSTS = [
     'localhost',           # For local testing
     '0.0.0.0',             # Allows access via network IP
     '192.168.0.101',
+    'peter-All-Series',
 ]
 
 
@@ -65,11 +68,15 @@ INSTALLED_APPS = [
     'debug_toolbar',
 ]
 
-EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"  # or "anymail.backends.sendinblue.EmailBackend" for older versions
+
 ANYMAIL = {
-    "BREVO_API_KEY": "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",
+    "BREVO_API_KEY": os.environ.get("BREVO_API_KEY"),
 }
-DEFAULT_FROM_EMAIL = "info@peterretief.org"  # Must be an authenticated domain email
+EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+
+# settings.py
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'peter@diode.co.za')
+
 SERVER_EMAIL = "info@peterretief.org"
 
 AUTH_USER_MODEL = 'core.User'
@@ -179,6 +186,9 @@ SESSION_COOKIE_SECURE = False
 # Add this at the bottom of settings.py
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+LOGIN_REDIRECT_URL = '/invoices/'
+LOGOUT_REDIRECT_URL = '/'
 
 USE_THOUSAND_SEPARATOR = True
 
