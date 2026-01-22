@@ -13,12 +13,96 @@ User = get_user_model()
 
 # --- Public Views ---
 
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
+from .forms import AppInterestForm
+
+def contact_signup(request):
+    """
+    Handles the landing page contact form. 
+    Replaces the standard signup with a lead-capture & vetting process.
+    """
+    submitted = False
+    
+    if request.method == 'POST':
+        form = AppInterestForm(request.POST)
+        if form.is_valid():
+            name = form.cleaned_data['name']
+            email = form.cleaned_data['email']
+            understanding = form.cleaned_data['understanding']
+            
+            # Construct the email body
+            email_body = (
+                f"New interest in the Billing App:\n\n"
+                f"Name: {name}\n"
+                f"Email: {email}\n\n"
+                f"Understanding of the App:\n"
+                f"{understanding}\n\n"
+                f"--- End of Message ---"
+            )
+            
+            try:
+                send_mail(
+                    subject=f"App Access Request: {name}",
+                    message=email_body,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=['peter@diode.co.za'],
+                    fail_silently=False,
+                )
+                # Toggle submitted to True to show the success preview
+                submitted = True
+                messages.success(request, "Your request has been sent to Peter.")
+            except Exception as e:
+                # Log the error if mail fails (useful for local debugging)
+                messages.error(request, "Unable to send email at this time. Please try again later.")
+    else:
+        form = AppInterestForm()
+
+    return render(request, 'registration/signup_contact.html', {
+        'form': form,
+        'submitted': submitted
+    })
+
+
 def landing_page(request):
-    """Redirects authenticated users to dashboard, else shows landing."""
+    """The main entry point: Handles the contact form or redirects if logged in."""
+    # 1. Redirect if already logged in
     if request.user.is_authenticated:
         return redirect('invoices:dashboard')
-    return render(request, 'landing_page.html')
 
+    submitted = False
+    
+    # 2. Handle the Form Submission
+    if request.method == 'POST' and 'signup_request' in request.POST:
+        form = AppInterestForm(request.POST)
+        if form.is_valid():
+            email_body = (
+                f"New Access Request\n"
+                f"Name: {form.cleaned_data['name']}\n"
+                f"Email: {form.cleaned_data['email']}\n"
+                f"Understanding: {form.cleaned_data['understanding']}"
+            )
+            try:
+                send_mail(
+                    subject="App Access Request",
+                    message=email_body,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=['peter@diode.co.za'],
+                )
+                submitted = True
+            except Exception:
+                messages.error(request, "Mail server error.")
+    else:
+        # 3. Handle Initial Load (Crucial for the form to show up!)
+        form = AppInterestForm()
+
+    # Make sure this matches your filename in /templates/
+    return render(request, 'landing_page.html', {
+        'form': form,
+        'submitted': submitted
+    })
 # --- Admin & User Management ---
 
 @user_passes_test(lambda u: u.is_superuser)
@@ -82,3 +166,5 @@ def edit_profile(request):
 def update_profile(request):
     """Alias for edit_profile."""
     return edit_profile(request)
+
+

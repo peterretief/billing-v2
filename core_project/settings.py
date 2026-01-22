@@ -78,7 +78,13 @@ INSTALLED_APPS = [
 ANYMAIL = {
     "BREVO_API_KEY": os.environ.get("BREVO_API_KEY"),
 }
-EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+#EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+
+# Change this line:
+# EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
+
+# To this:
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 GEMINI_API_KEY=os.environ.get('GEMINI_API_KEY')
 

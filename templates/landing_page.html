@@ -1,47 +1,100 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}Welcome to Billing v2{% endblock %}
 
 {% block content %}
-<div class="container text-center" style="margin-top: 10vh;">
-    <i class="bi bi-receipt-cutoff" style="font-size: 6rem; color: var(--primary-blue);"></i>
-    <h1 class="display-4 fw-bold mt-3">Billing V2</h1>
-    <p class="lead text-muted">A simple, yet powerful invoicing and time-tracking tool.</p>
-    <div class="mt-5">
-        <a href="{% url 'login' %}" class="btn btn-primary btn-lg mx-2">
-            <i class="bi bi-box-arrow-in-right me-2"></i>Get Started
-        </a>
-        <button type="button" class="btn btn-secondary btn-lg mx-2" data-bs-toggle="modal" data-bs-target="#learnMoreModal">
-            <i class="bi bi-info-circle me-2"></i>Learn More
-        </button>
-    </div>
-</div>
+<style>
+    .dashboard-teaser {
+        filter: blur(3px) grayscale(30%);
+        transition: all 0.5s ease;
+        cursor: pointer;
+    }
+    /* Clears up when hovering over the card or the image */
+    .card:hover .dashboard-teaser {
+        filter: blur(0px) grayscale(0%);
+        transform: scale(1.03);
+    }
+</style>
 
-<!-- Learn More Modal -->
-<div class="modal fade" id="learnMoreModal" tabindex="-1" aria-labelledby="learnMoreModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="learnMoreModalLabel">About Billing v2</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="container" style="margin-top: 8vh; margin-bottom: 8vh;">
+    <div class="row align-items-center">
+        <div class="col-lg-6 text-center text-lg-start">
+            <i class="bi bi-receipt-cutoff" style="font-size: 5rem; color: #0d6efd;"></i>
+            <h1 class="display-4 fw-bold mt-3">Billing V2</h1>
+            <p class="lead text-muted mb-4">A simple, yet powerful invoicing and time-tracking tool built for freelancers.</p>
+            
+            <div class="d-grid d-md-block gap-3">
+                <a href="{% url 'login' %}" class="btn btn-primary btn-lg px-5 shadow-sm">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Login
+                </a>
             </div>
-            <div class="modal-body">
-                <p>Billing v2 is a comprehensive, multi-tenant application designed to help freelancers and small businesses streamline their invoicing and time-tracking processes.</p>
-                
-                <h6 class="mt-4">Key Features:</h6>
-                <ul>
-                    <li><strong>Client Management:</strong> Keep all your client information organized in one place.</li>
-                    <li><strong>Time Tracking:</strong> Log hours spent on projects and categorize your work.</li>
-                    <li><strong>Invoicing:</strong> Generate professional invoices from your timesheet entries with ease.</li>
-                    <li><strong>Payment Tracking:</strong> Record payments and keep track of outstanding balances.</li>
-                    <li><strong>VAT Support:</strong> Configure VAT rates and generate VAT reports.</li>
-                    <li><strong>Customizable Profiles:</strong> Set up your business profile with your company details and logo.</li>
-                </ul>
 
-                <p class="mt-4">This application is built with Django, a high-level Python web framework, and utilizes Bootstrap 5 for a clean, modern user interface.</p>
+            <div class="mt-5 d-none d-lg-block">
+                <h6 class="text-uppercase small fw-bold text-muted mb-3">Core Features</h6>
+                <div class="row g-2">
+                    <div class="col-6"><i class="bi bi-check2-circle text-success me-2"></i>Time Tracking</div>
+                    <div class="col-6"><i class="bi bi-check2-circle text-success me-2"></i>VAT Reporting</div>
+                    <div class="col-6"><i class="bi bi-check2-circle text-success me-2"></i>Tenant Isolation</div>
+                    <div class="col-6"><i class="bi bi-check2-circle text-success me-2"></i>PDF Invoicing</div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+        </div>
+
+        <div class="col-lg-5 offset-lg-1 mt-5 mt-lg-0">
+            <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                <div class="card-body p-4 p-md-5">
+                    {% if submitted %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-envelope-check text-success display-2"></i>
+                            <h2 class="fw-bold mt-3">Request Sent</h2>
+                            <p class="text-muted">Thanks for your interest! Peter will reach out to you soon.</p>
+                            
+                            <div class="mt-4 position-relative overflow-hidden rounded-4 border shadow-sm">
+                                <p class="small text-uppercase fw-bold text-primary mt-3 mb-2" style="letter-spacing: 1px;">
+                                    Sneak Peek: Your Future Dashboard
+                                </p>
+                                
+                                <img src="{% static 'images/dashboard_preview.png' %}" 
+                                     alt="App Dashboard Preview" 
+                                     class="img-fluid dashboard-teaser">
+                                     
+                                <div class="position-absolute top-50 start-50 translate-middle">
+                                    <span class="badge rounded-pill bg-dark bg-opacity-75 p-3 shadow">
+                                        <i class="bi bi-lock-fill me-1"></i> Awaiting Approval
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <h3 class="fw-bold mb-3">Request Access</h3>
+                        <p class="text-muted mb-4">New accounts are currently by invitation only. Please tell me a bit about your business.</p>
+                        
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="signup_request" value="1">
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Full Name</label>
+                                {{ form.name }}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">Email Address</label>
+                                {{ form.email }}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold small">What do you think this app does?</label>
+                                {{ form.understanding }}
+                            </div>
+                            
+                            <button type="submit" class="btn btn-dark btn-lg w-100 fw-bold mt-2">
+                                <i class="bi bi-send-fill me-2"></i>Apply for Access
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>

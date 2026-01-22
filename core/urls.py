@@ -10,5 +10,5 @@ urlpatterns = [
     # Dashboard and Main Lists
     path('profile/edit/', views.edit_profile, name='edit_profile'),
     path('profile/update/', views.update_profile, name='update_profile'),
- 
-]
+    path('signup/', views.contact_signup, name='signup'),
+ ]
