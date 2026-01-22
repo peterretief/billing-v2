@@ -31,6 +31,7 @@ class WorkCategory(models.Model):
         return self.name
 
 
+
 class TimesheetEntry(TenantModel):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='timesheets')
     category = models.ForeignKey(WorkCategory, on_delete=models.SET_NULL, null=True, blank=True)

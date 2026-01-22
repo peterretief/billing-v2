@@ -354,12 +354,21 @@ def invoice_edit(request, pk):
 
 @login_required
 def dashboard(request):
-    # Filter by tenant
+    # 1. Basic Querysets
     invoices = Invoice.objects.filter(user=request.user)
-    tax_summary = Invoice.objects.get_tax_summary(request.user)
     vat_reports = VATReport.objects.filter(user=request.user).order_by('-year', '-month')
     
-    # Corrected Math: Use payments__amount because amount_paid field doesn't exist in DB
+    # 2. Calculate Unbilled WIP (Work in Progress)
+    # This sums up all logged timesheets that have NOT been billed yet
+    unbilled_data = TimesheetEntry.objects.filter(
+        user=request.user, 
+        is_billed=False
+    ).aggregate(
+        total_value=Sum(F('hours') * F('hourly_rate'))
+    )
+    unbilled_value = unbilled_data['total_value'] or Decimal('0.00')
+
+    # 3. Aggregated Invoice Stats
     stats = invoices.aggregate(
         billed=Sum('total_amount'),
         tax=Sum('tax_amount'),
@@ -368,20 +377,24 @@ def dashboard(request):
     
     billed = stats['billed'] or Decimal('0.00')
     tax = stats['tax'] or Decimal('0.00')
-    paid = stats['paid'] or Decimal('0.00')
-    #outstanding = billed - paid
+    
+    # 4. Use Manager methods for specialized reports
+    tax_summary = Invoice.objects.get_tax_summary(request.user)
+    tax_year_stats = Invoice.objects.get_tax_year_report(request.user)
     outstanding = Invoice.objects.get_total_outstanding(request.user)
 
     context = {
-        'tax_summary': tax_summary, # Must be here for the button logic to work
-        'vat_reports': vat_reports, 
+        'unbilled_value': unbilled_value,  # THIS FIXES THE R 0.00 ISSUE
         'total_billed': billed,
         'total_tax': tax,
         'total_outstanding': outstanding,
-        # Corrected: Use date_issued instead of date
+        'tax_year': tax_year_stats,
+        'tax_summary': tax_summary,
+        'vat_reports': vat_reports, 
         'recent_invoices': invoices.order_by('-date_issued', '-id')[:5],
     }
     return render(request, 'invoices/dashboard.html', context)
+
 
 @login_required
 def invoice_list(request):

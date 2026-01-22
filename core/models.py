@@ -70,5 +70,15 @@ class UserProfile(models.Model):
     account_number = models.CharField(max_length=50, blank=True)
     branch_code = models.CharField(max_length=20, blank=True)
 
+    @property
+    def annual_revenue_forecast(self):
+        """Calculates the 12-month forecast based on the current target."""
+        return self.monthly_target * 12
+
+    @property
+    def quarterly_revenue_forecast(self):
+        """Calculates the 3-month forecast."""
+        return self.monthly_target * 3
+
     def __str__(self):
         return f"Profile: {self.user.username}"

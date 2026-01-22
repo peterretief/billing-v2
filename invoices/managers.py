@@ -2,6 +2,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db import models
 from django.db.models import Sum, F, Q
 from django.db.models.functions import Coalesce
+from datetime import date
+from django.utils import timezone
+
 
 class InvoiceQuerySet(models.QuerySet):
     def active(self):
@@ -86,4 +89,30 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
             'collected': collected,
             'paid': paid,
             'outstanding': collected - paid
+        }
+    
+    def get_tax_year_dates(self):
+        """Returns the start and end dates of the current SA Tax Year."""
+        today = timezone.now().date()
+        # SA Tax year starts March 1st
+        if today.month >= 3:
+            start_date = date(today.year, 3, 1)
+            end_date = date(today.year + 1, 2, 28)
+        else:
+            start_date = date(today.year - 1, 3, 1)
+            end_date = date(today.year, 2, 28)
+        return start_date, end_date
+
+    def get_tax_year_report(self, user):
+        """Calculates total net revenue for the current income tax year."""
+        start, end = self.get_tax_year_dates()
+        res = self.filter(user=user, date_issued__range=[start, end]).aggregate(
+            net_revenue=Sum('subtotal_amount'),
+            total_vat=Sum('tax_amount')
+        )
+        return {
+            'start': start,
+            'end': end,
+            'net_revenue': res['net_revenue'] or Decimal('0.00'),
+            'total_vat': res['total_vat'] or Decimal('0.00'),
         }
