@@ -26,4 +26,6 @@ urlpatterns = [
     path('vat/<int:pk>/download/', views.download_vat_latex, name='download_vat_latex'),
     path('create/', views.invoice_create, name='invoice_create'), # Add this!
     path('bulk-post/', views.bulk_post, name='bulk_post'),
+    path('financial-assessment/', views.financial_assessment, name='financial_assessment'),
+    path('record-vat-payment/', views.record_vat_payment, name='record_vat_payment'),
 ]

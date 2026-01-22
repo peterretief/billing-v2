@@ -4,6 +4,19 @@ from .models import Invoice, InvoiceItem
 from django.utils import timezone
 
 
+from .models import TaxPayment
+
+class VATPaymentForm(forms.ModelForm):
+    class Meta:
+        model = TaxPayment
+        fields = ['payment_date', 'amount', 'reference', 'tax_type']
+        widgets = {
+            'payment_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'reference': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. VAT201 Jan 2026'}),
+            'tax_type': forms.HiddenInput(),
+        }
+
 class InvoiceForm(forms.ModelForm):
     class Meta:
         model = Invoice

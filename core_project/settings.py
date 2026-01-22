@@ -39,6 +39,11 @@ ALLOWED_HOSTS = [
 ]
 
 
+# In settings.py
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": lambda request: False,  # Always show in debug mode
+}
+
 
 CSRF_TRUSTED_ORIGINS = ['https://peterretief.org']
 
@@ -56,6 +61,7 @@ INSTALLED_APPS = [
     'clients',
     'invoices',
     'timesheets',
+    'notifications',
     'crispy_forms',
     'crispy_bootstrap5',
     'django.contrib.admin',
@@ -73,6 +79,8 @@ ANYMAIL = {
     "BREVO_API_KEY": os.environ.get("BREVO_API_KEY"),
 }
 EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+
+GEMINI_API_KEY=os.environ.get('GEMINI_API_KEY')
 
 # settings.py
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'peter@diode.co.za')
@@ -117,6 +125,8 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'timesheets.context_processors.unbilled_count',
+                'django.contrib.messages.context_processors.messages',
+                'notifications.context_processors.onboarding', 
             ],
         },
     },
@@ -128,12 +138,26 @@ WSGI_APPLICATION = 'core_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'billing_v2_db',
+        'USER': 'peter',
+        'PASSWORD': '220961',
+        'HOST': '127.0.0.1', # Use IP to avoid socket issues
+        'PORT': '5432',
     }
 }
+
+
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.sqlite3',
+#        'NAME': BASE_DIR / 'db.sqlite3',
+#    }
+#}
 
 
 # Password validation
@@ -178,7 +202,6 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-
 # In core_project/settings.py
 CSRF_COOKIE_SECURE = False 
 SESSION_COOKIE_SECURE = False
@@ -199,3 +222,19 @@ USE_THOUSAND_SEPARATOR = True
 
 # You can leave these blank for now
 DEFAULT_FROM_EMAIL = 'info@peterretief.org'
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# core_project/settings.py
+
+# Replace '220961' with your actual password if it changes
+REDIS_PASSWORD = '220961' 
+
+CELERY_BROKER_URL = f'redis://:{REDIS_PASSWORD}@localhost:6379/0'
+CELERY_RESULT_BACKEND = f'redis://:{REDIS_PASSWORD}@localhost:6379/0'
+
+# Standard Celery settings
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+

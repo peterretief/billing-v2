@@ -218,6 +218,7 @@ class TimesheetListView(LoginRequiredMixin, ListView):
 # --- 2. LOGGING, EDITING & DELETION ---
 
 
+
 @login_required
 def log_time(request):
     if request.method == 'POST':
@@ -226,29 +227,35 @@ def log_time(request):
             entry = form.save(commit=False)
             entry.user = request.user
             
-            # --- FIX: Capture the Category ID ---
+            # Capture the Category ID
             category_id = request.POST.get('category')
             if category_id:
                 entry.category_id = category_id
             
+            # Set default hourly rate if missing
             if not entry.hourly_rate or entry.hourly_rate == 0:
                 entry.hourly_rate = entry.client.default_hourly_rate
 
-            meta_data = {}
-            for key, value in request.POST.items():
-                if key.startswith('meta_'):
-                    field_name = key.replace('meta_', '')
-                    if value.strip():
-                        meta_data[field_name] = value
+            # Handle Metadata
+            meta_data = {k.replace('meta_', ''): v for k, v in request.POST.items() 
+                         if k.startswith('meta_') and v.strip()}
             
             entry.metadata = meta_data
             entry.save()
+            
             messages.success(request, f"Logged {entry.hours}h for {entry.client.name}.")
+            
+            # SUCCESS: Return the response with the HTMX trigger
+            response = redirect('timesheets:timesheet_list')
+            response['HX-Trigger'] = 'timesheetAdded'
+            return response
         else:
             messages.error(request, "Please correct the errors below.")
-    
-    return redirect('timesheets:timesheet_list')
+            # If invalid, we redirect back to let the list view re-render the modal/form errors
+            return redirect('timesheets:timesheet_list')
 
+    # Fallback for GET requests
+    return redirect('timesheets:timesheet_list')
 
 
 @login_required
@@ -337,7 +344,7 @@ def generate_invoice_bulk(request):
 
     with transaction.atomic():
         # Select for update prevents other processes from touching these entries during calculation
-        entries = TimesheetEntry.objects.select_for_update().filter(
+        entries = TimesheetEntry.objects.select_for_update(of=('self',)).filter(
             id__in=selected_ids, 
             user=request.user, 
             is_billed=False

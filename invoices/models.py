@@ -160,3 +160,13 @@ class VATReport(TenantModel):
 
     def __str__(self):
         return f"VAT Report {self.year}-{self.month:02d} ({self.user.username})"
+    
+
+class TaxPayment(TenantModel):
+    payment_date = models.DateField(default=timezone.now)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    reference = models.CharField(max_length=100, help_text="e.g., VAT201 Period 2026/01")
+    tax_type = models.CharField(max_length=20, default='VAT', choices=[('VAT', 'VAT'), ('INCOME_TAX', 'Income Tax')])
+
+    def __str__(self):
+        return f"{self.tax_type} Payment - R {self.amount} ({self.payment_date})"

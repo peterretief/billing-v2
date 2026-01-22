@@ -43,6 +43,13 @@ class UserProfile(models.Model):
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     
+    monthly_target = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=50000.00,
+        help_text="Your monthly revenue goal (e.g., 50000)"
+    )
+
     # Business Details
     company_name = models.CharField(max_length=255, blank=True)
     business_email = models.EmailField(blank=True)

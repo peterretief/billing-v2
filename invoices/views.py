@@ -1,3 +1,4 @@
+import profile
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
@@ -8,11 +9,112 @@ from django.utils import timezone
 from django.db.models import Sum
 from decimal import Decimal
 
+from httpx import request
+
 from .models import Invoice, InvoiceItem, VATReport, Payment
-from .forms import InvoiceForm, InvoiceItemFormSet
+from .forms import InvoiceForm, InvoiceItemFormSet, VATPaymentForm
 from .utils import generate_invoice_pdf, email_invoice_to_client
+from timesheets.models import TimesheetEntry
+from clients.models import Client
 
 from django.template.loader import render_to_string
+
+from django.conf import settings
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from timesheets.models import TimesheetEntry
+from clients.models import Client
+
+from google import genai
+
+from django.db.models import Sum, F
+from google import genai
+from core.models import UserProfile
+
+from django.utils import timezone
+from datetime import date
+
+
+@login_required
+def record_vat_payment(request):
+    if request.method == "POST":
+        form = VATPaymentForm(request.POST)
+        if form.is_valid():
+            payment = form.save(commit=False)
+            payment.user = request.user  # Assign to current tenant
+            payment.save()
+            
+            # Use the manager fix we just did to get fresh numbers
+            tax_summary = Invoice.objects.get_tax_summary(request.user)
+            return render(request, 'invoices/partials/tax_summary_box.html', {
+                'tax_summary': tax_summary,
+                'message': 'Payment Recorded!'
+            })
+    else:
+        form = VATPaymentForm(initial={'tax_type': 'VAT'})
+    
+    return render(request, 'invoices/partials/vat_payment_form.html', {'form': form})
+
+@login_required
+def financial_assessment(request):
+    """
+    Analyzes current month progress against the R 50,000 target.
+    """
+    today = date.today()
+    start_of_month = today.replace(day=1)
+
+    # 1. Get Actual Billed (Net) for the current month
+    actual_billed = Invoice.objects.filter(
+        user=request.user,
+        date_issued__gte=start_of_month
+    ).exclude(status='CANCELLED').aggregate(
+        total=Sum('subtotal_amount')
+    )['total'] or Decimal('0.00')
+
+    # 2. Get Unbilled (WIP)
+    unbilled_stats = TimesheetEntry.objects.filter(
+        user=request.user, 
+        is_billed=False
+    ).aggregate(
+        total_value=Sum(F('hours') * F('hourly_rate')),
+        total_hours=Sum('hours')
+    )
+    total_unbilled = unbilled_stats['total_value'] or Decimal('0.00')
+    total_hours = unbilled_stats['total_hours'] or 0
+
+    # 3. Aggregated Progress
+    total_progress = actual_billed + total_unbilled
+    user_profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    target = user_profile.monthly_target
+
+    # 4. Gemini Logic
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    prompt = (
+        f"Context: Freelance financial health check for {today.strftime('%B %Y')}.\n"
+        f"Data:\n"
+        f"- Monthly Revenue Target: R {target}\n"
+        f"- Already Invoiced (Net): R {actual_billed}\n"
+        f"- Unbilled Work in Progress: R {total_unbilled}\n"
+        f"- Total Combined Progress: R {total_progress}\n\n"
+        f"Task: Assess if the user is on track for their R {target} goal. "
+        f"If they are already over the target, congratulate them. Be direct (2 sentences)."
+    )
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.0-flash", 
+            contents=prompt
+        )
+        assessment_text = response.text
+    except Exception as e:
+        assessment_text = "Assessment unavailable. Please check your dashboard stats."
+
+    return render(request, 'invoices/partials/assessment_result.html', {
+        'assessment': assessment_text,
+        'total_unbilled': total_unbilled,
+        'target': target
+    })
+
 
 @login_required
 def bulk_post(request):
@@ -250,12 +352,11 @@ def invoice_edit(request, pk):
 
 # --- CORE DASHBOARD & LIST VIEWS ---
 
-
-
 @login_required
 def dashboard(request):
     # Filter by tenant
     invoices = Invoice.objects.filter(user=request.user)
+    tax_summary = Invoice.objects.get_tax_summary(request.user)
     vat_reports = VATReport.objects.filter(user=request.user).order_by('-year', '-month')
     
     # Corrected Math: Use payments__amount because amount_paid field doesn't exist in DB
@@ -272,6 +373,7 @@ def dashboard(request):
     outstanding = Invoice.objects.get_total_outstanding(request.user)
 
     context = {
+        'tax_summary': tax_summary, # Must be here for the button logic to work
         'vat_reports': vat_reports, 
         'total_billed': billed,
         'total_tax': tax,
@@ -284,7 +386,7 @@ def dashboard(request):
 @login_required
 def invoice_list(request):
     # Corrected: Use date_issued instead of date
-    invoice_queryset = Invoice.objects.filter(user=request.user).order_by('-date_issued', '-id')
+    invoice_queryset = Invoice.objects.filter(user=request.user).select_related('client').order_by('-date_issued', '-id')
     
     status_filter = request.GET.get('status')
     if status_filter == 'UNPAID':
