@@ -47,6 +47,9 @@
                     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'invoices:dashboard' %}">Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link {% if request.resolver_match.app_name == 'clients' %}active{% endif %}" href="{% url 'clients:client_list' %}">Clients</a></li>
                     <li class="nav-item"><a class="nav-link {% if 'timesheets' in request.path %}active{% endif %}" href="{% url 'timesheets:timesheet_list' %}">Timesheets</a></li>
+
+          <li class="nav-item"><a class="nav-link {% if 'items' in request.path %}active{% endif %}" href="{% url 'items:item_list' %}">Items</a></li>
+
                     <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'invoice_list' %}active{% endif %}" href="{% url 'invoices:invoice_list' %}">Invoices</a></li>
                 </ul>
 
@@ -74,12 +77,33 @@
                             {% endif %}
 
                             <li><hr class="dropdown-divider"></li>
+                     
+                     
+                     
                             <li class="px-3 py-2">
                                 <form action="{% url 'logout' %}" method="post">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-danger btn-sm w-100">Logout</button>
                                 </form>
                             </li>
+                     
+
+
+
+
+                            {% if user.is_authenticated %}
+            <form action="{% url 'logout' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="nav-link btn btn-link py-0" style="text-decoration: none;">
+                    <i class="bi bi-box-arrow-right me-1"></i>Logout
+                </button>
+            </form>
+            {% endif %}
+
+
+                            
+                     
+                     
                         </ul>
                     </li>
                 </ul>

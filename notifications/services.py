@@ -128,9 +128,11 @@ from .models import Notification
 
 def generate_notifications(user):
     """
-    Creates a simple, static onboarding checklist for the user.
+    Creates a simple, static onboarding checklist for the user
+    AND integrates AI-generated personalized suggestions.
     Only creates the notification if it doesn't already exist.
     """
+    # Static onboarding steps
     steps = [
         ("Step 1: Setup your business profile", 2),
         ("Step 2: Create your first client", 2),
@@ -142,6 +144,17 @@ def generate_notifications(user):
             user=user,
             message=message,
             priority=priority,
+            defaults={'is_read': False}
+        )
+
+    # Integrate AI-generated suggestions
+    gemini_suggestions = get_gemini_suggestions(user)
+    for suggestion in gemini_suggestions:
+        # Give AI suggestions a higher priority or different style
+        Notification.objects.get_or_create(
+            user=user,
+            message=suggestion,
+            priority=1, # Assuming 1 is a higher priority for AI suggestions
             defaults={'is_read': False}
         )
 

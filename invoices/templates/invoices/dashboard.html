@@ -204,9 +204,47 @@
                         <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-light btn-sm fw-bold">
                              Invoicing Queue
                         </a>
+                        <a href="{% url 'items:item_list' %}" class="btn btn-sm btn-outline-light text-start border-0">
+                            <i class="bi bi-box-seam me-2"></i> Items
+                        </a>
                         <a href="{% url 'clients:client_list' %}" class="btn btn-sm btn-outline-light text-start border-0">
                             <i class="bi bi-people me-2"></i> Client Directory
                         </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-light py-3 border-bottom-0">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>Unbilled Timesheets</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <h5 class="fw-bold mb-1">R {{ unbilled_timesheet_value|default:"0"|floatformat:2|intcomma }}</h5>
+                                <small class="text-muted">{{ unbilled_timesheet_hours|floatformat:1 }} hours pending</small>
+                            </div>
+                            <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-sm btn-outline-primary w-100">
+                                View & Bill
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-light py-3 border-bottom-0">
+                            <h6 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2"></i>Unbilled Items</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <h5 class="fw-bold mb-1">R {{ unbilled_items_value|default:"0"|floatformat:2|intcomma }}</h5>
+                                <small class="text-muted">Ready to invoice</small>
+                            </div>
+                            <a href="{% url 'items:item_list' %}" class="btn btn-sm btn-outline-primary w-100">
+                                View & Bill
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

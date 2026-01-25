@@ -4,7 +4,7 @@ from django.contrib.auth.signals import user_logged_in
 
 from .models import UserProfile
 from notifications.models import Notification
-from notifications.services import generate_notifications
+from notifications.tasks import generate_notifications_async
 from timesheets.models import TimesheetEntry
 
 # --- 1. Generation Logic ---
@@ -16,7 +16,7 @@ def user_logged_in_receiver(sender, request, user, **kwargs):
     Ensure generate_notifications uses get_or_create internally 
     to prevent the "wall of buttons" you saw.
     """
-    generate_notifications(user)
+    generate_notifications_async.delay(user.id)
 
 
 # --- 2. Completion Logic (Step 1: Profile) ---

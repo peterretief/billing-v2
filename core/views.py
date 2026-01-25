@@ -68,13 +68,14 @@ def contact_signup(request):
 
 def landing_page(request):
     """The main entry point: Handles the contact form or redirects if logged in."""
+    
     # 1. Redirect if already logged in
     if request.user.is_authenticated:
         return redirect('invoices:dashboard')
 
-    submitted = False
-    
-    # 2. Handle the Form Submission
+    # 2. Check if we just redirected from a successful submission (prevents resend on refresh)
+    submitted = request.GET.get('submitted') == 'true'
+
     if request.method == 'POST' and 'signup_request' in request.POST:
         form = AppInterestForm(request.POST)
         if form.is_valid():
@@ -91,18 +92,19 @@ def landing_page(request):
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=['peter@diode.co.za'],
                 )
-                submitted = True
+                # Redirect to the same page with the success flag in the URL
+                return redirect('/?submitted=true')
             except Exception:
                 messages.error(request, "Mail server error.")
     else:
-        # 3. Handle Initial Load (Crucial for the form to show up!)
+        # Handle Initial Load (GET request)
         form = AppInterestForm()
 
-    # Make sure this matches your filename in /templates/
     return render(request, 'landing_page.html', {
         'form': form,
         'submitted': submitted
     })
+
 # --- Admin & User Management ---
 
 @user_passes_test(lambda u: u.is_superuser)

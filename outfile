@@ -1,0 +1,32 @@
+--- Starting Billing Logic Test ---
+Step 1: Creating CustomInvoice...
+Created: JOHS-06-26 (Status: DRAFT)
+Step 2: Adding Line Items...
+
+[TRACE] update_totals called for Invoice 31
+DEBUG: Standard Items Subtotal: 0.00
+DEBUG: Found 'custom_lines' attribute (Instance is CustomInvoice)
+DEBUG: Combined Subtotal: 300.0000
+DEBUG: Final Total being saved: 300.0000
+
+[TRACE] update_totals called for Invoice 31
+DEBUG: Standard Items Subtotal: 0.00
+DEBUG: Found 'custom_lines' attribute (Instance is CustomInvoice)
+DEBUG: Combined Subtotal: 300.0000
+DEBUG: Final Total being saved: 300.0000
+
+[TRACE] update_totals called for Invoice 31
+DEBUG: Standard Items Subtotal: 0.00
+DEBUG: Found 'custom_lines' attribute (Instance is CustomInvoice)
+DEBUG: Combined Subtotal: 333.0000
+DEBUG: Final Total being saved: 333.0000
+
+[TRACE] update_totals called for Invoice 31
+DEBUG: Standard Items Subtotal: 0.00
+DEBUG: Found 'custom_lines' attribute (Instance is CustomInvoice)
+DEBUG: Combined Subtotal: 333.0000
+DEBUG: Final Total being saved: 333.0000
+Step 3: Verifying Totals...
+Subtotal: 0.00
+Total Amount: 0.00
+FAILURE: Expected at least 333.00, but got 0.00

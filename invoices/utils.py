@@ -72,7 +72,8 @@ def generate_invoice_pdf(invoice):
 
     # Billing Mode Setup
     is_service = invoice.billing_type == 'SERVICE'
-    context['label_qty'] = "Hours" if is_service else "Qty"
+    context['label_desc'] = "Description" if is_service else "Item"
+    context['label_qty'] = "Hours" if is_service else "Units"
     context['label_rate'] = "Rate" if is_service else "Unit Price"
 
     # Address Handling
@@ -126,12 +127,12 @@ def generate_invoice_pdf(invoice):
 # --- Email Functions ---
 
 
-
 def email_invoice_to_client(invoice):
     """
     Standard email for sending out a new invoice.
     Uses a Static From (system verified) and Dynamic Reply-To (tenant's business email).
     """
+    from .models import Invoice
     try:
         pdf_bytes = generate_invoice_pdf(invoice)
         profile = invoice.user.profile
@@ -164,7 +165,8 @@ def email_invoice_to_client(invoice):
         email.send()
         
         invoice.last_generated = now()
-        invoice.save(update_fields=['last_generated'])
+        invoice.status = Invoice.Status.PENDING
+        invoice.save(update_fields=['last_generated', 'status'])
         return True
     except Exception as e:
         print(f"Email Error: {e}")

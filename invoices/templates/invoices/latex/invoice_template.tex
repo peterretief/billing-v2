@@ -72,7 +72,7 @@
 % 3. ITEMS TABLE
 \renewcommand{\arraystretch}{1.5}
 \begin{tabularx}{\textwidth}{X r r r}
-    \textbf{Description} & \textbf{ {{ label_qty }} } & \textbf{ {{ label_rate }} } & \textbf{Total} \\
+    \textbf{ {{ label_desc }} } & \textbf{ {{ label_qty }} } & \textbf{ {{ label_rate }} } & \textbf{Total} \\
     \midrule
     {% for item in items %}
     {{ item.description }} & {{ item.quantity }} & R {{ item.unit_price }} & R {{ item.row_subtotal }} \\

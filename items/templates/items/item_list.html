@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Unbilled Items</h2>
+        <a href="{% url 'items:item_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus"></i> Add New Item
+        </a>
+    </div>
+
+    <form action="{% url 'items:generate_invoice_from_items' %}" method="post">
+        {% csrf_token %}
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4">
+                <h5 class="mb-0 fw-bold">Select Items to Invoice</h5>
+                <div id="selectionActions" style="display: none;">
+                    <button type="submit" class="btn btn-success btn-sm fw-bold px-3">
+                        <i class="bi bi-receipt-cutoff me-1"></i> Create Invoices (<span id="selectedCount">0</span>)
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                                <th>Date</th>
+                                <th>Client</th>
+                                <th>Description</th>
+                                <th>Quantity</th>
+                                <th>Unit Price</th>
+                                <th>Total</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td class="ps-4">
+                                    <input type="checkbox" name="selected_items" value="{{ item.id }}" class="form-check-input item-checkbox">
+                                </td>
+                                <td>{{ item.date|date:"Y-m-d" }}</td>
+                                <td>{{ item.client.name }}</td>
+                                <td>{{ item.description }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.unit_price|floatformat:2 }}</td>
+                                <td>{{ item.total|floatformat:2 }}</td>
+                                <td class="text-end">
+                                    <div class="btn-group">
+                                        <a href="{% url 'items:item_update' item.id %}"
+                                           class="btn btn-sm btn-outline-primary" title="Edit Item">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <a href="{% url 'items:item_delete' item.id %}"
+                                           class="btn btn-sm btn-outline-danger" title="Delete Item">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    No unbilled items found.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.item-checkbox');
+    const selectionActions = document.getElementById('selectionActions');
+    const selectedCountSpan = document.getElementById('selectedCount');
+
+    function updateSelection() {
+        const count = document.querySelectorAll('.item-checkbox:checked').length;
+        if (selectionActions) {
+            selectionActions.style.display = count > 0 ? 'block' : 'none';
+        }
+        if (selectedCountSpan) {
+            selectedCountSpan.innerText = count;
+        }
+    }
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateSelection();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            if (!this.checked) {
+                selectAll.checked = false;
+            } else {
+                const allChecked = Array.from(checkboxes).every(c => c.checked);
+                if (allChecked) {
+                    selectAll.checked = true;
+                }
+            }
+            updateSelection();
+        });
+    });
+
+    updateSelection();
+});
+</script>
+{% endblock %}

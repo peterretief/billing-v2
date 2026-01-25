@@ -15,6 +15,7 @@ from .models import Invoice, InvoiceItem, VATReport, Payment
 from .forms import InvoiceForm, InvoiceItemFormSet, VATPaymentForm
 from .utils import generate_invoice_pdf, email_invoice_to_client
 from timesheets.models import TimesheetEntry
+from items.models import Item
 from clients.models import Client
 
 from django.template.loader import render_to_string
@@ -358,17 +359,30 @@ def dashboard(request):
     invoices = Invoice.objects.filter(user=request.user)
     vat_reports = VATReport.objects.filter(user=request.user).order_by('-year', '-month')
     
-    # 2. Calculate Unbilled WIP (Work in Progress)
-    # This sums up all logged timesheets that have NOT been billed yet
-    unbilled_data = TimesheetEntry.objects.filter(
+    # 2. Calculate Unbilled WIP (Work in Progress) - Timesheets
+    unbilled_timesheets_data = TimesheetEntry.objects.filter(
         user=request.user, 
         is_billed=False
     ).aggregate(
-        total_value=Sum(F('hours') * F('hourly_rate'))
+        total_value=Sum(F('hours') * F('hourly_rate')),
+        total_hours=Sum('hours')
     )
-    unbilled_value = unbilled_data['total_value'] or Decimal('0.00')
+    unbilled_timesheet_value = unbilled_timesheets_data['total_value'] or Decimal('0.00')
+    unbilled_timesheet_hours = unbilled_timesheets_data['total_hours'] or 0
 
-    # 3. Aggregated Invoice Stats
+    # 3. Calculate Unbilled Items
+    unbilled_items_data = Item.objects.filter(
+        user=request.user,
+        is_billed=False
+    ).aggregate(
+        total_value=Sum(F('quantity') * F('unit_price'))
+    )
+    unbilled_items_value = unbilled_items_data['total_value'] or Decimal('0.00')
+
+    # 4. Total unbilled (timesheets + items)
+    unbilled_value = unbilled_timesheet_value + unbilled_items_value
+
+    # 5. Aggregated Invoice Stats
     stats = invoices.aggregate(
         billed=Sum('total_amount'),
         tax=Sum('tax_amount'),
@@ -378,13 +392,16 @@ def dashboard(request):
     billed = stats['billed'] or Decimal('0.00')
     tax = stats['tax'] or Decimal('0.00')
     
-    # 4. Use Manager methods for specialized reports
+    # 6. Use Manager methods for specialized reports
     tax_summary = Invoice.objects.get_tax_summary(request.user)
     tax_year_stats = Invoice.objects.get_tax_year_report(request.user)
     outstanding = Invoice.objects.get_total_outstanding(request.user)
 
     context = {
-        'unbilled_value': unbilled_value,  # THIS FIXES THE R 0.00 ISSUE
+        'unbilled_value': unbilled_value,
+        'unbilled_timesheet_value': unbilled_timesheet_value,
+        'unbilled_timesheet_hours': unbilled_timesheet_hours,
+        'unbilled_items_value': unbilled_items_value,
         'total_billed': billed,
         'total_tax': tax,
         'total_outstanding': outstanding,
