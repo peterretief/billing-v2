@@ -438,6 +438,14 @@ def record_payment(request, pk):
         amount = Decimal(request.POST.get('amount', '0'))
 
         if amount > 0:
+            # Check if payment exceeds balance due
+            if amount > invoice.balance_due:
+                messages.error(
+                    request, 
+                    f"Payment amount (R {amount}) cannot exceed the balance due (R {invoice.balance_due})"
+                )
+                return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
+            
             # 1. Auto-Post Logic
             if invoice.status == 'DRAFT':
                 invoice.status = 'SENT' # Or 'POSTED' based on your status choices
@@ -447,19 +455,24 @@ def record_payment(request, pk):
                 invoice.save()
             
             # 2. Record the payment
-            Payment.objects.create(
-                invoice=invoice,
-                amount=amount,
-                reference=request.POST.get('reference', 'Payment received')
-            )
+            try:
+                Payment.objects.create(
+                    invoice=invoice,
+                    amount=amount,
+                    reference=request.POST.get('reference', 'Payment received')
+                )
 
-            # 3. Final Status Check
-            # Re-fetch or calculate to see if it's now fully paid
-            if invoice.balance_due <= 0:
-                invoice.status = 'PAID'
-                invoice.save()
+                # 3. Final Status Check
+                # Re-fetch or calculate to see if it's now fully paid
+                if invoice.balance_due <= 0:
+                    invoice.status = 'PAID'
+                    invoice.save()
 
-            messages.success(request, f"Invoice #{invoice.number} updated and payment recorded.")
+                messages.success(request, f"Invoice #{invoice.number} updated and payment recorded.")
+            except Exception as e:
+                messages.error(request, f"Error recording payment: {str(e)}")
+        else:
+            messages.error(request, "Payment amount must be greater than zero")
             
     return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
 

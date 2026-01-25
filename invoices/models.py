@@ -80,13 +80,9 @@ class Invoice(TenantModel):
 
     @property
     def balance_due(self):
-        # Use the snapshot field or calculated total
-        return self.total_amount - self.total_paid
-
-    @property
-    def balance_due(self):
-        # Use the database field total_amount, not calculated_total
-        return self.total_amount - self.total_paid
+        # Ensure both values are Decimal for proper arithmetic
+        total = Decimal(str(self.total_amount)) if self.total_amount else Decimal('0.00')
+        return total - self.total_paid
     # --- Sync Snapshot Fields ---
 
     def sync_totals(self):
@@ -127,7 +123,17 @@ class Payment(models.Model):
     date_paid = models.DateField(default=timezone.now)
     reference = models.CharField(max_length=100, blank=True)
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.amount > self.invoice.balance_due:
+            raise ValidationError(
+                f"Payment amount (R {self.amount}) cannot exceed the balance due (R {self.invoice.balance_due})"
+            )
+        if self.amount <= 0:
+            raise ValidationError("Payment amount must be greater than zero")
+
     def save(self, *args, **kwargs):
+        self.clean()
         super().save(*args, **kwargs)
         # Auto-update invoice status if balance is now zero
         inv = self.invoice
