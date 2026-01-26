@@ -12,6 +12,7 @@ urlpatterns = [
     path('<int:pk>/', views.invoice_detail, name='invoice_detail'),
     path('<int:pk>/edit/', views.invoice_edit, name='invoice_edit'),
     path('<int:pk>/duplicate/', views.duplicate_invoice, name='duplicate_invoice'),
+    path('<int:pk>/delete/', views.delete_invoice, name='delete_invoice'),
 
     # Payments (The new unified logic)
     path('<int:pk>/pay/', views.mark_invoice_paid, name='mark_as_paid'),

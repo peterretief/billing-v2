@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Delete Invoice - Billing System{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Delete Invoice
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning" role="alert">
+                        <strong>Warning:</strong> This action cannot be undone.
+                    </div>
+
+                    <p class="lead">
+                        Are you sure you want to delete invoice <strong>#{{ invoice.number }}</strong>?
+                    </p>
+
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <p class="text-muted mb-1">Client</p>
+                                    <p class="h6">{{ invoice.client.name }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="text-muted mb-1">Amount</p>
+                                    <p class="h6">R {{ invoice.total_amount|floatformat:2 }}</p>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="text-muted mb-1">Date Issued</p>
+                                    <p class="h6">{{ invoice.date_issued|date:"d M Y" }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="text-muted mb-1">Status</p>
+                                    <p class="h6"><span class="badge bg-secondary">{{ invoice.status }}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" class="mt-4">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-lg me-2">
+                            <i class="bi bi-trash"></i> Delete Invoice
+                        </button>
+                        <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="btn btn-secondary btn-lg">
+                            Cancel
+                        </a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -25,6 +25,11 @@
                     <li><a class="dropdown-item" href="{% url 'timesheets:export_metadata_pdf' invoice.id %}">Download Work Log</a></li>
                 </ul>
             </div>
+            {% if invoice.status == 'DRAFT' %}
+            <a href="{% url 'invoices:delete_invoice' invoice.pk %}" class="btn btn-outline-danger" title="Delete Draft Invoice">
+                <i class="bi bi-trash"></i> Delete
+            </a>
+            {% endif %}
         </div>
     </div>
 

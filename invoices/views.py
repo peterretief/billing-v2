@@ -531,3 +531,24 @@ def generate_vat_report(request):
     
     messages.success(request, f"VAT Report for {month}/{year} generated.")
     return redirect('invoices:dashboard')
+
+
+@login_required
+def delete_invoice(request, pk):
+    """
+    Delete a draft invoice. Only draft invoices can be deleted.
+    """
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    # Only allow deletion of draft invoices
+    if invoice.status != 'DRAFT':
+        messages.error(request, "Only draft invoices can be deleted.")
+        return redirect('invoices:invoice_detail', pk=pk)
+    
+    if request.method == 'POST':
+        invoice.delete()
+        messages.success(request, "Invoice deleted successfully.")
+        return redirect('invoices:invoice_list')
+    
+    # GET request - show confirmation page
+    return render(request, 'invoices/invoice_confirm_delete.html', {'invoice': invoice})

@@ -43,6 +43,7 @@
     {\Huge \textbf{ {{ company_name }} }} \par \vspace{0.4cm}
     \begin{tabular}{r@{}}
         {{ profile_address_safe }} \\
+        {% if phone %}\textbf{Phone:} {{ phone }} \\{% endif %}
         {% if vat_number %}\textbf{VAT:} {{ vat_number }} \\{% endif %}
         {% if tax_number %}\textbf{Tax Ref:} {{ tax_number }} \\{% endif %}
         {% if vendor_number %}\textbf{Vendor:} {{ vendor_number }}{% endif %}
@@ -57,6 +58,12 @@
     \lightheader{BILL TO:} \par \vspace{0.1cm}
     \textbf{ {{ client_name }} } \\
     {{ client_address_safe }}
+    {% if client_vat_number %}
+    \textbf{VAT Number:} {{ client_vat_number }} \\
+    {% endif %}
+    {% if client_phone %}
+    \textbf{Phone:} {{ client_phone }} \\
+    {% endif %}
 \end{minipage}
 \hfill
 \begin{minipage}[t]{0.4\textwidth}
@@ -109,7 +116,8 @@
         \textbf{Bank:} & {{ bank_name }} \\
         \textbf{Acc Holder:} & {{ account_holder }} \\
         \textbf{Acc Number:} & {{ account_number }} \\
-        \textbf{Branch:} & {{ branch_code }}
+        \textbf{Branch:} & {{ branch_code }} \\
+        \textbf{SWIFT/BIC:} & {{ swift_bic }}
     \end{tabular}
 \end{minipage}
 

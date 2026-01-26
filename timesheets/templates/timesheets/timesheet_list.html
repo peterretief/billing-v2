@@ -109,9 +109,18 @@
                                             data-hours="{{ entry.hours }}" data-rate="{{ entry.hourly_rate }}"
                                             data-category="{{ entry.category_id|default:'' }}"
                                             data-desc="{{ entry.description }}"
-                                            data-metadata='{{ entry.metadata_json|safe }}'>
+                                            data-metadata='{{ entry.metadata_json|safe }}'
+                                            title="Edit Entry">
                                         <i class="bi bi-pencil"></i>
                                     </button>
+                                    {% if not entry.is_billed %}
+                                    <a href="{% url 'timesheets:delete_entry' entry.id %}" 
+                                       class="btn btn-sm btn-outline-danger border-0"
+                                       onclick="return confirm('Are you sure you want to delete this entry?');"
+                                       title="Delete Entry">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}

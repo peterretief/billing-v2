@@ -69,6 +69,7 @@ class UserProfile(models.Model):
     account_holder = models.CharField(max_length=100, blank=True)
     account_number = models.CharField(max_length=50, blank=True)
     branch_code = models.CharField(max_length=20, blank=True)
+    swift_bic = models.CharField(max_length=20, blank=True, verbose_name="SWIFT/BIC Code")
 
     @property
     def annual_revenue_forecast(self):

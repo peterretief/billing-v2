@@ -48,6 +48,7 @@ class UserProfileForm(forms.ModelForm):
             'account_holder',
             'account_number',
             'branch_code',
+            'swift_bic',
         ]
         labels = {
             'vat_rate': 'Default VAT Rate (%)',

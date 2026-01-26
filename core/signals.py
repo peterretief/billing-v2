@@ -36,16 +36,27 @@ def mark_profile_complete(sender, instance, **kwargs):
         ).update(is_read=True)
 
 
-# --- 3. Completion Logic (Step 3: Timesheets) ---
+# --- 3. Completion Logic (Step 2: Client) ---
+
+@receiver(post_save, sender=UserProfile)
+def mark_client_complete(sender, instance, **kwargs):
+    """
+    Step 2: Mark client task as read when a client is created.
+    Note: This is handled in clients/signals.py
+    """
+    pass
+
+
+# --- 4. Completion Logic (Step 4: Timesheets) ---
 
 @receiver(post_save, sender=TimesheetEntry)
 def mark_timesheet_complete(sender, instance, created, **kwargs):
     """
-    Step 3: Mark timesheet task as read on the first successful log.
+    Step 4: Mark timesheet task as read on the first successful log.
     """
     if created:
         Notification.objects.filter(
             user=instance.user,
-            message__icontains="Step 3",
+            message__icontains="Step 4",
             is_read=False
         ).update(is_read=True)

@@ -60,14 +60,18 @@ def generate_invoice_pdf(invoice):
         'vat_number': tex_safe(profile.vat_number),
         'tax_number': tex_safe(profile.tax_number),
         'vendor_number': tex_safe(profile.vendor_number),
+        'phone': tex_safe(profile.phone),
         'invoice_number': tex_safe(invoice.number),
         'date_issued': invoice.date_issued,
         'due_date': invoice.due_date,
         'client_name': tex_safe(invoice.client.name),
+        'client_vat_number': tex_safe(invoice.client.vat_number),
+        'client_phone': tex_safe(invoice.client.phone),
         'bank_name': tex_safe(profile.bank_name),
         'account_holder': tex_safe(profile.account_holder),
         'account_number': tex_safe(profile.account_number),
         'branch_code': tex_safe(profile.branch_code),
+        'swift_bic': tex_safe(profile.swift_bic),
     }
 
     # Billing Mode Setup

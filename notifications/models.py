@@ -1,12 +1,12 @@
 from django.db import models
 from django.conf import settings
+from core.models import TenantModel
 
-class Notification(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+class Notification(TenantModel):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     priority = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.message

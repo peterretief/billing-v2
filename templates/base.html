@@ -86,23 +86,11 @@
                                     <button type="submit" class="btn btn-outline-danger btn-sm w-100">Logout</button>
                                 </form>
                             </li>
-                     
 
 
-
-
-                            {% if user.is_authenticated %}
-            <form action="{% url 'logout' %}" method="post" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="nav-link btn btn-link py-0" style="text-decoration: none;">
-                    <i class="bi bi-box-arrow-right me-1"></i>Logout
-                </button>
-            </form>
-            {% endif %}
 
 
                             
-                     
                      
                         </ul>
                     </li>
@@ -133,7 +121,7 @@
 
 {% for task in onboarding_tasks %}
 <li class="breadcrumb-item small">
-    <span class="badge bg-primary-subtle text-primary border px-3 py-2">
+    <span class="badge bg-primary text-white border px-3 py-2 fw-bold">
         <i class="bi bi-check2-square me-1"></i> {{ task.message }}
     </span>
 </li>

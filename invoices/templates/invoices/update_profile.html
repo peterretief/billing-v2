@@ -35,6 +35,10 @@
                     <div class="col-md-6">{{ form.branch_code.label_tag }}{{ form.branch_code }}</div>
                 </div>
 
+                <div class="row mb-3">
+                    <div class="col-md-6">{{ form.swift_bic.label_tag }}{{ form.swift_bic }}</div>
+                </div>
+
                 <div class="mt-4">
                     <button type="submit" class="btn btn-success btn-lg">Update Profile</button>
                     <a href="{% url 'invoices:invoice_list' %}" class="btn btn-secondary btn-lg">Cancel</a>

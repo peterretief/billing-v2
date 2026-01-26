@@ -18,8 +18,11 @@ def create_onboarding_checklist(user_id):
     User = get_user_model()
     user = User.objects.get(pk=user_id)
     
+    # Import models for checklist
+    from items.models import Item
+    from timesheets.models import TimesheetEntry
+    
     # Define the steps and the conditions to check
-    # Note: Replace field names like 'business_name' with your actual model fields
     checks = [
         {
             'id': 'profile',
@@ -32,9 +35,14 @@ def create_onboarding_checklist(user_id):
             'complete': Client.objects.filter(user=user).exists()
         },
         {
+            'id': 'item',
+            'message': 'Step 3: Add your first item.',
+            'complete': Item.objects.filter(user=user).exists()
+        },
+        {
             'id': 'timesheet',
-            'message': 'Step 3: Log some work in your timesheets.',
-            'complete': False # Add your Timesheet model check here
+            'message': 'Step 4: Log some work in your timesheets.',
+            'complete': TimesheetEntry.objects.filter(user=user).exists()
         }
     ]
 
@@ -132,20 +140,42 @@ def generate_notifications(user):
     AND integrates AI-generated personalized suggestions.
     Only creates the notification if it doesn't already exist.
     """
-    # Static onboarding steps
+    # Import models for checklist
+    from items.models import Item
+    from timesheets.models import TimesheetEntry
+    
+    # Define the steps and the conditions to check
     steps = [
-        ("Step 1: Setup your business profile", 2),
-        ("Step 2: Create your first client", 2),
-        ("Step 3: Log your first timesheet", 2),
+        {
+            'message': 'Step 1: Setup your business profile (address, VAT, etc).',
+            'priority': 2,
+            'complete': bool(getattr(user, 'business_name', False))
+        },
+        {
+            'message': 'Step 2: Create your first client.',
+            'priority': 2,
+            'complete': Client.objects.filter(user=user).exists()
+        },
+        {
+            'message': 'Step 3: Add your first item.',
+            'priority': 2,
+            'complete': Item.objects.filter(user=user).exists()
+        },
+        {
+            'message': 'Step 4: Log some work in your timesheets.',
+            'priority': 2,
+            'complete': TimesheetEntry.objects.filter(user=user).exists()
+        }
     ]
 
-    for message, priority in steps:
-        Notification.objects.get_or_create(
-            user=user,
-            message=message,
-            priority=priority,
-            defaults={'is_read': False}
-        )
+    for step in steps:
+        if not step['complete']:
+            Notification.objects.get_or_create(
+                user=user,
+                message=step['message'],
+                priority=step['priority'],
+                defaults={'is_read': False}
+            )
 
     # Integrate AI-generated suggestions
     gemini_suggestions = get_gemini_suggestions(user)

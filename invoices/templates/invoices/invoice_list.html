@@ -33,7 +33,9 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <strong>{{ invoice.number|default:"Draft" }}</strong>
+                                <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="text-decoration-none">
+                                    <strong>{{ invoice.number|default:"Draft" }}</strong>
+                                </a>
                                 {% if invoice.status == 'DRAFT' %}
                                     <span class="badge bg-warning text-dark ms-1">Draft</span>
                                 {% endif %}
