@@ -6,7 +6,8 @@
 \usepackage{tabularx}   
 \usepackage{xcolor}     
 \usepackage{fontspec}
-\usepackage{tikz} % Added for the PAID stamp
+\usepackage{tikz} 
+\usepackage{graphicx} 
 
 % --- Font Setup ---
 {% verbatim %}
@@ -25,10 +26,10 @@
 
 \begin{document}
 
-% --- PAID WATERMARK STAMP ---
+% --- NATIVE PAID WATERMARK ---
 {% if invoice.status == 'PAID' %}
 \begin{tikzpicture}[remember picture, overlay]
-    \node[rotate=30, scale=6, text opacity=0.2, red] at (current page.center) {
+    \node[rotate=30, scale=6, text opacity=0.15, red] at (current page.center) {
         \begin{tabular}{|c|}
             \hline
             \textbf{PAID} \\
@@ -39,16 +40,32 @@
 {% endif %}
 
 % 1. HEADER
-\begin{flushright}
-    {\Huge \textbf{ {{ company_name }} }} \par \vspace{0.4cm}
-    \begin{tabular}{r@{}}
-        {{ profile_address_safe }} \\
-        {% if phone %}\textbf{Phone:} {{ phone }} \\{% endif %}
-        {% if vat_number %}\textbf{VAT:} {{ vat_number }} \\{% endif %}
-        {% if tax_number %}\textbf{Tax Ref:} {{ tax_number }} \\{% endif %}
-        {% if vendor_number %}\textbf{Vendor:} {{ vendor_number }}{% endif %}
-    \end{tabular}
-\end{flushright}
+\noindent
+\begin{minipage}[t]{0.4\textwidth}
+    \vspace{0pt} % Sets top anchor for alignment
+    {% if logo_path %}
+        \includegraphics[width=4.5cm, height=2.5cm, keepaspectratio]{ {{ logo_path }} }
+    {% else %}
+        % Native Muted Box Icon with First Letter
+        \begin{tikzpicture}
+            \fill[blue!30!gray!40] (0,0) rectangle (1.2,1.2);
+            \node[white] at (0.6,0.6) {\fontsize{18}{22}\selectfont \textbf{\textsf{ {{ company_name|slice:":1"|upper }} }} };
+        \end{tikzpicture}
+    {% endif %}
+\end{minipage}
+\begin{minipage}[t]{0.6\textwidth}
+    \vspace{0pt} % Sets top anchor for alignment
+    \begin{flushright}
+        {\Huge \textbf{ {{ company_name }} }} \par \vspace{0.4cm}
+        \begin{tabular}{r@{}}
+            {{ profile_address_safe }} \\
+            {% if phone %}\textbf{Phone:} {{ phone }} \\{% endif %}
+            {% if vat_number %}\textbf{VAT:} {{ vat_number }} \\{% endif %}
+            {% if tax_number %}\textbf{Tax Ref:} {{ tax_number }} \\{% endif %}
+            {% if vendor_number %}\textbf{Vendor:} {{ vendor_number }}{% endif %}
+        \end{tabular}
+    \end{flushright}
+\end{minipage}
 
 \vspace{1.2cm}
 

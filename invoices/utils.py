@@ -11,31 +11,20 @@ from django.utils.timezone import now
 # --- Helper Functions ---
 
 def format_currency(value):
-    """
-    Consistently rounds any numerical value to 2 decimal places.
-    """
+    """Consistently rounds any numerical value to 2 decimal places."""
     if value is None:
         return Decimal('0.00')
     return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 def tex_safe(text):
-    """
-    Escapes LaTeX special characters so they don't crash the compiler.
-    """
+    """Escapes LaTeX special characters so they don't crash the compiler."""
     if text is None:
         return ""
     text = str(text)
     mapping = {
-        '&': r'\&',
-        '$': r'\$',
-        '%': r'\%',
-        '#': r'\#',
-        '_': r'\_',
-        '{': r'\{',
-        '}': r'\}',
-        '~': r'\textasciitilde{}',
-        '^': r'\textasciicircum{}',
-        '\\': r'\textbackslash{}',
+        '&': r'\&', '$': r'\$', '%': r'\%', '#': r'\#', '_': r'\_',
+        '{': r'\{', '}': r'\}', '~': r'\textasciitilde{}',
+        '^': r'\textasciicircum{}', '\\': r'\textbackslash{}',
     }
     return "".join(mapping.get(c, c) for c in text)
 
@@ -43,19 +32,26 @@ def tex_safe(text):
 
 def generate_invoice_pdf(invoice):
     """
-    Generates a PDF using xelatex by pulling calculated totals 
-    directly from the Invoice database fields.
+    Generates a PDF using xelatex. 
+    Now runs xelatex twice to ensure TikZ watermarks align correctly.
     """
     profile = invoice.user.profile
     
-    # Ensure totals are accurate before generating
+    # 1. Sync Data
     from .models import Invoice
     Invoice.objects.update_totals(invoice)
     invoice.refresh_from_db()
 
-    # 1. Header & Client Context
+    # 2. Image Path Handling
+    logo_path = ""
+    if profile.logo and hasattr(profile.logo, 'path'):
+        if os.path.exists(profile.logo.path):
+            logo_path = profile.logo.path.replace('\\', '/')
+
+    # 3. Context Building
     context = {
         'invoice': invoice,
+        'logo_path': logo_path,
         'company_name': tex_safe(profile.company_name),
         'vat_number': tex_safe(profile.vat_number),
         'tax_number': tex_safe(profile.tax_number),
@@ -84,26 +80,33 @@ def generate_invoice_pdf(invoice):
     context['profile_address_safe'] = tex_safe(profile.address).replace('\n', r' \\ ')
     context['client_address_safe'] = tex_safe(invoice.client.address).replace('\n', r' \\ ')
 
-    # 2. Financial Context
+    # Financials
     context['subtotal'] = f"{invoice.subtotal_amount:,.2f}"
     context['vat_total'] = f"{invoice.tax_amount:,.2f}"
     context['grand_total'] = f"{invoice.total_amount:,.2f}"
     
-    # FIX: Use vat_rate from UserProfile
-    raw_vat_rate = getattr(profile, 'vat_rate', Decimal('15.00'))
-    if raw_vat_rate is None:
-        raw_vat_rate = Decimal('15.00')
+    raw_vat_rate = getattr(profile, 'vat_rate', Decimal('15.00')) or Decimal('15.00')
     context['tax_rate'] = f"{raw_vat_rate:.0f}"
 
-    # 3. Items List
-    context['items'] = [
-        {
-            'description': tex_safe(item.description),
-            'quantity': f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
-            'unit_price': f"{item.unit_price:,.2f}",
-            'row_subtotal': f"{(item.quantity * item.unit_price):,.2f}"
-        } for item in invoice.items.all()
-    ]
+    # Item List Assembly
+    items_list = []
+    if hasattr(invoice, 'custominvoice'):
+        for line in invoice.custominvoice.custom_lines.all():
+            items_list.append({
+                'description': tex_safe(line.description),
+                'quantity': f"{line.quantity:.2f} {tex_safe(line.unit_label)}",
+                'unit_price': f"{line.unit_price:,.2f}",
+                'row_subtotal': f"{line.total:,.2f}"
+            })
+    else:
+        for item in invoice.items.all():
+            items_list.append({
+                'description': tex_safe(item.description),
+                'quantity': f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
+                'unit_price': f"{item.unit_price:,.2f}",
+                'row_subtotal': f"{(item.quantity * item.unit_price):,.2f}"
+            })
+    context['items'] = items_list
 
     # 4. Render and Compile
     latex_content = render_to_string('invoices/latex/invoice_template.tex', context)
@@ -113,11 +116,16 @@ def generate_invoice_pdf(invoice):
         with open(tex_file_path, 'w', encoding='utf-8') as f:
             f.write(latex_content)
 
+        # PASS 1: Generate auxiliary files (for TikZ positioning)
+        subprocess.run(
+            ['xelatex', '-interaction=nonstopmode', '-output-directory', tempdir, tex_file_path],
+            capture_output=True, text=True, timeout=30
+        )
+
+        # PASS 2: Final PDF with correct watermark placement
         result = subprocess.run(
             ['xelatex', '-interaction=nonstopmode', '-output-directory', tempdir, tex_file_path],
-            capture_output=True,
-            text=True,
-            timeout=30
+            capture_output=True, text=True, timeout=30
         )
 
         pdf_path = os.path.join(tempdir, 'invoice.pdf')
@@ -126,27 +134,19 @@ def generate_invoice_pdf(invoice):
                 return f.read()
         else:
             print("LaTeX Output:", result.stdout)
-            raise Exception(f"LaTeX failed to generate PDF. Check logs.")
+            raise Exception("LaTeX failed to generate PDF. Check logs.")
 
+# ... [Keep Email Functions as they were] ...
 # --- Email Functions ---
 
-
 def email_invoice_to_client(invoice):
-    """
-    Standard email for sending out a new invoice.
-    Uses a Static From (system verified) and Dynamic Reply-To (tenant's business email).
-    """
+    """Standard method for sending out new invoices."""
     from .models import Invoice
     try:
         pdf_bytes = generate_invoice_pdf(invoice)
         profile = invoice.user.profile
         
-        # 1. Setup Sender Identity
-        # This makes the email show as "Company Name <your-verified@email.com>"
         friendly_from = f'"{profile.company_name}" <{settings.DEFAULT_FROM_EMAIL}>'
-        
-        # 2. Setup Reply-To
-        # Fallback to the user's login email if business_email is empty
         reply_address = profile.business_email if profile.business_email else invoice.user.email
         
         subject = f"Invoice {invoice.number} from {profile.company_name}"
@@ -156,16 +156,8 @@ def email_invoice_to_client(invoice):
                 f"Due Date: {invoice.due_date}\n\n"
                 f"Regards,\n{profile.company_name}")
         
-        email = EmailMessage(
-            subject=subject,
-            body=body,
-            from_email=friendly_from,
-            to=[invoice.client.email],
-            reply_to=[reply_address],
-        )
-        
-        filename = f"Invoice_{invoice.number or 'Draft'}.pdf"
-        email.attach(filename, pdf_bytes, 'application/pdf')
+        email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])
+        email.attach(f"Invoice_{invoice.number or 'Draft'}.pdf", pdf_bytes, 'application/pdf')
         email.send()
         
         invoice.last_generated = now()
@@ -177,9 +169,7 @@ def email_invoice_to_client(invoice):
         return False
 
 def email_receipt_to_client(invoice, amount_paid):
-    """
-    Sends a receipt email after a payment is recorded.
-    """
+    """Method for sending updated invoices as receipts."""
     try:
         pdf_bytes = generate_invoice_pdf(invoice)
         profile = invoice.user.profile
@@ -188,27 +178,15 @@ def email_receipt_to_client(invoice, amount_paid):
         reply_address = profile.business_email if profile.business_email else invoice.user.email
         
         subject = f"Payment Receipt: Invoice {invoice.number}"
-        body = (
-            f"Hi {invoice.client.name},\n\n"
-            f"Thank you for your payment of R {amount_paid:,.2f}.\n\n"
-            f"Your payment has been recorded against Invoice {invoice.number}. "
-            f"Balance remaining: R {invoice.balance_due:,.2f}.\n\n"
-            f"Please find the updated Tax Invoice attached.\n\n"
-            f"Regards,\n{profile.company_name}"
-        )
+        body = (f"Hi {invoice.client.name},\n\n"
+                f"Thank you for your payment of R {amount_paid:,.2f}.\n\n"
+                f"Balance remaining: R {invoice.balance_due:,.2f}.\n\n"
+                f"Regards,\n{profile.company_name}")
         
-        email = EmailMessage(
-            subject=subject,
-            body=body,
-            from_email=friendly_from,
-            to=[invoice.client.email],
-            reply_to=[reply_address],
-        )
-        
-        filename = f"Receipt_{invoice.number}.pdf"
-        email.attach(filename, pdf_bytes, 'application/pdf')
+        email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])
+        email.attach(f"Receipt_{invoice.number}.pdf", pdf_bytes, 'application/pdf')
         email.send()
         return True
     except Exception as e:
-        print(f"Receipt Email Error: {e}")
+        print(f"Receipt Error: {e}")
         return False

@@ -1,6 +1,8 @@
 import os
 import django
 from decimal import Decimal
+from django.utils import timezone
+from datetime import timedelta
 
 # Set up Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'billing_v2.settings') # Ensure this matches your project name
@@ -28,7 +30,8 @@ def run_test():
     invoice = Invoice.objects.create(
         user=user,
         client=client,
-        status='DRAFT'
+        status='DRAFT',
+        due_date=timezone.now() + timedelta(days=30)
     )
     print(f"Created: {invoice.number} (Status: {invoice.status})")
 
