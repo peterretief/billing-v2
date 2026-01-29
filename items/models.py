@@ -13,22 +13,29 @@ class Item(TenantModel):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField(default=timezone.now)
     is_billed = models.BooleanField(default=False)
+    is_taxable = models.BooleanField(default=True)
+   
+    # This is the "Billed" state: Null until the invoice is generated
     invoice = models.ForeignKey(
-        'invoices.Invoice',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='billed_items'
+        'invoices.Invoice', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='billed_items' # Mirroring your 'billed_timesheets' pattern
     )
-
     objects = ItemManager()
 
     class Meta:
         ordering = ['-date']
         verbose_name_plural = "Items"
 
+    is_recurring = models.BooleanField(
+        default=False, 
+        help_text="If checked, this item will be automatically billed every month."
+    )
+
     def __str__(self):
-        return f"{self.date} - {self.client.name} - {self.description}"
+        return f"{self.date} - {self.client.name} - {self.description} (Recurring: {self.is_recurring})"
 
     @property
     def total(self):
