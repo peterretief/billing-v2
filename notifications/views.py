@@ -1,5 +1,7 @@
 from django.http import JsonResponse
+
 from .models import Notification
+
 
 def get_notifications(request):
     if not request.user.is_authenticated:

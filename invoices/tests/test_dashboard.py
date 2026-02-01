@@ -1,21 +1,20 @@
-from decimal import Decimal
-from django.test import TestCase, Client as TestClient
-from django.contrib.auth import get_user_model
-from invoices.models import Invoice, InvoiceItem
-from core.models import UserProfile
-from timesheets.models import TimesheetEntry
-from items.models import Item
-from clients.models import Client
-
-from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 
+from django.contrib.auth import get_user_model
+from django.test import Client as TestClient
+from django.test import TestCase
+from django.utils import timezone
+
+from clients.models import Client
+from core.models import UserProfile
+from invoices.models import Invoice, Payment, TaxPayment
 
 User = get_user_model()
 
 
-class DashboardTotalsTest(TestCase):
-    """Test that dashboard totals are calculated correctly."""
+class DashboardCalculationsTest(TestCase):
+    """Test that dashboard calculations are correct."""
     
     def setUp(self):
         """Set up test user and client."""
@@ -33,206 +32,121 @@ class DashboardTotalsTest(TestCase):
         self.client = TestClient()
         self.client.login(username='dashboard_tester', password='pass')
 
-    def test_unbilled_timesheet_calculation(self):
-        """Verify unbilled timesheet totals are calculated correctly."""
-        # Create unbilled timesheets
-        timesheet1 = TimesheetEntry.objects.create(
-            user=self.user,
-            client=self.client_obj,
-            hours=Decimal('5.00'),
-            hourly_rate=Decimal('100.00'),
-            description="Dev Work",
-            is_billed=False
-        )
-        
-        timesheet2 = TimesheetEntry.objects.create(
-            user=self.user,
-            client=self.client_obj,
-            hours=Decimal('3.50'),
-            hourly_rate=Decimal('80.00'),
-            description="Design Work",
-            is_billed=False
-        )
-        
-        # Create a billed timesheet (should not be included)
-        timesheet3 = TimesheetEntry.objects.create(
-            user=self.user,
-            client=self.client_obj,
-            hours=Decimal('2.00'),
-            hourly_rate=Decimal('100.00'),
-            description="Billed Work",
-            is_billed=True
-        )
-        
-        # Expected: (5 * 100) + (3.5 * 80) = 500 + 280 = 780
-        response = self.client.get('/invoices/')
-        self.assertEqual(response.status_code, 200)
-        
-        unbilled_ts_value = response.context['unbilled_timesheet_value']
-        unbilled_ts_hours = response.context['unbilled_timesheet_hours']
-        
-        self.assertEqual(unbilled_ts_value, Decimal('780.00'))
-        self.assertEqual(unbilled_ts_hours, Decimal('8.50'))
-        print(f"✓ Unbilled Timesheets: R {unbilled_ts_value} ({unbilled_ts_hours} hours)")
+    def test_tax_summary_calculation(self):
+        """Verify tax_summary is calculated correctly."""
+        self.profile.is_vat_registered = True
+        self.profile.save()
 
-    def test_unbilled_items_calculation(self):
-        """Verify unbilled items totals are calculated correctly."""
-        # Create unbilled items
-        item1 = Item.objects.create(
+        # Create some invoices
+        Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
-            description="Widget A",
-            quantity=Decimal('10.00'),
-            unit_price=Decimal('50.00'),
-            is_billed=False
+            total_amount=Decimal('1150.00'),
+            tax_amount=Decimal('150.00'),
+            status='PAID',
+            due_date=timezone.now().date() + timedelta(days=30)
         )
-        
-        item2 = Item.objects.create(
+        Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
-            description="Widget B",
-            quantity=Decimal('5.00'),
-            unit_price=Decimal('75.00'),
-            is_billed=False
+            total_amount=Decimal('575.00'),
+            tax_amount=Decimal('75.00'),
+            status='PENDING',
+            due_date=timezone.now().date() + timedelta(days=30)
         )
-        
-        # Create a billed item (should not be included)
-        item3 = Item.objects.create(
+        # Invoice with no tax
+        Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
-            description="Billed Widget",
-            quantity=Decimal('2.00'),
-            unit_price=Decimal('100.00'),
-            is_billed=True
+            total_amount=Decimal('200.00'),
+            tax_amount=Decimal('0.00'),
+            status='PENDING',
+            due_date=timezone.now().date() + timedelta(days=30)
         )
-        
-        # Expected: (10 * 50) + (5 * 75) = 500 + 375 = 875
-        response = self.client.get('/invoices/')
-        self.assertEqual(response.status_code, 200)
-        
-        unbilled_items_value = response.context['unbilled_items_value']
-        self.assertEqual(unbilled_items_value, Decimal('875.00'))
-        print(f"✓ Unbilled Items: R {unbilled_items_value}")
+        # VAT Payment
+        TaxPayment.objects.create(
+            user=self.user,
+            amount=Decimal('100.00'),
+            tax_type='VAT'
+        )
 
-    def test_combined_unbilled_total(self):
-        """Verify total unbilled (timesheets + items) is correct."""
-        # Create unbilled timesheets
-        TimesheetEntry.objects.create(
-            user=self.user,
-            client=self.client_obj,
-            hours=Decimal('5.00'),
-            hourly_rate=Decimal('100.00'),
-            description="Dev Work",
-            is_billed=False
-        )
-        
-        # Create unbilled items
-        Item.objects.create(
-            user=self.user,
-            client=self.client_obj,
-            description="Widget",
-            quantity=Decimal('10.00'),
-            unit_price=Decimal('50.00'),
-            is_billed=False
-        )
-        
-        # Expected: 500 (timesheet) + 500 (items) = 1000
         response = self.client.get('/invoices/')
         self.assertEqual(response.status_code, 200)
-        
-        unbilled_ts = response.context['unbilled_timesheet_value']
-        unbilled_items = response.context['unbilled_items_value']
-        unbilled_total = response.context['unbilled_value']
-        
-        expected_total = unbilled_ts + unbilled_items
-        self.assertEqual(unbilled_total, expected_total)
-        self.assertEqual(unbilled_total, Decimal('1000.00'))
-        print(f"✓ Combined Unbilled Total: R {unbilled_total} (TS: {unbilled_ts} + Items: {unbilled_items})")
 
-    def test_billed_items_excluded(self):
-        """Verify that billed timesheets and items are excluded."""
-        # Create billed entries
-        TimesheetEntry.objects.create(
-            user=self.user,
-            client=self.client_obj,
-            hours=Decimal('10.00'),
-            hourly_rate=Decimal('100.00'),
-            description="Billed TS",
-            is_billed=True
-        )
-        
-        Item.objects.create(
-            user=self.user,
-            client=self.client_obj,
-            description="Billed Item",
-            quantity=Decimal('20.00'),
-            unit_price=Decimal('100.00'),
-            is_billed=True
-        )
-        
-        response = self.client.get('/invoices/')
-        self.assertEqual(response.status_code, 200)
-        
-        unbilled_ts = response.context['unbilled_timesheet_value']
-        unbilled_items = response.context['unbilled_items_value']
-        
-        self.assertEqual(unbilled_ts, Decimal('0.00'))
-        self.assertEqual(unbilled_items, Decimal('0.00'))
-        print("✓ Billed items correctly excluded from unbilled totals")
+        tax_summary = response.context['tax_summary']
+        # vat_due is collected, vat_paid is paid, balance is outstanding
+        self.assertEqual(tax_summary['collected'], Decimal('150.00'))
+        self.assertEqual(tax_summary['paid'], Decimal('100.00'))
+        self.assertEqual(tax_summary['outstanding'], Decimal('50.00'))
+        print(f"✓ Tax Summary: Due: R{tax_summary['collected']}, Paid: R{tax_summary['paid']}, Balance: R{tax_summary['outstanding']}")
 
-    def test_other_user_data_excluded(self):
-        """Verify that other users' data doesn't affect totals."""
-        # Create another user with their own data (use unique email)
-        other_user = User.objects.create_user(
-            username='other_user', 
-            email='other@test.com',
-            password='pass'
-        )
-        other_profile, _ = UserProfile.objects.get_or_create(user=other_user)
-        other_client = Client.objects.create(
-            user=other_user,
-            name="Other Client",
-            client_code="OTH"
-        )
-        
-        # Create unbilled entries for the other user
-        TimesheetEntry.objects.create(
-            user=other_user,
-            client=other_client,
-            hours=Decimal('100.00'),
-            hourly_rate=Decimal('1000.00'),
-            description="Other's Work",
-            is_billed=False
-        )
-        
-        # Create unbilled entry for our test user
-        TimesheetEntry.objects.create(
+    def test_total_outstanding_calculation(self):
+        """Verify total_outstanding is calculated correctly."""
+        # Create some invoices
+        Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
-            hours=Decimal('5.00'),
-            hourly_rate=Decimal('100.00'),
-            description="Our Work",
-            is_billed=False
+            total_amount=Decimal('1000.00'),
+            status='PENDING',
+            due_date=timezone.now().date() + timedelta(days=30)
+        )
+        Invoice.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            total_amount=Decimal('500.00'),
+            status='PAID',
+            due_date=timezone.now().date() + timedelta(days=30)
+        )
+        Invoice.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            total_amount=Decimal('200.00'),
+            status='DRAFT',
+            due_date=timezone.now().date() + timedelta(days=30)
+        )
+        # Partially paid invoice
+        invoice4 = Invoice.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            total_amount=Decimal('1000.00'),
+            status='PENDING',
+            due_date=timezone.now().date() + timedelta(days=30)
+        )
+        Payment.objects.create(
+            invoice=invoice4,
+            amount=Decimal('300.00'),
+            user=self.user
         )
         
         response = self.client.get('/invoices/')
         self.assertEqual(response.status_code, 200)
         
-        unbilled_ts = response.context['unbilled_timesheet_value']
-        # Should only be 500 (our user's data), not 100500 (including other user)
-        self.assertEqual(unbilled_ts, Decimal('500.00'))
-        print("✓ Other users' data correctly excluded from totals")
+        total_outstanding = response.context['total_outstanding']
+        # outstanding = (1000 - 0) + (1000 - 300) = 1700
+        self.assertEqual(total_outstanding, Decimal('1700.00'))
+        print(f"✓ Total Outstanding: R {total_outstanding}")
 
-    def test_empty_dashboard_totals(self):
-        """Verify dashboard works correctly when no unbilled items exist."""
+    def test_total_billed_calculation(self):
+        """Verify total_billed is calculated correctly."""
+        # Create some invoices
+        Invoice.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            total_amount=Decimal('1000.00'),
+            status='PAID',
+            due_date=timezone.now().date() + timedelta(days=30)
+        )
+        Invoice.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            total_amount=Decimal('500.00'),
+            status='PENDING',
+            due_date=timezone.now().date() + timedelta(days=30)
+        )
+        
         response = self.client.get('/invoices/')
         self.assertEqual(response.status_code, 200)
         
-        unbilled_ts = response.context['unbilled_timesheet_value']
-        unbilled_items = response.context['unbilled_items_value']
-        unbilled_total = response.context['unbilled_value']
-        
-        self.assertEqual(unbilled_ts, Decimal('0.00'))
-        self.assertEqual(unbilled_items, Decimal('0.00'))
-        self.assertEqual(unbilled_total, Decimal('0.00'))
-        print("✓ Empty dashboard displays correct zero totals")
+        total_billed = response.context['total_billed']
+        self.assertEqual(total_billed, Decimal('1500.00'))
+        print(f"✓ Total Billed: R {total_billed}")

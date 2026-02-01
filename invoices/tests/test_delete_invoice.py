@@ -1,15 +1,17 @@
+from datetime import timedelta
 from decimal import Decimal
-from django.test import TestCase, Client as TestClient
+
 from django.contrib.auth import get_user_model
+from django.test import Client as TestClient
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
 
+from clients.models import Client
+from core.models import UserProfile
 from invoices.models import Invoice
 from items.models import Item
 from timesheets.models import TimesheetEntry
-from core.models import UserProfile
-from clients.models import Client
 
 User = get_user_model()
 
@@ -199,7 +201,7 @@ class InvoiceDeleteTest(TestCase):
     def test_delete_invoice_user_isolation(self):
         """Test that users can only delete their own invoices."""
         # Create another user
-        other_user = User.objects.create_user(
+        User.objects.create_user(
             username='otheruser',
             email='other@test.com',
             password='pass123'

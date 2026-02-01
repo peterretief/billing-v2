@@ -1,9 +1,11 @@
-from django.db import models
-from core.models import TenantModel
 import re
-from django.db.models import Sum, Q, DecimalField
-from django.db.models.functions import Coalesce
 from decimal import Decimal
+
+from django.db import models
+from django.db.models import DecimalField, Q, Sum
+from django.db.models.functions import Coalesce
+
+from core.models import TenantModel
 
 
 class ClientQuerySet(models.QuerySet):
@@ -35,6 +37,7 @@ class Client(TenantModel):
     )
     objects = ClientQuerySet.as_manager()
     name = models.CharField(max_length=255)
+    contact_name = models.CharField(max_length=255, blank=True, verbose_name="Contact Name")
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
@@ -69,9 +72,14 @@ class Client(TenantModel):
             
         super().save(*args, **kwargs) 
 
+    @property
+    def salutation(self):
+        """Returns contact name if available, otherwise company name."""
+        return self.contact_name if self.contact_name else self.name
+
 
     def __str__(self):
-        return self.name
+        return self.salutation
 
     class Meta:
         ordering = ['name']

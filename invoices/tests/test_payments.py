@@ -1,13 +1,14 @@
-from decimal import Decimal
-from django.test import TestCase
-from django.contrib.auth import get_user_model
-from invoices.models import Invoice, InvoiceItem, Payment
-from core.models import UserProfile
-from clients.models import Client
-
-from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.utils import timezone
+
+from clients.models import Client
+from core.models import UserProfile
+from invoices.models import Invoice, Payment
+from items.models import Item
 
 User = get_user_model()
 
@@ -37,7 +38,9 @@ class PaymentValidationTest(TestCase):
         )
         
         # Add items to make total R500
-        InvoiceItem.objects.create(
+        Item.objects.create(
+            user=self.user,
+            client=self.client_obj,
             invoice=self.invoice,
             description="Test Item",
             quantity=Decimal('5.00'),

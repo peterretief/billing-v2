@@ -1,34 +1,40 @@
-from decimal import Decimal
+import os
+
+# --- 1. LIST & DASHBOARD ---
+import subprocess
 from collections import defaultdict
 from datetime import timedelta
+from decimal import Decimal
 
-from django.http import HttpResponse
-from django.shortcuts import render, get_object_or_404, redirect
+from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib import messages
 from django.db import transaction
-from django.db.models import Sum, F, Q, Value, DecimalField
+from django.db.models import DecimalField, F, Q, Sum, Value
 from django.db.models.functions import Coalesce
-from django.views.generic import ListView
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils import timezone
+from django.views.generic import ListView
+
+import items
+from clients.models import Client
+from invoices.models import Invoice
+
+from .forms import TimesheetEntryForm, WorkCategoryForm
 
 # Internal App Imports
 from .models import TimesheetEntry, WorkCategory
-from .forms import TimesheetEntryForm,WorkCategoryForm
-from clients.models import Client
-from invoices.models import Invoice, InvoiceItem
-
-# --- 1. LIST & DASHBOARD ---
-
-import subprocess
-import os
-from django.template.loader import render_to_string
-from django.http import HttpResponse
-from django.conf import settings
 
 
-from collections import defaultdict
+@login_required
+def get_client_rate(request):
+    client_id = request.GET.get('client')
+    client = get_object_or_404(Client, id=client_id, user=request.user)
+    # Return just the input field with the new value
+    return HttpResponse(f'<input type="number" name="hourly_rate" id="id_hourly_rate" value="{client.default_hourly_rate}" class="form-control">')
 
 @login_required
 def export_metadata_pdf(request, invoice_id):
@@ -386,7 +392,9 @@ def generate_invoice_bulk(request):
 
             # 4. Create the Invoice Items
             for (desc, rate), total_h in line_items.items():
-                InvoiceItem.objects.create(
+                items.models.Item.objects.create(
+                    user=request.user,  # <--- Added missing tenant field
+                    client=client,      # <--- Added missing client field
                     invoice=invoice, 
                     description=desc, 
                     quantity=total_h, 

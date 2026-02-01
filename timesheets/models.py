@@ -1,14 +1,13 @@
-from email.mime import text
-from django.db import models
-from django.utils import timezone
-from core.models import TenantModel
-from clients.models import Client
-from invoices.models import Invoice
 import json
 
+from django.db import models
+from django.utils import timezone
+
+from clients.models import Client
+from core.models import TenantModel
+
 # timesheets/models.py
-from .managers import TimesheetManager # Import your new file
-  
+from .managers import TimesheetManager  # Import your new file
 
 
 def get_unbilled_total(self):
@@ -20,7 +19,7 @@ def get_unbilled_total(self):
 
 
 
-class WorkCategory(models.Model):
+class WorkCategory(TenantModel):
     user = models.ForeignKey('core.User', on_delete=models.CASCADE)
     name = models.CharField(max_length=50) # e.g., "Meeting", "Development"
     

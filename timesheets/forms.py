@@ -1,6 +1,8 @@
 # timesheets/forms.py
 from django import forms
+
 from .models import TimesheetEntry, WorkCategory
+
 
 class TimesheetEntryForm(forms.ModelForm):
     class Meta:

@@ -1,13 +1,15 @@
+from datetime import timedelta
 from decimal import Decimal
-from django.test import TestCase, Client as TestClient
+
 from django.contrib.auth import get_user_model
+from django.test import Client as TestClient
+from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
 
-from invoices.models import Invoice
-from core.models import UserProfile
 from clients.models import Client
+from core.models import UserProfile
+from invoices.models import Invoice
 
 User = get_user_model()
 
@@ -95,8 +97,7 @@ class DeletedInvoiceReportTest(TestCase):
         self.assertEqual(all_invoices_before.count(), 2)
         
         # Get dashboard before deletion (uses aggregate queries)
-        response_before = self.test_client.get(reverse('invoices:dashboard'))
-        stats_before = response_before.context
+        self.test_client.get(reverse('invoices:dashboard'))
         
         # Delete the draft invoice
         self.test_client.post(reverse('invoices:delete_invoice', args=[self.invoice.pk]))
@@ -106,8 +107,7 @@ class DeletedInvoiceReportTest(TestCase):
         self.assertEqual(all_invoices_after.count(), 1)
         
         # Get dashboard after deletion
-        response_after = self.test_client.get(reverse('invoices:dashboard'))
-        stats_after = response_after.context
+        self.test_client.get(reverse('invoices:dashboard'))
         
         # Verify only the posted invoice remains
         remaining_invoice = all_invoices_after.first()

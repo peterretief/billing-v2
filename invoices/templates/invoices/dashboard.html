@@ -1,194 +1,93 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Dashboard{% endblock %}
-
-{% block extra_css %}
-<style>
-    .card-stat { border-left: 4px solid; transition: transform 0.2s; }
-    .card-stat:hover { transform: scale(1.01); }
-    .htmx-indicator { display: none; }
-    .htmx-request .htmx-indicator { display: block; }
-    /* Ensure table text remains sharp */
-    .table td { vertical-align: middle; }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="container mt-4">
-    
     <div class="row mb-4 align-items-center">
-        <div class="col-md-7">
+        <div class="col-md-8">
             <h2 class="fw-bold mb-0">Business Dashboard</h2>
-            <p class="text-muted">Overview for {{ user.profile.company_name|default:user.username }}</p>
         </div>
-        <div class="col-md-5 text-md-end">
-            <a href="{% url 'invoices:invoice_list' %}" class="btn btn-outline-primary shadow-sm">
-                <i class="bi bi-list-ul me-1"></i> View All Invoices
-            </a>
+        {% if flagged_count > 0 %}
+        <div class="col-md-4 text-end">
+            <div class="alert alert-danger mb-0 py-2 shadow-sm">
+                <i class="bi bi-shield-lock-fill me-2"></i><strong>{{ flagged_count }}</strong> Anomaly Found
+            </div>
         </div>
+        {% endif %}
     </div>
 
-    <div class="card shadow-sm border-0 mb-4 bg-light">
-        <div class="card-body d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="mb-1 fw-bold"><i class="bi bi-robot me-2 text-primary"></i>Financial Health Check</h6>
-                <p class="small text-muted mb-0">Target: <strong>R {{ user.profile.monthly_target|intcomma }}</strong></p>
-            </div>
-            <button class="btn btn-sm btn-primary" hx-get="{% url 'invoices:financial_assessment' %}" hx-target="#assessment-results" hx-indicator="#ai-loader">
-                Analyze Performance
-            </button>
-        </div>
-        <div id="ai-loader" class="htmx-indicator text-center p-3">
-            <div class="spinner-border spinner-border-sm text-primary"></div>
-        </div>
-        <div id="assessment-results" class="px-3 pb-3"></div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm card-stat border-warning h-100">
-                <div class="card-body">
-                    <h6 class="text-muted small fw-bold text-uppercase">Unbilled (WIP)</h6>
-                    <h3 class="fw-bold mb-0">R {{ unbilled_value|default:"0"|floatformat:2|intcomma }}</h3>
-                    <small class="text-muted">Current work in progress</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm card-stat border-primary h-100">
-                <div class="card-body">
-                    <h6 class="text-muted small fw-bold text-uppercase">Total Billed</h6>
-                    <h3 class="fw-bold mb-0">R {{ total_billed|default:"0"|floatformat:2|intcomma }}</h3>
-                    <small class="text-muted">Life-to-date sales</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm card-stat border-danger h-100">
-                <div class="card-body">
-                    <h6 class="text-muted small fw-bold text-uppercase">Outstanding</h6>
-                    <h3 class="fw-bold mb-0 text-danger">R {{ total_outstanding|default:"0"|floatformat:2|intcomma }}</h3>
-                    <small class="text-muted">Total customer debt</small>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {% if user.profile.is_vat_registered %}
-    <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100 bg-dark text-white">
-                <div id="tax-summary-section" class="card-body">
-                    {% include 'invoices/partials/tax_summary_box.html' %}
-                </div>
-                <div class="card-footer bg-transparent border-0 pt-0 pb-3 text-center">
-                    <button class="btn btn-link btn-sm text-warning text-decoration-none" hx-get="{% url 'invoices:record_vat_payment' %}" hx-target="#vat-form-container">
-                        <i class="bi bi-plus-circle me-1"></i> Record VAT Payment
-                    </button>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-body">
-                    <h6 class="text-muted small fw-bold text-uppercase mb-3">SARS Income Tax Year</h6>
-                    <div class="d-flex justify-content-between align-items-end mb-2">
-                        <div>
-                            <span class="d-block small text-muted">{{ tax_year.start|date:"M Y" }} - {{ tax_year.end|date:"M Y" }}</span>
-                            <h3 class="fw-bold mb-0">R {{ tax_year.net_revenue|intcomma }}</h3>
-                        </div>
-                        <span class="badge bg-light text-dark border">Net Revenue</span>
-                    </div>
-                    <div class="progress" style="height: 8px;">
-                        <div class="progress-bar bg-info" style="width: {% widthratio tax_year.net_revenue 1000000 100 %}%"></div>
-                    </div>
-                    <small class="text-muted mt-2 d-block">Annual progress against R1m bracket.</small>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <div id="vat-form-container" class="mb-4"></div>
-
-    <div class="row">
+    <div class="row g-4">
         <div class="col-lg-8">
-            <div class="card border-0 shadow-sm mb-4">
-                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom-0">
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-primary text-white p-3">
+                        <small class="text-uppercase opacity-75">Unbilled WIP</small>
+                        <h3 class="fw-bold mb-0">R {{ unbilled_value|floatformat:2|intcomma }}</h3>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-dark text-white p-3">
+                        <small class="text-uppercase opacity-75">Total Billed</small>
+                        <h3 class="fw-bold mb-0">R {{ total_billed|floatformat:2|intcomma }}</h3>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm bg-danger text-white p-3">
+                        <small class="text-uppercase opacity-75">Outstanding</small>
+                        <h3 class="fw-bold mb-0">R {{ total_outstanding|floatformat:2|intcomma }}</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 border-0">
                     <h5 class="mb-0 fw-bold">Recent Invoices</h5>
                 </div>
                 <div class="table-responsive">
-                    <table class="table align-middle mb-0 table-hover">
+                    <table class="table align-middle table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-4">Invoice</th>
+                                <th class="ps-3">Invoice</th>
                                 <th>Client</th>
                                 <th>Status</th>
-                                <th class="text-end pe-4">Actions</th>
+                                <th class="text-end pe-3">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for inv in recent_invoices %}
                             <tr>
-                                <td class="ps-4">
-                                    <span class="fw-bold text-dark">#{{ inv.number|default:inv.id }}</span>
-                                    <div class="small text-muted">R {{ inv.total_amount|floatformat:2|intcomma }}</div>
+                                <td class="ps-3">
+                                    <span class="fw-bold">#{{ inv.number }}</span>
+                                    <div class="small text-muted">R {{ inv.total_amount|intcomma }}</div>
                                 </td>
                                 <td>{{ inv.client.name }}</td>
                                 <td>
-                                    <span class="badge rounded-pill {% if inv.status == 'PAID' %}bg-success{% elif inv.status == 'DRAFT' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
-                                        {{ inv.get_status_display }}
+                                    <span class="badge {% if inv.status == 'PAID' %}bg-success{% elif inv.status == 'PENDING' %}bg-info text-dark{% else %}bg-secondary{% endif %}">
+                                        {% if inv.status == 'PENDING' %}Sent{% else %}{{ inv.get_status_display }}{% endif %}
                                     </span>
                                 </td>
-                                <td class="text-end pe-4">
-                                    <div class="btn-group">
-                                        <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-eye"></i>
+                                <td class="text-end pe-3">
+                                    <div class="btn-group btn-group-sm shadow-sm">
+                                        <a href="{% url 'invoices:invoice_detail' inv.pk %}" class="btn btn-outline-secondary">
+                                            <i class="bi bi-eye"></i> View
                                         </a>
+                                        
                                         {% if inv.status != 'PAID' %}
-                                        <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#paymentModal{{ inv.pk }}">
-                                            <i class="bi bi-cash-stack"></i>
+                                        <button class="btn btn-outline-success"
+                                                hx-get="{% url 'invoices:get_payment_modal' inv.pk %}"
+                                                hx-target="#paymentModalContent"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#paymentModal">
+                                            <i class="bi bi-cash-stack"></i> Pay
                                         </button>
                                         {% endif %}
                                     </div>
-
-                                    {% if inv.status != 'PAID' %}
-                                    <div class="modal fade" id="paymentModal{{ inv.pk }}" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <form action="{% url 'invoices:record_payment' inv.pk %}" method="post" class="modal-content text-start text-dark">
-                                                {% csrf_token %}
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title fw-bold">Record Payment: #{{ inv.number|default:inv.id }}</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-bold">Amount Received (R)</label>
-                                                        <div class="input-group">
-                                                            <span class="input-group-text">R</span>
-                                                            <input type="number" name="amount" step="0.01" class="form-control" 
-                                                                   value="{{ inv.balance_due|stringformat:'.2f' }}" 
-                                                                   max="{{ inv.balance_due }}" required>
-                                                        </div>
-                                                        <small class="text-muted">Balance: R {{ inv.balance_due|floatformat:2|intcomma }}</small>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-bold">Reference</label>
-                                                        <input type="text" name="reference" class="form-control" placeholder="e.g. EFT, Cash">
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="submit" class="btn btn-success w-100">Save Payment</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                    {% endif %}
                                 </td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="4" class="text-center py-5 text-muted">No activity found.</td></tr>
+                            <tr>
+                                <td colspan="4" class="text-center py-4 text-muted small">No recent invoices found.</td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -197,59 +96,43 @@
         </div>
 
         <div class="col-lg-4">
-            <div class="card border-0 shadow-sm bg-primary text-white mb-4">
+            <div class="card border-0 shadow-sm mb-4 bg-light">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-3"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h6>
+                    <h6 class="fw-bold text-uppercase small mb-3 text-muted">Management Tools</h6>
                     <div class="d-grid gap-2">
-                        <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-light btn-sm fw-bold">
-                             Invoicing Queue
+                        <a href="{% url 'invoices:billing_audit_report' %}" class="btn btn-dark text-start">
+                            <i class="bi bi-shield-check me-2 text-warning"></i> AI Audit Report
                         </a>
-                        <a href="{% url 'items:item_list' %}" class="btn btn-sm btn-outline-light text-start border-0">
-                            <i class="bi bi-box-seam me-2"></i> Items
+                        <a href="{% url 'invoices:invoice_list' %}" class="btn btn-white border text-start">
+                            <i class="bi bi-files me-2"></i> All Invoices
                         </a>
-                        <a href="{% url 'clients:client_list' %}" class="btn btn-sm btn-outline-light text-start border-0">
-                            <i class="bi bi-people me-2"></i> Client Directory
+                        <a href="{% url 'clients:client_list' %}" class="btn btn-white border text-start">
+                            <i class="bi bi-people me-2"></i> Client List
                         </a>
                     </div>
                 </div>
             </div>
 
-            <div class="row g-3">
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-light py-3 border-bottom-0">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-clock-history me-2"></i>Unbilled Timesheets</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-2">
-                                <h5 class="fw-bold mb-1">R {{ unbilled_timesheet_value|default:"0"|floatformat:2|intcomma }}</h5>
-                                <small class="text-muted">{{ unbilled_timesheet_hours|floatformat:1 }} hours pending</small>
-                            </div>
-                            <a href="{% url 'timesheets:timesheet_list' %}" class="btn btn-sm btn-outline-primary w-100">
-                                View & Bill
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12">
-                    <div class="card border-0 shadow-sm h-100">
-                        <div class="card-header bg-light py-3 border-bottom-0">
-                            <h6 class="mb-0 fw-bold"><i class="bi bi-box-seam me-2"></i>Unbilled Items</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-2">
-                                <h5 class="fw-bold mb-1">R {{ unbilled_items_value|default:"0"|floatformat:2|intcomma }}</h5>
-                                <small class="text-muted">Ready to invoice</small>
-                            </div>
-                            <a href="{% url 'items:item_list' %}" class="btn btn-sm btn-outline-primary w-100">
-                                View & Bill
-                            </a>
-                        </div>
-                    </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-robot fs-1 text-primary mb-2"></i>
+                    <h6 class="fw-bold">Financial Assessment</h6>
+                    <p class="small text-muted">Let Gemini analyze your monthly progress.</p>
+                    <button class="btn btn-primary btn-sm px-4" 
+                            hx-get="{% url 'invoices:financial_assessment' %}" 
+                            hx-target="#assessment-results">
+                        Analyze Now
+                    </button>
+                    <div id="assessment-results" class="mt-3 small text-start"></div>
                 </div>
             </div>
-            
-            </div> 
+        </div>
     </div>
 </div>
+
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" id="paymentModalContent">
+        </div>
+</div>
+
 {% endblock %}

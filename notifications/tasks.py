@@ -1,5 +1,7 @@
 from celery import shared_task
+
 from .services import generate_notifications
+
 
 @shared_task
 def generate_notifications_async(user_id):

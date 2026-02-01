@@ -1,7 +1,9 @@
-from decimal import Decimal
 from django.db import transaction
+
 from invoices.models import Invoice, InvoiceItem
+
 from .models import TimesheetEntry
+
 
 def create_invoice_from_timesheets(user, client, timesheet_ids):
     """

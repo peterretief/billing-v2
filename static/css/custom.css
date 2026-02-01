@@ -1,0 +1,19 @@
+/* Core Branding */
+:root {
+    --primary-blue: #004481; /* Example professional blue */
+    --accent-gold: #D4AF37;
+}
+
+body {
+    font-family: 'Calibri', 'Segoe UI', sans-serif;
+    background-color: #f8f9fa;
+}
+
+.card {
+    border-radius: 12px;
+}
+
+/* Fix for the receipt icon color we used in login */
+.bi-receipt-cutoff {
+    color: var(--primary-blue);
+}

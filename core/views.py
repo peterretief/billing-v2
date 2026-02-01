@@ -1,23 +1,36 @@
 import secrets
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib import messages
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import PasswordResetForm
 
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.forms import PasswordResetForm
+from django.core.mail import send_mail  # <--- Added this
+from django.http import HttpResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
+
+from .forms import AdminUserCreationForm, AppInterestForm, UserProfileForm
 from .models import UserProfile
-from .forms import UserProfileForm, AdminUserCreationForm
 
 User = get_user_model()
 
 # --- Public Views ---
 
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.core.mail import send_mail
-from django.conf import settings
-from .forms import AppInterestForm
+@login_required
+@require_POST
+def dismiss_onboarding(request):
+    # HTMX sends this as a string "true"
+    is_permanent = request.POST.get('permanent') == 'true'
+    
+    if is_permanent:
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        profile.show_onboarding_tips = False
+        profile.save()
+    
+    # Return empty so HTMX removes the element immediately
+    return HttpResponse("")
+
 
 def contact_signup(request):
     """
@@ -54,9 +67,11 @@ def contact_signup(request):
                 # Toggle submitted to True to show the success preview
                 submitted = True
                 messages.success(request, "Your request has been sent to Peter.")
-            except Exception as e:
+            except Exception:
                 # Log the error if mail fails (useful for local debugging)
-                messages.error(request, "Unable to send email at this time. Please try again later.")
+                messages.error(request,
+                                "Unable to send email at this time. " \
+                                "Please try again later.")
     else:
         form = AppInterestForm()
 
@@ -73,7 +88,8 @@ def landing_page(request):
     if request.user.is_authenticated:
         return redirect('invoices:dashboard')
 
-    # 2. Check if we just redirected from a successful submission (prevents resend on refresh)
+    # 2. Check if we just 
+    # redirected from a successful submission (prevents resend on refresh)
     submitted = request.GET.get('submitted') == 'true'
 
     if request.method == 'POST' and 'signup_request' in request.POST:
@@ -120,7 +136,7 @@ def admin_create_user(request):
             messages.error(request, 'A user with this email already exists.')
         else:
             # 1. Create user with a random usable password
-            user = User.objects.create_user(
+            User.objects.create_user(
                 username=username, 
                 email=email, 
                 password=secrets.token_urlsafe(32)
@@ -148,7 +164,8 @@ def admin_create_user(request):
 def edit_profile(request):
     """Updates UserProfile details and triggers HTMX UI refresh."""
     profile, _ = UserProfile.objects.get_or_create(user=request.user)
-    form = UserProfileForm(request.POST or None, request.FILES or None, instance=profile)
+    form = UserProfileForm(request.POST or None, 
+                           request.FILES or None, instance=profile)
     
     if request.method == 'POST' and form.is_valid():
         form.save()

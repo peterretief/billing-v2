@@ -1,6 +1,8 @@
-from django.core.management.base import BaseCommand
-from timesheets.models import WorkCategory
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
+
+from timesheets.models import WorkCategory
+
 
 class Command(BaseCommand):
     help = 'Setup initial work categories'

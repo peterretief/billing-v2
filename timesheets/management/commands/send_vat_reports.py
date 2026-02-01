@@ -1,10 +1,11 @@
-from django.core.management.base import BaseCommand
-from django.core.mail import EmailMessage
-from django.utils import timezone
 from dateutil.relativedelta import relativedelta
-from invoices.models import Invoice
+from django.core.mail import EmailMessage
+from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
-import os
+from django.utils import timezone
+
+from invoices.models import Invoice
+
 
 class Command(BaseCommand):
     help = 'Generates and emails the VAT report for the previous month'

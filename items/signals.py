@@ -1,7 +1,9 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Item
+
 from notifications.models import Notification
+
+from .models import Item
 
 
 @receiver(post_save, sender=Item)

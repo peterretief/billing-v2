@@ -1,17 +1,13 @@
 import datetime
 import re
 import uuid
-from django.db.models.signals import pre_save, post_save, post_delete
+
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from .models import Invoice, InvoiceItem
+
+from .models import Invoice
 
 # --- 1. Total Calculations (Standard Only) ---
-
-@receiver(post_save, sender=InvoiceItem)
-@receiver(post_delete, sender=InvoiceItem)
-def update_invoice_totals_on_item_change(sender, instance, **kwargs):
-    """ONLY handles standard timesheet items."""
-    Invoice.objects.update_totals(instance.invoice)
 
 @receiver(post_save, sender=Invoice)
 def update_totals_on_tax_mode_change(sender, instance, created, **kwargs):
@@ -73,7 +69,7 @@ def create_invoice_number(sender, instance, **kwargs):
                 new_number = f"{client_code}-{next_sequence:02d}-{short_year}"
                 
             instance.number = new_number
-        except Exception as e:
+        except Exception:
             # High-reliability fallback if DB query fails
             instance.number = f"INV-{uuid.uuid4().hex[:4].upper()}"
 
@@ -90,3 +86,25 @@ def connect_custom_signals():
 
 # Call this LAST
 connect_custom_signals()
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils import timezone
+
+from invoices.models import Invoice
+
+
+@receiver(post_save, sender=Invoice)
+def update_items_on_sent(sender, instance, **kwargs):
+    # Changed from 'SENT' to 'PENDING' to match your Status choices
+    if instance.status == 'PENDING':
+        instance.billed_items.all().update(is_billed=True)
+        
+        from items.models import Item
+        item_descriptions = instance.billed_items.values_list('description', flat=True)
+        Item.objects.filter(
+            user=instance.user,
+            client=instance.client,
+            is_recurring=True,
+            description__in=item_descriptions
+        ).update(last_billed_date=timezone.now().date())       

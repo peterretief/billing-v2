@@ -1,5 +1,6 @@
 # timesheets/urls.py
 from django.urls import path
+
 from . import views
 
 app_name = 'timesheets'
@@ -21,4 +22,5 @@ urlpatterns = [
     path('categories/manage/', views.manage_categories, name='manage_categories'),
     path('reports/invoice/<int:invoice_id>/', views.invoice_time_report, name='invoice_time_report'),
     path('invoice/<int:invoice_id>/metadata-pdf/', views.export_metadata_pdf, name='export_metadata_pdf'),
+    path('get-client-rate/', views.get_client_rate, name='get_client_rate'),
 ]

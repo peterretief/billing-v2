@@ -1,0 +1,84 @@
+\documentclass[11pt, a4paper]{article}
+
+% --- Packages ---
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}   
+\usepackage{tabularx}   
+\usepackage{xcolor}     
+\usepackage{fontspec}
+\usepackage{tikz} 
+\usepackage{graphicx} 
+
+\documentclass[11pt, a4paper]{article}
+\usepackage[margin=2.0cm]{geometry}
+\usepackage{booktabs, tabularx, xcolor, fontspec, graphicx, tikz}
+
+% --- FONT SETTINGS ---
+{% verbatim %}
+\setmainfont{Calibri}
+\newfontfamily\calibrilight{Calibri Light}
+\newcommand{\lightheader}[1]{{\calibrilight \color{gray} #1}}
+{% endverbatim %}
+
+
+
+\begin{document}
+
+% --- HEADER (Minimalist Left Aligned) ---
+\begin{minipage}[t]{0.5\textwidth}
+    \vspace{0pt}
+    {\Huge \textbf{ {{ company_name }} }} \\
+    \vspace{2pt}
+    {{ profile_address_safe | linebreaksbr }} \\
+    {% if phone %}Phone: {{ phone }}{% endif %}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.4\textwidth}
+    \vspace{0pt} \raggedleft
+    \textbf{\Large INVOICE} \\
+    \vspace{5pt}
+    Number: \textbf{ {{ invoice_number }} } \\
+    Date: {{ date_issued }} \\
+    Due: {{ due_date }}
+\end{minipage}
+
+\vspace{1.5cm}
+
+% --- BILL TO ---
+\textbf{Bill To:} \\
+{{ client_name }} \\
+{{ client_address_safe | linebreaksbr }} \\
+\textcolor{gray}{ {{ client_email }} }
+
+\vspace{1.2cm}
+
+% --- LINE ITEMS TABLE ---
+\renewcommand{\arraystretch}{1.5}
+\begin{tabularx}{\textwidth}{X r r r}
+    \textbf{Description} & \textbf{Qty} & \textbf{Rate} & \textbf{Total} \\
+    \hline
+    {% for item in items %}
+    {{ item.description }} & {{ item.quantity }} & R {{ item.unit_price }} & R {{ item.row_subtotal }} \\
+    {% endfor %}
+    \hline
+    \multicolumn{3}{r}{Subtotal} & R {{ subtotal }} \\
+    \multicolumn{3}{r}{\textbf{\Large Total Amount}} & \textbf{\Large R {{ grand_total }} } \\
+\end{tabularx}
+
+\vfill
+
+% --- FOOTER / BANKING ---
+\hrule \vspace{0.4cm}
+\begin{minipage}[t]{0.6\textwidth}
+    \textbf{Banking Details} \\
+    Bank: {{ bank_name }} \\
+    Account: {{ account_number }} \\
+    Branch: {{ branch_code }}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.3\textwidth}
+    \raggedleft
+    \textit{Thank you for your business!}
+\end{minipage}
+
+\end{document}

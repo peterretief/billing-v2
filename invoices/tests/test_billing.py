@@ -1,13 +1,14 @@
-from decimal import Decimal
-from django.test import TestCase
-from django.contrib.auth import get_user_model
-from invoices.models import Invoice, InvoiceItem
-from core.models import UserProfile
-from clients.models import Client
-
-from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.utils import timezone
+
+from clients.models import Client
+from core.models import UserProfile
+from invoices.models import Invoice
+from items.models import Item
 
 User = get_user_model()
 
@@ -43,13 +44,16 @@ class BillingLogicTest(TestCase):
         )
         
         # Add a standard item (e.g., 5 hours @ 100)
-        InvoiceItem.objects.create(
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
             invoice=invoice,
             description="Development Work",
             quantity=Decimal('5.00'),
             unit_price=Decimal('100.00')
         )
         
+        invoice.save()
         invoice.refresh_from_db()
         self.assertEqual(invoice.total_amount, Decimal('500.00'))
         print(f"Standard Billing Success: {invoice.number} total is {invoice.total_amount}")

@@ -1,98 +1,117 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block content %}
 <div class="container mt-4">
-    <div class="card shadow-sm border-0">
-        <div class="card-header bg-white py-3">
-            <h5 class="mb-0 fw-bold">Invoices & Reports</h5>
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-7">
+            <h2 class="fw-bold mb-1">Invoices & Reports</h2>
+            <p class="text-muted small">Manage billing cycles, download reports, and settle accounts.</p>
         </div>
-        
-        <div class="table-responsive">
-            <form action="{% url 'invoices:bulk_post' %}" method="post">
-                {% csrf_token %}
-                
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <form action="{% url 'invoices:bulk_post' %}" method="post">
+            {% csrf_token %}
+            
+            <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
+                    <thead class="table-light text-uppercase small fw-bold">
                         <tr>
-                            <th style="width: 40px;">
-                                <input type="checkbox" id="selectAll" class="form-check-input">
+                            <th class="ps-4" style="width: 40px;">
+                                <input type="checkbox" id="selectAll" class="form-check-input border-2">
                             </th>
-                            <th>Invoice #</th>
+                            <th>Invoice Details</th>
                             <th>Client</th>
-                            <th>Date</th>
                             <th>Total Due</th>
-                            <th class="text-end">Actions</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for invoice in invoices %}
                         <tr>
-                            <td>
+                            <td class="ps-4">
                                 {% if invoice.status == 'DRAFT' %}
-                                    <input type="checkbox" name="invoice_ids" value="{{ invoice.id }}" class="form-check-input">
+                                    <input type="checkbox" name="invoice_ids" value="{{ invoice.id }}" class="form-check-input invoice-checkbox border-2">
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="text-decoration-none">
-                                    <strong>{{ invoice.number|default:"Draft" }}</strong>
+                                <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="text-decoration-none fw-bold text-dark">
+                                    {{ invoice.number|default:"[DRAFT]" }}
                                 </a>
-                                {% if invoice.status == 'DRAFT' %}
-                                    <span class="badge bg-warning text-dark ms-1">Draft</span>
-                                {% endif %}
+                                <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
                             </td>
                             <td>{{ invoice.client.name }}</td>
-                            <td>{{ invoice.date_issued|date:"d M Y" }}</td>
-                            <td class="fw-bold">R {{ invoice.total_amount }}</td>
-                            <td class="text-end">
-                                <div class="btn-group">
-                                    <a href="{% url 'timesheets:export_metadata_pdf' invoice.id %}" 
-                                       class="btn btn-sm btn-outline-secondary" title="Download LaTeX Work Log">
+                            <td class="fw-bold text-primary">R {{ invoice.total_amount|intcomma }}</td>
+                            <td>
+                                <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'PENDING' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">
+                                    {% if invoice.status == 'PENDING' %}Sent{% else %}{{ invoice.get_status_display }}{% endif %}
+                                </span>
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group btn-group-sm shadow-sm">
+                                    <a href="{% url 'timesheets:export_metadata_pdf' invoice.id %}" class="btn btn-outline-secondary" title="Work Log">
                                         <i class="bi bi-file-earmark-pdf"></i> Log
                                     </a>
                                     
-                                    <a href="{% url 'timesheets:invoice_time_report' invoice.id %}" 
-                                       class="btn btn-sm btn-outline-info" target="_blank" title="View Time Report">
-                                        <i class="bi bi-clock-history"></i>
+                                    <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}" class="btn btn-outline-dark" target="_blank">
+                                        <i class="bi bi-file-pdf"></i> Classic
                                     </a>
-                                    
-                                    <a href="{% url 'invoices:invoice_pdf' invoice.id %}" class="btn btn-sm btn-primary" target="_blank">
-                                        PDF
+                                    <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}?style=modern" class="btn btn-outline-dark" target="_blank">
+                                        <i class="bi bi-magic"></i> Modern
                                     </a>
+
+                                    {% if invoice.status != 'PAID' %}
+<button class="btn btn-sm btn-success"
+        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
+        hx-target="#paymentModalContent"
+        hx-trigger="click"
+        data-bs-toggle="modal" 
+        data-bs-target="#paymentModal"
+        title="Record Payment">
+    <i class="bi bi-cash-stack"></i> 
+    <span class="d-none d-md-inline">Pay</span>
+</button>                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-4 text-muted">No invoices found.</td>
+                            <td colspan="6" class="text-center py-5 text-muted italic">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                No invoices found matching your criteria.
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
 
-                <div class="card-footer bg-white">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-send me-1"></i> Post Selected Drafts
+            <div class="card-footer bg-light border-0 py-3 px-4">
+                <div class="d-flex align-items-center">
+                    <button type="submit" id="postBtn" class="btn btn-primary fw-bold shadow-sm px-4" disabled>
+                        <i class="bi bi-send-fill me-2"></i>Post Selected Drafts
                     </button>
+                    <span id="selectedCount" class="ms-3 text-muted small"></span>
                 </div>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 
     {% if invoices.has_other_pages %}
-    <nav aria-label="Page navigation" class="mt-4">
-        <ul class="pagination justify-content-center pagination-sm">
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
             {% if invoices.has_previous %}
-                <li class="page-item"><a class="page-link" href="?page=1">First</a></li>
-                <li class="page-item"><a class="page-link" href="?page={{ invoices.previous_page_number }}">Previous</a></li>
+                <li class="page-item"><a class="page-link shadow-sm" href="?page=1">First</a></li>
+                <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.previous_page_number }}">Previous</a></li>
             {% endif %}
 
-            <li class="page-item active">
-                <span class="page-link">Page {{ invoices.number }} of {{ invoices.paginator.num_pages }}</span>
-            </li>
+            <li class="page-item active"><span class="page-link shadow-sm">{{ invoices.number }}</span></li>
 
             {% if invoices.has_next %}
-                <li class="page-item"><a class="page-link" href="?page={{ invoices.next_page_number }}">Next</a></li>
-                <li class="page-item"><a class="page-link" href="?page={{ invoices.paginator.num_pages }}">Last</a></li>
+                <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.next_page_number }}">Next</a></li>
+                <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.paginator.num_pages }}">Last</a></li>
             {% endif %}
         </ul>
     </nav>
@@ -100,11 +119,25 @@
 </div>
 
 <script>
-    document.getElementById('selectAll').onclick = function() {
-        var checkboxes = document.getElementsByName('invoice_ids');
-        for (var checkbox of checkboxes) {
-            checkbox.checked = this.checked;
-        }
+    // Logic to select all and enable/disable the post button
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.invoice-checkbox');
+    const postBtn = document.getElementById('postBtn');
+    const countDisplay = document.getElementById('selectedCount');
+
+    function updateCounter() {
+        const count = document.querySelectorAll('.invoice-checkbox:checked').length;
+        postBtn.disabled = count === 0;
+        countDisplay.textContent = count > 0 ? `${count} invoice(s) selected` : "";
     }
+
+    selectAll.onclick = function() {
+        checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        updateCounter();
+    }
+
+    checkboxes.forEach(cb => {
+        cb.onclick = updateCounter;
+    });
 </script>
 {% endblock %}

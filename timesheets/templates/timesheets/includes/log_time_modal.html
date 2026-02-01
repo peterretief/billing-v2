@@ -11,10 +11,16 @@
                 <div class="modal-body p-4">
                     <div class="mb-4">
                         <label class="form-label text-muted small fw-bold text-uppercase">Client</label>
-                        <select name="client" class="form-select" required id="id_client">
+                        <select name="client" 
+                                class="form-select" 
+                                required 
+                                id="id_client"
+                                hx-get="{% url 'timesheets:get_client_rate' %}"
+                                hx-target="#rate-input-wrapper"
+                                hx-trigger="change">
                             <option value="" selected disabled>Choose a client...</option>
                             {% for client in clients %}
-                                <option value="{{ client.id }}" data-rate="{{ client.default_hourly_rate }}">
+                                <option value="{{ client.id }}">
                                     {{ client.name }}
                                 </option>
                             {% endfor %}
@@ -32,7 +38,9 @@
                         </div>
                         <div class="col-md-4">
                             <label class="small fw-bold text-muted text-uppercase">Rate (R)</label>
-                            {{ timesheet_form.hourly_rate }}
+                            <div id="rate-input-wrapper">
+                                {{ timesheet_form.hourly_rate }}
+                            </div>
                         </div>
                     </div>
 
@@ -43,29 +51,19 @@
 
                     <hr class="my-4 opacity-25">
 
-
-
-
-
-
-
                     <div class="mb-3">
                         <label class="form-label text-dark fw-bold small text-uppercase">Work Category</label>
-
-<select name="category" 
-        id="id_category" 
-        class="form-select"
-        hx-get="{% url 'timesheets:get_category_fields' %}" 
-        hx-target="#dynamicFields" 
-        hx-trigger="change">
-    <option value="">Select Category</option>
-    {% for cat in categories %}
-        <option value="{{ cat.id }}">{{ cat.name }}</option>
-    {% endfor %}
-</select>
-
-
-
+                        <select name="category" 
+                                id="id_category" 
+                                class="form-select"
+                                hx-get="{% url 'timesheets:get_category_fields' %}" 
+                                hx-target="#dynamicFields" 
+                                hx-trigger="change">
+                            <option value="">Select Category</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
 
                     <div id="dynamicFieldsContainer" class="p-4 mb-3 border-start border-4 border-primary bg-light rounded shadow-sm" style="display: none;">

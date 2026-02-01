@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class TenantManager(models.Manager):
     """
     The base manager for all user-owned data.

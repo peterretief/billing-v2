@@ -1,6 +1,7 @@
 # items/managers.py
 from django.db import models
-from django.db.models import Sum, F
+from django.db.models import F, Sum
+
 
 class ItemManager(models.Manager):
     def unbilled(self, user):

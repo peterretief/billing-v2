@@ -1,8 +1,9 @@
 from django import forms
-from .models import UserProfile, User
-from decimal import Decimal
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.humanize.templatetags.humanize import intcomma
+
+from .models import User, UserProfile
+
 
 class AppInterestForm(forms.Form):
     name = forms.CharField(max_length=100, widget=forms.TextInput(attrs={
@@ -62,7 +63,8 @@ class UserProfileForm(forms.ModelForm):
         
         # 1. Automatic Bootstrap Styling for ALL fields
         for name, field in self.fields.items():
-            css_class = 'form-check-input' if isinstance(field.widget, forms.CheckboxInput) else 'form-control'
+            css_class = 'form-check-input' if \
+                isinstance(field.widget, forms.CheckboxInput) else 'form-control'
             field.widget.attrs.update({'class': css_class})
             
         # 2. Add the Revenue Forecast Logic

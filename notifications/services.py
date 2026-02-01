@@ -1,18 +1,21 @@
 import json
 import logging
+
 from django.conf import settings
 from google import genai
 from google.genai import types
-from .models import Notification
+
 from invoices.models import Invoice
-from core.models import UserProfile
+
+from .models import Notification
+
 logger = logging.getLogger(__name__)
 
 
 from django.contrib.auth import get_user_model
-from .models import Notification
+
 from clients.models import Client
-from invoices.models import Invoice
+
 
 def create_onboarding_checklist(user_id):
     User = get_user_model()
@@ -58,7 +61,6 @@ def create_onboarding_checklist(user_id):
 
 
 def check_onboarding_status(user):
-    from invoices.models import Invoice
     from clients.models import Client
     from notifications.models import Notification
     
@@ -132,7 +134,6 @@ def get_gemini_suggestions(user):
 
 
 
-from .models import Notification
 
 def generate_notifications(user):
     """

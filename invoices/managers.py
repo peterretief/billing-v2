@@ -1,13 +1,10 @@
-from decimal import Decimal, ROUND_HALF_UP
-from django.db import models
-from django.db.models import Sum, F, Q
-from django.db.models.functions import Coalesce
 from datetime import date
-from django.utils import timezone
-from django.apps import apps
+from decimal import ROUND_HALF_UP, Decimal
 
-#import traceback
-#from decimal import Decimal
+from django.db import models
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 
 class InvoiceQuerySet(models.QuerySet):
@@ -31,52 +28,47 @@ class InvoiceQuerySet(models.QuerySet):
 class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
     def update_totals(self, invoice):
-        """Recalculates and saves financial snapshots for DRAFT invoices."""
         if invoice.status != 'DRAFT':
-            print(f"DEBUG: Skipping invoice {invoice.id} because status is {invoice.status}")
             return
-
-        # LOG THE CALLER
- #       print(f"\n[TRACE] update_totals called for Invoice {invoice.id}")
- #       # This prints the last 5 steps of the code that led here
- #       traceback.print_stack(limit=5)
-
 
         profile = getattr(invoice.user, 'profile', None)
         is_registered = getattr(profile, 'is_vat_registered', False)
-        
-        # 1. Standard Items
-        items = invoice.items.all()
-        subtotal = sum((item.row_subtotal for item in items), Decimal('0.00'))
-        print(f"DEBUG: Standard Items Subtotal: {subtotal}")
-        
-        # 2. Custom Items
-        custom_subtotal = Decimal('0.00')
+    
+        subtotal = Decimal('0.00')
+    
+        # --- LOGIC GATE START ---
+    
+        # 1. Primary Source: Billed Items
+        has_items = False
+        if hasattr(invoice, 'billed_items') and invoice.billed_items.exists():
+            items = invoice.billed_items.all()
+            subtotal += sum((item.quantity * item.unit_price for item in items), Decimal('0.00'))
+            has_items = True
+    
+        # 2. Fallback Source: Timesheets
+        # ONLY add timesheets if NO items were found.
+        if not has_items and hasattr(invoice, 'billed_timesheets'):
+            timesheets = invoice.billed_timesheets.all()
+            subtotal += sum((ts.hours * ts.hourly_rate for ts in timesheets), Decimal('0.00'))
+
+        # 3. Custom Items
+        # (If you want custom lines to ALWAYS add, keep this separate)
         if hasattr(invoice, 'custom_lines'):
-            print("DEBUG: Found 'custom_lines' attribute (Instance is CustomInvoice)")
-            lines = invoice.custom_lines.all()
-            custom_subtotal = sum((line.total for line in lines), Decimal('0.00'))
-        elif hasattr(invoice, 'custominvoice'):
-            print("DEBUG: Found 'custominvoice' relation (Instance is Invoice)")
-            lines = invoice.custominvoice.custom_lines.all()
-            custom_subtotal = sum((line.total for line in lines), Decimal('0.00'))
-        else:
-            print("DEBUG: No custom lines or relations found.")
+            subtotal += sum((line.total for line in invoice.custom_lines.all()), Decimal('0.00'))
+    
+        # --- LOGIC GATE END ---
 
-        subtotal += custom_subtotal
-        print(f"DEBUG: Combined Subtotal: {subtotal}")
-
-        # 3. Tax Calculation
+        # 4. Tax Calculation
         tax_amount = Decimal('0.00')
         if is_registered and invoice.tax_mode != 'NONE':
-            rate = getattr(profile, 'vat_rate', Decimal('15.00')) / Decimal('100.00')
-            tax_amount = subtotal * rate # Simplified for debugging
+            rate_val = getattr(profile, 'vat_rate', Decimal('15.00'))
+            rate = rate_val / Decimal('100.00')
+            tax_amount = subtotal * rate
 
         invoice.subtotal_amount = subtotal
         invoice.tax_amount = tax_amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         invoice.total_amount = subtotal + invoice.tax_amount
-        
-        print(f"DEBUG: Final Total being saved: {invoice.total_amount}")
+    
         invoice.save(update_fields=['subtotal_amount', 'tax_amount', 'total_amount'])
 
 

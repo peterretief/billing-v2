@@ -1,13 +1,28 @@
+# --- 1. Generation Logic ---
+from django.contrib.auth import get_user_model
+from django.contrib.auth.signals import user_logged_in
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth.signals import user_logged_in
 
-from .models import UserProfile
 from notifications.models import Notification
 from notifications.tasks import generate_notifications_async
 from timesheets.models import TimesheetEntry
 
-# --- 1. Generation Logic ---
+from .models import UserProfile
+
+User = get_user_model()
+
+# --- 0. Creation Logic (The Foundation) ---
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    """
+    Ensure every User has a Profile as soon as they are created.
+    This prevents the 'User has no profile' error in scripts and views.
+    """
+    if created:
+        UserProfile.objects.get_or_create(user=instance)
+
 
 @receiver(user_logged_in)
 def user_logged_in_receiver(sender, request, user, **kwargs):

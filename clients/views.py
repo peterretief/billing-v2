@@ -1,26 +1,26 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import ListView, DetailView
-from django.contrib import messages
-from django.db.models import Sum, Q
+from django.db.models import Q, Sum
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.generic import DetailView, ListView
 
-from .models import Client
-from .forms import ClientForm
 from invoices.models import Invoice
 
 # ... (your existing imports) ...
-from timesheets.models import TimesheetEntry
 from timesheets.forms import TimesheetEntryForm
 
+from .forms import ClientForm
+from .models import Client
 
 # views.py
 from .services import BrevoSenderService
 
+
 def onboard_tenant(request):
     # ... validation ...
     service = BrevoSenderService()
-    sender_id = service.create_tenant_sender(tenant.name, tenant.email)
+    service.create_tenant_sender(tenant.name, tenant.email)
     # ... return response ...
 
     

@@ -1,7 +1,9 @@
-from django import forms
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Column, Submit
+from crispy_forms.layout import Column, Layout, Row, Submit
+from django import forms
+
 from .models import Client
+
 
 class ClientForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):

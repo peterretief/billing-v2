@@ -27,18 +27,6 @@
 \begin{document}
 
 % --- NATIVE PAID WATERMARK ---
-{% if invoice.status == 'PAID' %}
-\begin{tikzpicture}[remember picture, overlay]
-    \node[rotate=30, scale=6, text opacity=0.15, red] at (current page.center) {
-        \begin{tabular}{|c|}
-            \hline
-            \textbf{PAID} \\
-            \hline
-        \end{tabular}
-    };
-\end{tikzpicture}
-{% endif %}
-
 % 1. HEADER
 \noindent
 \begin{minipage}[t]{0.4\textwidth}
@@ -73,7 +61,7 @@
 \noindent
 \begin{minipage}[t]{0.5\textwidth}
     \lightheader{BILL TO:} \par \vspace{0.1cm}
-    \textbf{ {{ client_name }} } \\
+    \noindent\textbf{ {{ client_name }} } \\
     {{ client_address_safe }}
     {% if client_vat_number %}
     \textbf{VAT Number:} {{ client_vat_number }} \\

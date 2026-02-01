@@ -1,6 +1,27 @@
 import os
 from pathlib import Path
+
+from celery.schedules import crontab
 from dotenv import load_dotenv
+
+CELERY_BEAT_SCHEDULE = {
+    # 1. Monthly Recurring Invoices (Runs every day at 8:00 AM)
+    # Note: The task logic handles the "First Business Day" check internally.
+    'generate-recurring-invoices-daily-check': {
+        'task': 'invoices.tasks.generate_recurring_monthly_invoices',
+        'schedule': crontab(hour=8, minute=0),
+    },
+    
+    # 2. Gemini Financial Health Check (Runs on the 15th of every month at 9:00 AM)
+    'send-mid-month-report': {
+        'task': 'invoices.tasks.send_mid_month_financial_report',
+        'schedule': crontab(day_of_month=15, hour=9, minute=0),
+    },
+}
+
+TIME_ZONE = 'Africa/Johannesburg'
+USE_TZ = True
+CELERY_TIMEZONE = 'Africa/Johannesburg'
 
 # --- PATHS & ENVIRONMENT ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -109,6 +130,7 @@ DATABASES = {
     }
 }
 
+
 # --- STATIC & MEDIA ---
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
@@ -121,9 +143,9 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'peter@diode.co.za')
 SERVER_EMAIL = "info@peterretief.org"
 
 # --- REDIS & CELERY ---
-REDIS_PASSWORD = '220961'
-CELERY_BROKER_URL = f'redis://:{REDIS_PASSWORD}@localhost:6379/0'
-CELERY_RESULT_BACKEND = f'redis://:{REDIS_PASSWORD}@localhost:6379/0'
+REDIS_PASSWORD = {"REDIS_PASSWORD": os.environ.get("REDIS_PASSWORD")}
+CELERY_BROKER_URL = 'redis://:220961@localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://:220961@localhost:6379/0'
 CELERY_TASK_ALWAYS_EAGER = False  # Set to False to actually use Redis
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'

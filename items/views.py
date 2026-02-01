@@ -1,25 +1,49 @@
 # items/views.py
-from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from .models import Item
-from .forms import ItemForm
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect
-from django.contrib import messages
-from django.db import transaction
 from collections import defaultdict
-from invoices.models import Invoice, InvoiceItem
-from django.utils import timezone
 from datetime import timedelta
+
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
+from django.shortcuts import redirect, render
+from django.urls import reverse_lazy
+from django.utils import timezone
+from django.views.generic import CreateView, DeleteView, ListView, UpdateView
+
+from invoices.models import Invoice
+
+from .forms import ItemForm
+from .models import Item
 
 
 class ItemListView(LoginRequiredMixin, ListView):
     model = Item
     template_name = 'items/item_list.html'
-    context_object_name = 'items'
+    context_object_name = 'one_off_items'
 
     def get_queryset(self):
-        return Item.objects.filter(user=self.request.user, is_billed=False)
+        # TOP TABLE: Linear cycle items (One-offs)
+        return Item.objects.filter(
+            user=self.request.user, 
+            invoice__isnull=True, 
+            is_recurring=False
+        ).order_by('-date')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        
+        # --- THE FIX ---
+        # Passing 'today' allows the template to compare months for the green tick
+        ctx['today'] = timezone.now() 
+        # ----------------
+        
+        # BOTTOM TABLE: Persistent cycle items (Templates)
+        ctx['queued_items'] = Item.objects.filter(
+            user=self.request.user, 
+            is_recurring=True
+        ).order_by('-date', '-id')
+        
+        return ctx
 
 class ItemCreateView(LoginRequiredMixin, CreateView):
     model = Item
@@ -33,7 +57,6 @@ class ItemCreateView(LoginRequiredMixin, CreateView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
-        # Filter client dropdown to only show clients added by this user
         form.fields['client'].queryset = form.fields['client'].queryset.filter(user=self.request.user)
         return form
 
@@ -48,7 +71,6 @@ class ItemUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
-        # Filter client dropdown to only show clients added by this user
         form.fields['client'].queryset = form.fields['client'].queryset.filter(user=self.request.user)
         return form
 
@@ -59,7 +81,6 @@ class ItemDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_queryset(self):
         return Item.objects.filter(user=self.request.user)
-
 
 def generate_invoice_from_items(request):
     if request.method != 'POST':
@@ -80,7 +101,8 @@ def generate_invoice_from_items(request):
         items = Item.objects.select_for_update().filter(
             id__in=selected_ids,
             user=request.user,
-            is_billed=False
+            is_billed=False,
+            is_recurring=False
         ).select_related('client')
 
         if not items.exists():
@@ -104,20 +126,70 @@ def generate_invoice_from_items(request):
             )
 
             for item in client_items:
-                InvoiceItem.objects.create(
-                    invoice=invoice,
-                    description=item.description,
-                    quantity=item.quantity,
-                    unit_price=item.unit_price,
-                    is_taxable=profile.is_vat_registered
-                )
                 item.is_billed = True
                 item.invoice = invoice
                 item.save()
 
+            # Ensure this matches your model's calculation method
+            # Usually invoice.sync_totals() or Invoice.objects.update_totals(invoice)
             invoice.sync_totals()
             invoice.save()
 
         messages.success(request, f"Generated {len(client_map)} invoice(s) as drafts.")
 
     return redirect('invoices:invoice_list')
+
+
+
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+
+from .models import Item
+from .services import import_recurring_to_invoices
+
+
+@login_required
+def item_list(request):
+    """Clean list view for all billable items."""
+    items = Item.objects.filter(user=request.user)
+    return render(request, 'items/item_list.html', {
+        'recurring_items': items.filter(is_recurring=True),
+        'one_off_items': items.filter(is_recurring=False, is_billed=False),
+    })
+
+@login_required
+def trigger_billing(request):
+    """
+    Triggers the billing engine. 
+    Designed to work seamlessly with HTMX for a 'no-refresh' experience.
+    """
+    if request.method != "POST":
+        return redirect('invoices:dashboard')
+
+    try:
+        # Run the engine
+        new_invoice_ids = import_recurring_to_invoices(request.user)
+        
+        if new_invoice_ids:
+            msg = f"Billing complete: {len(new_invoice_ids)} invoices generated and sent."
+            msg_class = "success"
+        else:
+            msg = "Nothing to bill: All items are up to date for this month."
+            msg_class = "info"
+            
+    except Exception as e:
+        msg = f"System error: {str(e)}"
+        msg_class = "danger"
+
+    # HTMX Response: Returns a beautiful Bootstrap Alert partial
+    if request.headers.get('HX-Request'):
+        return HttpResponse(
+            f'<div class="alert alert-{msg_class} alert-dismissible fade show border-0 shadow-sm" role="alert">'
+            f'<i class="bi bi-info-circle-fill me-2"></i> {msg}'
+            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>'
+            '</div>'
+        )
+    
+    # Standard Redirect Fallback
+    messages.add_message(request, getattr(messages, msg_class.upper()), msg)
+    return redirect('invoices:dashboard')

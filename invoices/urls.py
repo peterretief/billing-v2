@@ -1,10 +1,13 @@
 from django.urls import path
+
 from . import views
 
 app_name = 'invoices'
 
 urlpatterns = [
     # Dashboard & Lists
+    path('<int:pk>/pdf/', views.generate_invoice_pdf_view, name='generate_invoice_pdf_view'),
+    path('<int:pk>/pay/', views.mark_invoice_paid, name='mark_as_paid'),
     path('', views.dashboard, name='dashboard'),
     path('list/', views.invoice_list, name='invoice_list'),
     
@@ -29,4 +32,6 @@ urlpatterns = [
     path('bulk-post/', views.bulk_post, name='bulk_post'),
     path('financial-assessment/', views.financial_assessment, name='financial_assessment'),
     path('record-vat-payment/', views.record_vat_payment, name='record_vat_payment'),
+    path('audit-report/', views.billing_audit_report, name='billing_audit_report'),
+    path('invoice/<int:pk>/payment-modal/', views.get_payment_modal, name='get_payment_modal'),
 ]

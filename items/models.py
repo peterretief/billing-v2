@@ -1,10 +1,11 @@
 from django.db import models
 from django.utils import timezone
-from core.models import TenantModel
+
 from clients.models import Client
-from invoices.models import Invoice
+from core.models import TenantModel
 
 from .managers import ItemManager
+
 
 class Item(TenantModel):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='items')
@@ -13,7 +14,7 @@ class Item(TenantModel):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField(default=timezone.now)
     is_billed = models.BooleanField(default=False)
-    is_taxable = models.BooleanField(default=True)
+    is_taxable = models.BooleanField(default=False)
    
     # This is the "Billed" state: Null until the invoice is generated
     invoice = models.ForeignKey(
@@ -34,9 +35,14 @@ class Item(TenantModel):
         help_text="If checked, this item will be automatically billed every month."
     )
 
+    last_billed_date = models.DateField(null=True, blank=True)
+
     def __str__(self):
-        return f"{self.date} - {self.client.name} - {self.description} (Recurring: {self.is_recurring})"
+        return f"{self.date} - {self.client.name} - {self.description} \
+            (Recurring: {self.is_recurring})"
 
     @property
     def total(self):
         return self.quantity * self.unit_price
+
+

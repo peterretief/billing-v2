@@ -1,19 +1,22 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Billing v2{% endblock %}</title>
+
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="{% static 'js/htmx.min.js' %}"></script>
     
     <style>
         :root { --primary-blue: #0d6efd; --bg-light: #f4f7f6; }
-        body { background-color: var(--bg-light); min-height: 100vh; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .navbar { box-shadow: 0 2px 10px rgba(0,0,0,.1); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        body { background-color: var(--bg-light); min-height: 100vh; font-family: 'Inter', sans-serif; }
+        .navbar { box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+        .user-avatar { width: 32px; height: 32px; line-height: 32px; font-size: 0.85rem; font-weight: 700; background-color: var(--primary-blue); text-align: center; }
         
         /* Nav Underline Effect */
         .navbar-dark .navbar-nav .nav-link { position: relative; transition: color 0.3s; padding: 0.5rem 1rem; }
@@ -22,17 +25,14 @@
             content: ''; position: absolute; bottom: 0; left: 20%; width: 60%; height: 3px;
             background-color: var(--primary-blue); border-radius: 10px 10px 0 0;
         }
-
-        .user-avatar { width: 32px; height: 32px; line-height: 32px; font-size: 0.85rem; font-weight: 700; background-color: var(--primary-blue); }
-        #notification-container { z-index: 1060; }
     </style>
 </head>
 
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-   
+
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
         <div class="container">
-            <a class="navbar-brand fw-bold d-flex align-items-center" href="{% if user.is_authenticated %}{% url 'invoices:dashboard' %}{% else %}{% url 'core:landing_page' %}{% endif %}">
+            <a class="navbar-brand fw-bold" href="{% if user.is_authenticated %}{% url 'invoices:dashboard' %}{% else %}{% url 'core:landing_page' %}{% endif %}">
                 <i class="bi bi-receipt-cutoff me-2 text-primary"></i> 
                 <span>Billing <span class="text-primary">v2</span></span>
             </a>
@@ -44,54 +44,38 @@
             <div class="collapse navbar-collapse" id="mainNav">
                 {% if user.is_authenticated %}
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'invoices:dashboard' %}">Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.app_name == 'clients' %}active{% endif %}" href="{% url 'clients:client_list' %}">Clients</a></li>
+                    <li class="nav-item"><a class="nav-link {% if 'invoices' in request.path %}active{% endif %}" href="{% url 'invoices:invoice_list' %}">Invoices</a></li>
+                    <li class="nav-item"><a class="nav-link {% if 'clients' in request.path %}active{% endif %}" href="{% url 'clients:client_list' %}">Clients</a></li>
+                    <li class="nav-item"><a class="nav-link {% if 'items' in request.path %}active{% endif %}" href="{% url 'items:item_list' %}">Items</a></li>
                     <li class="nav-item"><a class="nav-link {% if 'timesheets' in request.path %}active{% endif %}" href="{% url 'timesheets:timesheet_list' %}">Timesheets</a></li>
-
-          <li class="nav-item"><a class="nav-link {% if 'items' in request.path %}active{% endif %}" href="{% url 'items:item_list' %}">Items</a></li>
-
-                    <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'invoice_list' %}active{% endif %}" href="{% url 'invoices:invoice_list' %}">Invoices</a></li>
                 </ul>
 
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" data-bs-toggle="dropdown">
-                            <div class="user-avatar rounded-circle d-inline-block text-white text-center me-2">
+                            <div class="user-avatar rounded-circle d-inline-block text-white me-2">
                                 {{ user.email|slice:":1"|upper }}
                             </div>
                             <span class="d-none d-sm-inline">{{ user.email }}</span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2">
                             <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Management</li>
-                            <li><a class="dropdown-item" href="{% url 'timesheets:manage_categories' %}"><i class="bi bi-tags me-2"></i> Work Categories</a></li>
-                            <li><a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-building me-2"></i> Business Profile</a></li>
+                            <li><a class="dropdown-item" href="{% url 'timesheets:manage_categories' %}"><i class="bi bi-tags me-2 text-muted"></i> Work Categories</a></li>
+                            <li><a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-person-gear me-2 text-muted"></i> Profile</a></li>
                             
                             {% if user.is_superuser %}
                             <li><hr class="dropdown-divider"></li>
                             <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Admin</li>
-                            <li>
-                                <a class="dropdown-item" href="{% url 'core:admin_create_user' %}">
-                                    <i class="bi bi-person-plus-fill me-2"></i> Create User
-                                </a>
-                            </li>
+                            <li><a class="dropdown-item" href="{% url 'core:admin_create_user' %}"><i class="bi bi-person-plus-fill me-2 text-muted"></i> Create User</a></li>
                             {% endif %}
 
                             <li><hr class="dropdown-divider"></li>
-                     
-                     
-                     
                             <li class="px-3 py-2">
                                 <form action="{% url 'logout' %}" method="post">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-outline-danger btn-sm w-100">Logout</button>
                                 </form>
                             </li>
-
-
-
-
-                            
-                     
                         </ul>
                     </li>
                 </ul>
@@ -104,33 +88,24 @@
         </div>
     </nav>
 
-    <div id="onboarding-breadcrumb-wrapper" 
-         hx-get="{{ request.path }}" 
-         hx-trigger="profileUpdated from:body, clientAdded from:body, timesheetAdded from:body" 
-         hx-select="#onboarding-breadcrumb-wrapper"
-         hx-swap="outerHTML">
-        {% if user.is_authenticated and onboarding_tasks %}
-        <div class="bg-white border-bottom shadow-sm mb-4">
-            <div class="container py-2">
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0 align-items-center">
-                        <li class="breadcrumb-item d-flex align-items-center">
-                            <i class="bi bi-rocket-takeoff text-primary me-2"></i>
-                            <span class="text-muted small fw-bold text-uppercase">Setup Steps:</span>
-                        </li>
-
-{% for task in onboarding_tasks %}
-<li class="breadcrumb-item small">
-    <span class="badge bg-primary text-white border px-3 py-2 fw-bold">
-        <i class="bi bi-check2-square me-1"></i> {{ task.message }}
-    </span>
-</li>
-{% endfor %}
-
-
-
-                    </ol>
-                </nav>
+    <div id="onboarding-wrapper">
+        {% if show_onboarding_bar %}
+        <div class="bg-white border-bottom shadow-sm mb-4" id="onboarding-bar">
+            <div class="container py-2 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-rocket-takeoff text-primary me-2"></i>
+                    <span class="text-muted small fw-bold text-uppercase me-3 d-none d-md-inline">Setup Steps:</span>
+                    <div class="d-flex gap-2">
+                        {% for task in onboarding_tasks %}
+                        <span class="badge bg-primary px-3 py-2 shadow-sm">{{ task.message }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <button type="button" class="btn-close ms-3" 
+                        data-bs-toggle="modal" data-bs-target="#dismissModal"
+                        title="Dismiss options">
+                </button>
             </div>
         </div>
         {% endif %}
@@ -139,63 +114,50 @@
     <div class="container mt-3">
         {% if messages %}
             {% for message in messages %}
-                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm" role="alert">
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             {% endfor %}
         {% endif %}
-    </div>
-
-    <div id="notification-container" 
-         class="toast-container position-fixed bottom-0 end-0 p-3"
-         data-url="{% url 'notifications:get_notifications' %}">
-    </div>
-
-    <div class="container">
+        
         <main class="pb-5">
             {% block content %}{% endblock %}
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Slash shortcut for search
-        document.addEventListener('keydown', e => {
-            if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-                e.preventDefault();
-                const s = document.querySelector('input[type="search"], .search-input');
-                if (s) s.focus();
-            }
-        });
-
-        // Notifications logic (Currently paused to reduce logs)
-        const seenNotifications = new Set();
-        const notificationContainer = document.getElementById('notification-container');
-
-        function fetchNotifications() {
-            if (!notificationContainer) return;
-            fetch(notificationContainer.dataset.url)
-                .then(r => r.json())
-                .then(data => {
-                    data.forEach(n => {
-                        if (seenNotifications.has(n.id)) return;
-                        const t = document.createElement('div');
-                        t.className = 'toast show shadow-lg border-0 mb-2';
-                        t.innerHTML = `
-                            <div class="toast-header bg-dark text-white border-0">
-                                <i class="bi bi-info-circle text-primary me-2"></i>
-                                <strong class="me-auto">System Update</strong>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
-                            </div>
-                            <div class="toast-body bg-dark text-white-50">${n.message}</div>`;
-                        notificationContainer.appendChild(t);
-                        seenNotifications.add(n.id);
-                        new bootstrap.Toast(t).show();
-                    });
-                });
-        }
-    </script>
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
     {% block extra_js %}{% endblock %}
+
+    <div class="modal fade" id="dismissModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-light">
+                    <h6 class="modal-title fw-bold">Dismiss Steps?</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <p class="small text-muted mb-3">Hide these setup steps?</p>
+                    
+                    <div class="form-check form-switch d-inline-block mb-3">
+                        <input class="form-check-input" type="checkbox" id="permCheck" style="cursor: pointer;">
+                        <label class="form-check-label small fw-bold" for="permCheck" style="cursor: pointer;">
+                            Make Permanent
+                        </label>
+                    </div>
+
+                    <button type="button" 
+                            class="btn btn-primary btn-sm w-100"
+                            hx-post="{% url 'core:hide_onboarding' %}" 
+                            hx-vals='js:{"permanent": document.getElementById("permCheck").checked}'
+                            hx-target="#onboarding-bar" 
+                            hx-swap="outerHTML"
+                            data-bs-dismiss="modal">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

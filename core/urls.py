@@ -1,5 +1,6 @@
     # Profile Management
 from django.urls import path
+
 from . import views
 
 app_name = 'core'
@@ -11,4 +12,5 @@ urlpatterns = [
     path('profile/edit/', views.edit_profile, name='edit_profile'),
     path('profile/update/', views.update_profile, name='update_profile'),
     path('signup/', views.contact_signup, name='signup'),
+    path('hide-onboarding/', views.dismiss_onboarding, name='hide_onboarding'),
  ]

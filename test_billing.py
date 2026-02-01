@@ -1,66 +1,61 @@
-import os
-import django
-from decimal import Decimal
-from django.utils import timezone
-from datetime import timedelta
+# /opt/billing_v2/test_billing.py
+from datetime import date
 
-# Set up Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'billing_v2.settings') # Ensure this matches your project name
-django.setup()
+from django.db import IntegrityError
 
-from django.contrib.auth import get_user_model
-User = get_user_model()
+from invoices.models import Invoice
+from invoices.tasks import generate_recurring_monthly_invoices
 
-from invoices.models import Invoice, InvoiceItem
-from clients.models import Client
+print("--- Starting Billing Test Script ---")
 
-def run_test():
-    print("--- Starting Billing Logic Test ---")
-    
-    # 1. Setup: Get a user and a client
-    user = User.objects.first()
-    client = Client.objects.first()
-    
-    if not user or not client:
-        print("ERROR: Need at least one User and one Client in the DB to test.")
-        return
+# 1. Test the actual Task logic (with the workday check)
+print("Testing scheduled task logic...")
+result = generate_recurring_monthly_invoices()
+print(f"Task Result: {result}")
 
-    # 2. Create an Invoice
-    print("Step 1: Creating Invoice...")
-    invoice = Invoice.objects.create(
-        user=user,
-        client=client,
-        status='DRAFT',
-        due_date=timezone.now() + timedelta(days=30)
-    )
-    print(f"Created: {invoice.number} (Status: {invoice.status})")
+# 2. Force a clone for testing (ignoring the workday check)
+print("\nForcing a template clone for verification...")
+templates = Invoice.objects.filter(is_template=True)
 
-    # 3. Add Line Items
-    print("Step 2: Adding Line Items...")
-    InvoiceItem.objects.create(
-        invoice=invoice,
-        description="Consulting",
-        quantity=2,
-        unit_price=Decimal('150.00')
-    )
-    InvoiceItem.objects.create(
-        invoice=invoice,
-        description="Hosting",
-        quantity=1,
-        unit_price=Decimal('33.00')
-    )
+if not templates.exists():
+    print("Error: No templates found! Check 'is_template' in Admin.")
+else:
+    for template in templates:
+        try:
+            # Create the clone
+            new_inv = Invoice.objects.get(pk=template.pk)
+            new_inv.pk = None  
+            new_inv.date_issued = date.today()
+            new_inv.is_template = False
+            new_inv.status = 'DRAFT'
+            
+            # Use a unique test number to avoid IntegrityErrors
+            timestamp = date.today().strftime('%y%m%d')
+            new_inv.number = f"T-{timestamp}-{template.client.id}"
+            
+            new_inv.save()
+            
+            # Clone items
+            from items.models import Item
+            for item_to_clone in template.billed_items.all():
+                Item.objects.create(
+                    user=template.user,
+                    client=template.client,
+                    invoice=new_inv,
+                    description=item_to_clone.description,
+                    quantity=item_to_clone.quantity,
+                    unit_price=item_to_clone.unit_price,
+                    is_taxable=item_to_clone.is_taxable,
+                    is_recurring=item_to_clone.is_recurring
+                )
+            new_inv.sync_totals()
+            new_inv.save()
+                
+            print(f"Successfully created: {new_inv.number}")
+            
+        except IntegrityError:
+            print(f"Skipping {template.client}: Duplicate number detected.")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
 
-    # 4. Final Verification
-    invoice.refresh_from_db()
-    print(f"Step 3: Verifying Totals...")
-    print(f"Subtotal: {invoice.subtotal_amount}")
-    print(f"Total Amount: {invoice.total_amount}")
-
-    expected = Decimal('333.00')
-    if invoice.total_amount >= expected: # Adjust if you have VAT enabled
-        print("SUCCESS: The totals are calculating and persisting!")
-    else:
-        print(f"FAILURE: Expected at least {expected}, but got {invoice.total_amount}")
-
-if __name__ == "__main__":
-    run_test()
+print("\n--- Test Complete ---")

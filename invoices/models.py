@@ -1,10 +1,14 @@
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
+
 from django.db import models
-from core.models import TenantModel
-from clients.models import Client
-from .managers import InvoiceManager
 from django.utils import timezone
+
+from clients.models import Client
+from core.models import TenantModel
+
+from .managers import InvoiceManager
+
 
 class Invoice(TenantModel):
     class TaxMode(models.TextChoices):
@@ -22,6 +26,13 @@ class Invoice(TenantModel):
     class BillingType(models.TextChoices):
         PRODUCT = 'PRODUCT', 'Product-based'
         SERVICE = 'SERVICE', 'Service-based'
+
+    is_template = models.BooleanField(
+        default=False, 
+        db_index=True,
+        help_text="If checked, this invoice will be used as a base for recurring monthly billing."
+    )
+
 
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='invoices')
     number = models.CharField(max_length=50, blank=True)
@@ -50,22 +61,80 @@ class Invoice(TenantModel):
         ordering = ['-date_issued', '-id']
 
     @property
+    def invoice_number(self):
+        return self.number
+
+    @invoice_number.setter
+    def invoice_number(self, value):
+        self.number = value
+
+#    @property
+#    def calculated_subtotal(self):
+#        return sum(item.row_subtotal for item in self.items.all()) or Decimal('0.00')
+
+# In invoices/models.py
+    @property
     def calculated_subtotal(self):
-        return sum(item.row_subtotal for item in self.items.all()) or Decimal('0.00')
+        """Source of Truth: Only the billed items."""
+        from decimal import Decimal
+        # ONLY sum items. The linked timesheets are for reporting, not billing.
+        return sum(
+            (item.quantity * item.unit_price for item in self.billed_items.all()), 
+            Decimal('0.00')
+        )
+    
+
+    @property
+    def calculated_subtotal(self):
+        from decimal import Decimal
+    
+        # 1. Check for Billed Items (Direct items or generated from timesheets)
+        item_total = sum(
+            (item.quantity * item.unit_price for item in self.billed_items.all()), 
+            Decimal('0.00')
+        )
+    
+        # 2. If there are items, they are the ONLY source of truth.
+        if item_total > 0:
+            return item_total
+    
+        # 3. If NO items exist, fall back to the raw timesheet hours
+        timesheet_total = sum(
+            (ts.hours * ts.hourly_rate for ts in self.billed_timesheets.all()), 
+            Decimal('0.00')
+        )
+    
+        return timesheet_total
+
 
     @property
     def calculated_vat(self):
-        # Fix: Check tax_mode instead of use_vat
+        from decimal import Decimal
+
         if self.tax_mode == self.TaxMode.NONE:
             return Decimal('0.00')
+
+        # Ensure user profile and vat_rate exist, with a fallback.
+        try:
+            rate = self.user.profile.vat_rate / Decimal(100)
+        except (AttributeError, TypeError):
+            rate = Decimal('0.00') # Fallback if profile or vat_rate is not set
+
+        taxable_subtotal = Decimal('0.00')
+
+        if self.tax_mode == self.TaxMode.FULL:
+            # VAT on the whole invoice subtotal
+            taxable_subtotal = self.calculated_subtotal
         
-        taxable_subtotal = sum(
-            item.row_subtotal for item in self.items.filter(is_taxable=True)
-        ) or Decimal('0.00')
-        
-        # Pulling the rate from the User's Business Profile
-        # Note: Ensure self.user exists (TenantModel usually links to user)
-        rate = self.user.profile.vat_rate / 100
+        elif self.tax_mode == self.TaxMode.MIXED:
+            # VAT only on taxable items
+            item_total = sum(
+                item.total for item in self.billed_items.filter(is_taxable=True)
+            )
+            # You might want to decide if timesheets can be taxable in mixed mode.
+            # For now, we'll assume they are not individually taxable.
+            taxable_subtotal = item_total
+
         return (taxable_subtotal * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     @property
@@ -85,6 +154,14 @@ class Invoice(TenantModel):
         return total - self.total_paid
     # --- Sync Snapshot Fields ---
 
+    @property
+    def is_locked(self):
+        """
+        Invoice is immutable if it has been sent to the client (PENDING) 
+        or processed further (PAID, OVERDUE, CANCELLED).
+        """
+        return self.status != self.Status.DRAFT
+
     def sync_totals(self):
         """Call this before saving to update the snapshot fields."""
         self.subtotal_amount = self.calculated_subtotal
@@ -97,31 +174,16 @@ class Invoice(TenantModel):
             self.sync_totals()
         super().save(*args, **kwargs)
 
+
     def __str__(self):
         return f"{self.number or 'DRAFT'} - {self.client.name}"
-
-class InvoiceItem(models.Model):
-    class Preset(models.TextChoices):
-        CONSULTING = 'Consulting', 'Professional Consulting'
-        DEVELOPMENT = 'Development', 'Software Development'
-        DESIGN = 'Design', 'Graphic Design'
-        SUPPORT = 'Support', 'Technical Support'
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='items')
-    description = models.CharField(max_length=255)
-    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
-    is_taxable = models.BooleanField(default=True)
-
-    @property
-    def row_subtotal(self):
-        return (self.quantity * self.unit_price).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
     
 
-class Payment(models.Model):
+class Payment(TenantModel):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date_paid = models.DateField(default=timezone.now)
-    reference = models.CharField(max_length=100, blank=True)
+    reference = models.CharField(max_length=100, blank=True, null=True) # Ensure blank=True is here
 
     def clean(self):
         from django.core.exceptions import ValidationError
@@ -144,9 +206,6 @@ class Payment(models.Model):
     def __str__(self):
         return f"R {self.amount} for {self.invoice.number}"  
     
-
-# invoices/models.py
-from core.models import TenantModel  # Import where your TenantModel lives
 
 class VATReport(TenantModel):
     month = models.IntegerField()
@@ -176,3 +235,4 @@ class TaxPayment(TenantModel):
 
     def __str__(self):
         return f"{self.tax_type} Payment - R {self.amount} ({self.payment_date})"
+    

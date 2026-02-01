@@ -1,8 +1,10 @@
 # tasks.py
-from .services import BrevoSenderService
 from celery import shared_task
+
+from .services import BrevoSenderService
+
 
 @shared_task
 def check_verification():
-    service = BrevoSenderService()
+    BrevoSenderService()
     # ... logic to check status ...

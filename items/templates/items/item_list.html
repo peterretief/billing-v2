@@ -2,77 +2,115 @@
 
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Unbilled Items</h2>
-        <a href="{% url 'items:item_create' %}" class="btn btn-primary">
-            <i class="bi bi-plus"></i> Add New Item
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="fw-bold text-dark">Ad-hoc Unbilled Items</h2>
+        <a href="{% url 'items:item_create' %}" class="btn btn-primary btn-lg fw-bold">
+            <i class="bi bi-plus-lg me-2"></i> Add New Item
         </a>
     </div>
 
     <form action="{% url 'items:generate_invoice_from_items' %}" method="post">
         {% csrf_token %}
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4">
-                <h5 class="mb-0 fw-bold">Select Items to Invoice</h5>
+        <div class="card shadow-sm border-0 mb-5">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4 border-bottom">
+                <span class="text-muted fw-bold text-uppercase small">Select to Invoice</span>
                 <div id="selectionActions" style="display: none;">
-                    <button type="submit" class="btn btn-success btn-sm fw-bold px-3">
-                        <i class="bi bi-receipt-cutoff me-1"></i> Create Invoices (<span id="selectedCount">0</span>)
+                    <button type="submit" class="btn btn-success fw-bold px-4 shadow">
+                        <i class="bi bi-receipt-cutoff me-2"></i> CREATE INVOICE (<span id="selectedCount">0</span>)
                     </button>
                 </div>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4"><input type="checkbox" id="selectAll" class="form-check-input"></th>
-                                <th>Date</th>
-                                <th>Client</th>
-                                <th>Description</th>
-                                <th>Quantity</th>
-                                <th>Unit Price</th>
-                                <th>Total</th>
-                                <th class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in items %}
-                            <tr>
-                                <td class="ps-4">
-                                    <input type="checkbox" name="selected_items" value="{{ item.id }}" class="form-check-input item-checkbox">
-                                </td>
-                                <td>{{ item.date|date:"Y-m-d" }}</td>
-                                <td>{{ item.client.name }}</td>
-                                <td>{{ item.description }}</td>
-                                <td>{{ item.quantity }}</td>
-                                <td>{{ item.unit_price|floatformat:2 }}</td>
-                                <td>{{ item.total|floatformat:2 }}</td>
-                                <td class="text-end">
-                                    <div class="btn-group">
-                                        <a href="{% url 'items:item_update' item.id %}"
-                                           class="btn btn-sm btn-outline-primary" title="Edit Item">
-                                            <i class="bi bi-pencil"></i>
-                                        </a>
-                                        <a href="{% url 'items:item_delete' item.id %}"
-                                           class="btn btn-sm btn-outline-danger" title="Delete Item">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="8" class="text-center py-5 text-muted">
-                                    No unbilled items found.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small fw-bold text-uppercase">
+                        <tr>
+                            <th class="ps-4" style="width: 50px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
+                            <th>Date</th>
+                            <th>Client</th>
+                            <th>Description</th>
+                            <th>Total</th>
+                            <th class="text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in one_off_items %}
+                        <tr>
+                            <td class="ps-4"><input type="checkbox" name="selected_items" value="{{ item.id }}" class="form-check-input item-checkbox"></td>
+                            <td class="text-muted">{{ item.date|date:"Y-m-d" }}</td>
+                            <td class="fw-bold">{{ item.client.name }}</td>
+                            <td>{{ item.description }}</td>
+                            <td class="fw-bold text-dark">R {{ item.total|floatformat:2 }}</td>
+                            <td class="text-end pe-4">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'items:item_update' item.id %}" class="btn btn-outline-primary">Edit</a>
+                                    <a href="{% url 'items:item_delete' item.id %}" class="btn btn-outline-danger">Delete</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center py-5 text-muted">No ad-hoc items waiting for billing.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </form>
+
+    <hr class="my-5 opacity-25">
+
+    <div class="mb-3">
+        <h2 class="fw-bold text-info">Master Recurring Queue</h2>
+        <p class="text-muted small">These items are persistent templates and cannot be selected for manual invoicing here.</p>
+    </div>
+
+    <div class="card shadow-sm border-0 border-top border-info border-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light small fw-bold text-uppercase">
+                    <tr>
+                        <th class="ps-4">Client</th>
+                        <th>Service Description</th>
+                        <th>Standard Rate</th>
+                        <th class="text-center">Monthly Status</th>
+                        <th class="text-end pe-4">Queue Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in queued_items %}
+                    <tr>
+                        <td class="ps-4 fw-bold text-info">{{ item.client.name }}</td>
+                        <td>{{ item.description }}</td>
+                        <td>R {{ item.unit_price|floatformat:2 }}</td>
+
+                        <td class="text-center">
+                            {% if not today %}
+                                <span class="badge bg-danger">DATE VAR MISSING</span>
+                            {% elif item.last_billed_date and item.last_billed_date.month == today.month and item.last_billed_date.year == today.year %}
+                                <span class="badge bg-success" title="Billed on {{ item.last_billed_date|date:'Y-m-d' }}">
+                                    <i class="bi bi-check-circle-fill me-1"></i> BILLED
+                                </span>
+                            {% else %}
+                                <span class="badge bg-light text-dark border" title="Not yet billed this month">
+                                    <i class="bi bi-clock me-1"></i> PENDING
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end pe-4">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'items:item_update' item.id %}" class="btn btn-primary fw-bold">
+                                    <i class="bi bi-gear-fill me-1"></i> Edit</a>
+                                <a href="{% url 'items:item_delete' item.id %}" class="btn btn-outline-danger">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center py-5 text-muted">The recurring queue is currently empty.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -84,12 +122,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateSelection() {
         const count = document.querySelectorAll('.item-checkbox:checked').length;
-        if (selectionActions) {
-            selectionActions.style.display = count > 0 ? 'block' : 'none';
-        }
-        if (selectedCountSpan) {
-            selectedCountSpan.innerText = count;
-        }
+        if (selectionActions) selectionActions.style.display = count > 0 ? 'block' : 'none';
+        if (selectedCountSpan) selectedCountSpan.innerText = count;
     }
 
     if (selectAll) {
@@ -98,22 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
             updateSelection();
         });
     }
-
-    checkboxes.forEach(cb => {
-        cb.addEventListener('change', function() {
-            if (!this.checked) {
-                selectAll.checked = false;
-            } else {
-                const allChecked = Array.from(checkboxes).every(c => c.checked);
-                if (allChecked) {
-                    selectAll.checked = true;
-                }
-            }
-            updateSelection();
-        });
-    });
-
-    updateSelection();
+    checkboxes.forEach(cb => cb.addEventListener('change', updateSelection));
 });
 </script>
 {% endblock %}

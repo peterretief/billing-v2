@@ -1,10 +1,8 @@
 from django import forms
-from django.forms import inlineformset_factory
-from .models import Invoice, InvoiceItem
 from django.utils import timezone
 
+from .models import Invoice, TaxPayment
 
-from .models import TaxPayment
 
 class VATPaymentForm(forms.ModelForm):
     class Meta:
@@ -41,30 +39,3 @@ class InvoiceForm(forms.ModelForm):
 
 
 
-class InvoiceItemForm(forms.ModelForm):
-    # 1. Define the extra field
-    preset_description = forms.ChoiceField(
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-select preset-select'})
-    )
-
-    class Meta:
-        model = InvoiceItem
-        fields = ['preset_description', 'description', 'quantity', 'unit_price', 'is_taxable']
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 2. Assign choices dynamically to avoid boot-up errors
-        self.fields['preset_description'].choices = [('', '--- Select a Service ---')] + InvoiceItem.Preset.choices
-
-        
-
-
-# The Factory connects the Invoice and its Items
-InvoiceItemFormSet = inlineformset_factory(
-    Invoice, 
-    InvoiceItem,
-    form=InvoiceItemForm,
-    extra=1,           # Number of empty rows to start with
-    can_delete=True    # Allows removing rows
-)
