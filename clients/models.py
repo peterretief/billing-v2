@@ -82,6 +82,12 @@ class Client(TenantModel):
         return self.salutation
 
     class Meta:
-        ordering = ['name']
+        ordering = ['name'] # Moved outside the constraints list
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'client_code'], 
+                name='unique_client_code_per_user'
+            )
+        ]        
 
 

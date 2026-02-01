@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -32,6 +33,8 @@ class PaymentValidationTest(TestCase):
         self.invoice = Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="INV-PAY-TEST-01",  # Added explicit number to 
+                                       #satisfy unique constraint
             status='DRAFT',
             date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=14)
@@ -56,6 +59,7 @@ class PaymentValidationTest(TestCase):
         self.assertEqual(self.invoice.balance_due, Decimal('500.00'))
         
         Payment.objects.create(
+            user=self.user,      # Added user
             invoice=self.invoice,
             amount=Decimal('200.00'),
             reference='Test Payment'
@@ -68,6 +72,7 @@ class PaymentValidationTest(TestCase):
     def test_payment_equal_to_balance_succeeds(self):
         """Verify that payments equal to balance due are accepted."""
         Payment.objects.create(
+            user=self.user,      # Added user
             invoice=self.invoice,
             amount=Decimal('500.00'),
             reference='Full Payment'
@@ -80,10 +85,9 @@ class PaymentValidationTest(TestCase):
 
     def test_payment_exceeds_balance_rejected(self):
         """Verify that payments exceeding balance due are rejected."""
-        from django.core.exceptions import ValidationError
-        
         with self.assertRaises(ValidationError) as context:
             payment = Payment(
+                user=self.user,  # Added user
                 invoice=self.invoice,
                 amount=Decimal('600.00'),
                 reference='Overpayment'
@@ -95,10 +99,9 @@ class PaymentValidationTest(TestCase):
 
     def test_zero_payment_rejected(self):
         """Verify that zero or negative payments are rejected."""
-        from django.core.exceptions import ValidationError
-        
         with self.assertRaises(ValidationError) as context:
             payment = Payment(
+                user=self.user,  # Added user
                 invoice=self.invoice,
                 amount=Decimal('0.00'),
                 reference='Zero Payment'
@@ -112,6 +115,7 @@ class PaymentValidationTest(TestCase):
         """Verify that multiple partial payments accumulate correctly."""
         # First payment
         Payment.objects.create(
+            user=self.user,      # Added user
             invoice=self.invoice,
             amount=Decimal('200.00'),
             reference='Payment 1'
@@ -121,6 +125,7 @@ class PaymentValidationTest(TestCase):
         
         # Second payment
         Payment.objects.create(
+            user=self.user,      # Added user
             invoice=self.invoice,
             amount=Decimal('150.00'),
             reference='Payment 2'
@@ -131,6 +136,7 @@ class PaymentValidationTest(TestCase):
         
         # Third payment (final)
         Payment.objects.create(
+            user=self.user,      # Added user
             invoice=self.invoice,
             amount=Decimal('150.00'),
             reference='Payment 3'

@@ -1,10 +1,9 @@
 from django.apps import AppConfig
 
-
 class InvoicesConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
     name = 'invoices'
 
-
     def ready(self):
-        # This imports the signals when the app starts up
-        pass
+        # The # noqa: F401 stops Ruff from deleting this "unused" import
+        import invoices.signals  # noqa: F401

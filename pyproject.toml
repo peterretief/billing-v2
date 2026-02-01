@@ -6,3 +6,9 @@ select = ["E", "F", "I"]
 [tool.ruff.lint.isort]
 # This tells Ruff how to group your local Django apps
 known-first-party = ["invoices", "clients", "timesheets", "core", "items"]
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore "Unused Import" (F401) in all apps.py and signals.py files
+"**/apps.py" = ["F401"]
+"**/signals.py" = ["F401"]
+"**/__init__.py" = ["F401"]

@@ -18,7 +18,8 @@ class DashboardCalculationsTest(TestCase):
     
     def setUp(self):
         """Set up test user and client."""
-        self.user = User.objects.create_user(username='dashboard_tester', password='pass')
+        self.user = User.objects.create_user(username='dashboard_tester', 
+                                             password='pass')
         self.profile, _ = UserProfile.objects.get_or_create(user=self.user)
         self.profile.is_vat_registered = False
         self.profile.save()
@@ -37,30 +38,36 @@ class DashboardCalculationsTest(TestCase):
         self.profile.is_vat_registered = True
         self.profile.save()
 
-        # Create some invoices
+        # Create some invoices with unique numbers
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="TAX-INV-01",  # Added unique number
             total_amount=Decimal('1150.00'),
             tax_amount=Decimal('150.00'),
             status='PAID',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="TAX-INV-02",  # Added unique number
             total_amount=Decimal('575.00'),
             tax_amount=Decimal('75.00'),
             status='PENDING',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         # Invoice with no tax
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="TAX-INV-03",  # Added unique number
             total_amount=Decimal('200.00'),
             tax_amount=Decimal('0.00'),
             status='PENDING',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         # VAT Payment
@@ -74,48 +81,58 @@ class DashboardCalculationsTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         tax_summary = response.context['tax_summary']
-        # vat_due is collected, vat_paid is paid, balance is outstanding
+        # vat_due is collected (from PAID invoices), 
+        # vat_paid is paid, balance is outstanding
         self.assertEqual(tax_summary['collected'], Decimal('150.00'))
         self.assertEqual(tax_summary['paid'], Decimal('100.00'))
         self.assertEqual(tax_summary['outstanding'], Decimal('50.00'))
-        print(f"✓ Tax Summary: Due: R{tax_summary['collected']}, Paid: R{tax_summary['paid']}, Balance: R{tax_summary['outstanding']}")
+        print(f"✓ Tax Summary: Due: R{tax_summary['collected']}, "
+              "Paid: R{tax_summary['paid']}, Balance: R{tax_summary['outstanding']}")
 
     def test_total_outstanding_calculation(self):
         """Verify total_outstanding is calculated correctly."""
-        # Create some invoices
+        # Create some invoices with unique numbers
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="OUT-INV-01",
             total_amount=Decimal('1000.00'),
             status='PENDING',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="OUT-INV-02",
             total_amount=Decimal('500.00'),
             status='PAID',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="OUT-INV-03",
             total_amount=Decimal('200.00'),
             status='DRAFT',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         # Partially paid invoice
         invoice4 = Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="OUT-INV-04",
             total_amount=Decimal('1000.00'),
             status='PENDING',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         Payment.objects.create(
             invoice=invoice4,
             amount=Decimal('300.00'),
-            user=self.user
+            user=self.user  # Added user for multi-tenancy
         )
         
         response = self.client.get('/invoices/')
@@ -128,19 +145,23 @@ class DashboardCalculationsTest(TestCase):
 
     def test_total_billed_calculation(self):
         """Verify total_billed is calculated correctly."""
-        # Create some invoices
+        # Create some invoices with unique numbers
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="BILL-INV-01",
             total_amount=Decimal('1000.00'),
             status='PAID',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
+            number="BILL-INV-02",
             total_amount=Decimal('500.00'),
             status='PENDING',
+            date_issued=timezone.now().date(),
             due_date=timezone.now().date() + timedelta(days=30)
         )
         
@@ -148,5 +169,6 @@ class DashboardCalculationsTest(TestCase):
         self.assertEqual(response.status_code, 200)
         
         total_billed = response.context['total_billed']
+        # 1000 + 500 = 1500
         self.assertEqual(total_billed, Decimal('1500.00'))
         print(f"✓ Total Billed: R {total_billed}")

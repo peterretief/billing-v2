@@ -4,8 +4,9 @@ import uuid
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 
-from .models import Invoice
+from invoices.models import Invoice
 
 # --- 1. Total Calculations (Standard Only) ---
 
@@ -86,13 +87,6 @@ def connect_custom_signals():
 
 # Call this LAST
 connect_custom_signals()
-
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from django.utils import timezone
-
-from invoices.models import Invoice
-
 
 @receiver(post_save, sender=Invoice)
 def update_items_on_sent(sender, instance, **kwargs):

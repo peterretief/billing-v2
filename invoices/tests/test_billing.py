@@ -56,4 +56,5 @@ class BillingLogicTest(TestCase):
         invoice.save()
         invoice.refresh_from_db()
         self.assertEqual(invoice.total_amount, Decimal('500.00'))
-        print(f"Standard Billing Success: {invoice.number} total is {invoice.total_amount}")
+        print(f"Standard Billing Success: \
+              {invoice.number} total is {invoice.total_amount}")
