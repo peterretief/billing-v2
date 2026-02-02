@@ -62,7 +62,7 @@
                                 </td>
                                 <td class="text-end">R {{ inv.total_amount|floatformat:2|intcomma }}</td>
                                 <td class="text-end {% if inv.balance_due > 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
-                                    R {{ inv.balance_due|floatformat:2|intcomma }}
+                                    {{ GLOBAL_CURRENCY }}{{ inv.balance_due|floatformat:2|intcomma }}
                                 </td>
                                 <td class="text-end pe-4">
                                     <div class="btn-group">

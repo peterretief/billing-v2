@@ -26,7 +26,7 @@
             <div class="card border-0 shadow-sm p-4 h-100 d-flex flex-column justify-content-center">
                 <div class="d-flex justify-content-between mb-2">
                     <h6 class="text-uppercase small text-muted fw-bold">Revenue Target Progress</h6>
-                    <span class="fw-bold text-primary">R {{ total_value|floatformat:2|intcomma }} / R {{ target_amount|floatformat:0|intcomma }}</span>
+                    <span class="fw-bold text-primary">{{ request.user.profile.currency }} {{ total_value|floatformat:2|intcomma }} / {{ request.user.profile.currency }} {{ target_amount|floatformat:0|intcomma }}</span>
                 </div>
                 <div class="progress" style="height: 20px; border-radius: 10px;">
                     <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" style="width: {{ progress_percent }}%"></div>

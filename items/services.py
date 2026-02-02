@@ -1,7 +1,9 @@
 import logging
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import (
+    transaction,
+)
 from django.utils import timezone
 
 # Models
@@ -46,23 +48,19 @@ def import_recurring_to_invoices(user):
         
         with transaction.atomic():
             client_templates = templates.filter(client_id=cid)
-            # Fetch the client to get their specific payment terms
             client_obj = client_templates.first().client
             
-            # Use client's specific terms (default to 30 if field is empty/null)
             days_to_due = getattr(client_obj, 'payment_terms', 30) or 30
             calculated_due_date = today.date() + timedelta(days=days_to_due)
             
-            # Create Invoice
             invoice = Invoice.objects.create(
                 user=user,
                 client=client_obj,
                 date_issued=today.date(),
-                due_date=calculated_due_date, # DYNAMICALLY CALCULATED
+                due_date=calculated_due_date,
                 status='DRAFT'
             )
 
-            # Clone Items from master templates
             for t in client_templates:
                 Item.objects.create(
                     user=user, 
@@ -74,11 +72,9 @@ def import_recurring_to_invoices(user):
                     is_recurring=False
                 )
 
-            # Calculate Subtotals and Totals
             Invoice.objects.update_totals(invoice)
             invoice.refresh_from_db()
 
-            # Audit & Anomaly Detection
             is_huge = float(invoice.total_amount) > 10000
             BillingAuditLog.objects.create(
                 user=user, 
@@ -88,23 +84,32 @@ def import_recurring_to_invoices(user):
                 details={"total": float(invoice.total_amount)}
             )
             
-            # If AI flags it as an anomaly, we don't add to the auto-send list
             if not is_huge:
                 new_invoices.append(invoice)
 
     # 3. THE DISPATCH (Sending the emails)
+    # We maintain a list of successfully processed invoices to return to the task
+    processed_invoices = []
+
     for inv in new_invoices:
         try:
             if email_item_invoice_to_client(inv):
-                inv.status = 'PENDING' # Mark as 'Sent'
+                # --- NEW LOGIC START ---
+                inv.status = 'PENDING' 
+                inv.is_emailed = True      # Stamping for the History Table
+                inv.emailed_at = today     # Accurate timestamp for ordering
                 inv.save()
                 
-                # Update the master template's last_billed_date
+                # Update the master template's last_billed_date so it leaves Table 1
                 templates.filter(client=inv.client).update(last_billed_date=today.date())
+                # --- NEW LOGIC END ---
+                
                 logger.info(f"Successfully sent invoice {inv.id} to {inv.client.name}")
+                processed_invoices.append(inv)
             else:
                 logger.error(f"Mail delivery failure for invoice {inv.id}")
         except Exception as e:
             logger.error(f"System error during dispatch for invoice {inv.id}: {str(e)}")
 
-    return [i.id for i in new_invoices]
+    # Returning objects instead of IDs so the Celery task can access attributes
+    return processed_invoices

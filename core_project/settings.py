@@ -17,6 +17,13 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'invoices.tasks.send_mid_month_financial_report',
         'schedule': crontab(day_of_month=15, hour=9, minute=0),
     },
+
+# --- ADD THIS TEMPORARY TEST TIMER ---
+ #   'test-billing-trigger': {
+ #       'task': 'invoices.tasks.generate_recurring_monthly_invoices',
+ #       'schedule': 60.0, # Run every 60 seconds
+ #   },
+
 }
 
 TIME_ZONE = 'Africa/Johannesburg'
@@ -113,6 +120,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'timesheets.context_processors.unbilled_count',
                 'notifications.context_processors.onboarding',
+                'core.context_processors.currency_settings',
             ],
         },
     },

@@ -37,7 +37,7 @@
                             {{ timesheet_form.hours }}
                         </div>
                         <div class="col-md-4">
-                            <label class="small fw-bold text-muted text-uppercase">Rate (R)</label>
+                            <label class="small fw-bold text-muted text-uppercase">Rate ({{ request.user.profile.currency }})</label>
                             <div id="rate-input-wrapper">
                                 {{ timesheet_form.hourly_rate }}
                             </div>

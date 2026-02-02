@@ -54,7 +54,7 @@
                                         </div>
                                     {% endif %}
                                 </td>
-                                <td class="text-center">R {{ entry.hourly_rate }}</td>
+                                <td class="text-center">{{ request.user.profile.currency }} {{ entry.hourly_rate }}</td>
                                 <td class="text-end fw-bold">{{ entry.hours }}h</td>
                             </tr>
                             {% endfor %}

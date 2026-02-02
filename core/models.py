@@ -59,6 +59,7 @@ class UserProfile(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     logo = models.ImageField(upload_to='logos/', blank=True, null=True)
+    currency = models.CharField(max_length=3, default='R', help_text="e.g. R, $, €")
 
     # Tax & Registration
     is_vat_registered = models.BooleanField(default=False)

@@ -25,6 +25,9 @@
 \setlength{\parindent}{0pt}
 
 \begin{document}
+
+% --- NATIVE PAID WATERMARK ---
+% 1. HEADER
 \noindent
 \begin{minipage}[t]{0.4\textwidth}
     \vspace{0pt} % Sets top anchor for alignment
@@ -78,8 +81,7 @@
 
 \vspace{1.2cm}
 
-
-% --- 3. ITEMS TABLE ---
+% 3. ITEMS TABLE
 \renewcommand{\arraystretch}{1.5}
 \begin{tabularx}{\textwidth}{X r r r}
     \textbf{ {{ label_desc }} } & \textbf{ {{ label_qty }} } & \textbf{ {{ label_rate }} } & \textbf{Total} \\
@@ -93,19 +95,21 @@
     {% if invoice.tax_mode != 'NONE' %}
     \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & {{ currency }} {{ vat_total }} \\
     {% else %}
-    \multicolumn{3}{r}{\lightheader{VAT (Exempt)}} & \lightheader{ {{ currency }} 0.00 } \\
+    \multicolumn{3}{r}{\lightheader{VAT (Exempt)}} & \lightheader{{{ currency }} 0.00} \\
     {% endif %}
     
     \midrule
-    \multicolumn{3}{r}{\textbf{\Large Total Amount}} & \textbf{\Large {{ currency }} {{ grand_total }} } \\
+    \multicolumn{3}{r}{\textbf{\Large Total Amount}} & \textbf{\Large {{ request.user.profile.currency }} {{ grand_total }} } \\
     
-    {# Show Amount Paid and Balance if applicable #}
+    {# Show Amount Paid and Balance if a payment has been made #}
     {% if invoice.total_paid > 0 %}
     \multicolumn{3}{r}{Amount Paid} & {{ currency }} {{ invoice.total_paid|floatformat:2 }} \\
     \midrule
-    \multicolumn{3}{r}{\textbf{Balance Due}} & \textbf{ {{ currency }} {{ invoice.balance_due|floatformat:2 }} } \\
+    \multicolumn{3}{r}{\textbf{Balance Due}} & \textbf{{{ currency }} {{ invoice.balance_due|floatformat:2 }} } \\
     {% endif %}
 \end{tabularx}
+
+\vspace{1.5cm}
 
 % 4. BANKING DETAILS (FOOTER)
 \vfill 
@@ -122,6 +126,35 @@
     \end{tabular}
 \end{minipage}
 
+% 3. ITEMS TABLE
+\renewcommand{\arraystretch}{1.5}
+\begin{tabularx}{\textwidth}{X r r r}
+    \textbf{ {{ label_desc }} } & \textbf{ {{ label_qty }} } & \textbf{ {{ label_rate }} } & \textbf{Total} \\
+    \midrule
+    {% for item in items %}
+    {{ item.description }} & {{ item.quantity }} & {{ currency }} {{ item.unit_price }} & {{ currency }} {{ item.row_subtotal }} \\
+    {% endfor %}
+    \midrule
+    \multicolumn{3}{r}{Subtotal} & {{ currency }} {{ subtotal }} \\
+    
+    {% if invoice.tax_mode != 'NONE' %}
+    \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & {{ currency }} {{ vat_total }} \\
+    {% else %}
+    \multicolumn{3}{r}{\lightheader{VAT (Exempt)}} & \lightheader{{{ currency }} 0.00} \\
+    {% endif %}
+    
+    \midrule
+    \multicolumn{3}{r}{\textbf{\Large Total Amount}} & \textbf{\Large {{ request.user.profile.currency }} {{ grand_total }} } \\
+    
+    {# Show Amount Paid and Balance if a payment has been made #}
+    {% if invoice.total_paid > 0 %}
+    \multicolumn{3}{r}{Amount Paid} & {{ currency }} {{ invoice.total_paid|floatformat:2 }} \\
+    \midrule
+    \multicolumn{3}{r}{\textbf{Balance Due}} & \textbf{{{ currency }} {{ invoice.balance_due|floatformat:2 }} } \\
+    {% endif %}
+\end{tabularx}
+
+\vspace{1.5cm}
 
 
 \end{document}

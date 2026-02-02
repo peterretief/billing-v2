@@ -231,7 +231,7 @@ def record_payment(request, pk):
                 response['HX-Refresh'] = 'true' 
                 return response
             
-            messages.success(request, "Payment recorded.")
+            messages.success(request, f"Payment of {request.user.profile.currency} {amount} recorded.")
             return redirect('invoices:invoice_detail', pk=pk)
 
         except Exception as e:
@@ -300,7 +300,8 @@ def financial_assessment(request):
     target = user_profile.monthly_target or Decimal('50000.00')
     
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    prompt = f"Target: R {target}. Invoiced: R {actual_billed}. WIP: R {total_unbilled}. Assess in 2 sentences."
+    currency = user_profile.currency
+    prompt = f"Target: {currency} {target}. Invoiced: {currency} {actual_billed}. WIP: {currency} {total_unbilled}. Assess in 2 sentences."
     try:
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         assessment_text = response.text

@@ -1,7 +1,7 @@
 \documentclass[11pt, a4paper]{article}
 
 % --- Packages ---
-\usepackage[margin=2.5cm]{geometry}
+\usepackage[margin=2.0cm]{geometry}
 \usepackage{booktabs}   
 \usepackage{tabularx}   
 \usepackage{xcolor}     
@@ -9,27 +9,19 @@
 \usepackage{tikz} 
 \usepackage{graphicx} 
 
-\documentclass[11pt, a4paper]{article}
-\usepackage[margin=2.0cm]{geometry}
-\usepackage{booktabs, tabularx, xcolor, fontspec, graphicx, tikz}
-
 % --- FONT SETTINGS ---
-{% verbatim %}
+% Keeping Calibri as requested. 
+% Ensure 'ttf-mscorefonts-installer' is on the server if it fails here.
 \setmainfont{Calibri}
-\newfontfamily\calibrilight{Calibri Light}
-\newcommand{\lightheader}[1]{{\calibrilight \color{gray} #1}}
-{% endverbatim %}
-
-
 
 \begin{document}
 
-% --- HEADER (Minimalist Left Aligned) ---
+% --- HEADER ---
 \begin{minipage}[t]{0.5\textwidth}
     \vspace{0pt}
     {\Huge \textbf{ {{ company_name }} }} \\
     \vspace{2pt}
-    {{ profile_address_safe | linebreaksbr }} \\
+    {{ profile_address_safe }} \\
     {% if phone %}Phone: {{ phone }}{% endif %}
 \end{minipage}
 \hfill
@@ -47,7 +39,7 @@
 % --- BILL TO ---
 \textbf{Bill To:} \\
 {{ client_name }} \\
-{{ client_address_safe | linebreaksbr }} \\
+{{ client_address_safe }} \\
 \textcolor{gray}{ {{ client_email }} }
 
 \vspace{1.2cm}
@@ -58,11 +50,11 @@
     \textbf{Description} & \textbf{Qty} & \textbf{Rate} & \textbf{Total} \\
     \hline
     {% for item in items %}
-    {{ item.description }} & {{ item.quantity }} & R {{ item.unit_price }} & R {{ item.row_subtotal }} \\
+    {{ item.description }} & {{ item.quantity }} & {{ currency }} {{ item.unit_price }} & {{ currency }} {{ item.row_subtotal }} \\
     {% endfor %}
     \hline
-    \multicolumn{3}{r}{Subtotal} & R {{ subtotal }} \\
-    \multicolumn{3}{r}{\textbf{\Large Total Amount}} & \textbf{\Large R {{ grand_total }} } \\
+    \multicolumn{3}{r}{Subtotal} & {{ currency }} {{ subtotal }} \\
+    \multicolumn{3}{r}{\textbf{\Large Total Amount}} & \textbf{\Large {{ currency }} {{ grand_total }} } \\
 \end{tabularx}
 
 \vfill

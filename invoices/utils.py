@@ -51,6 +51,7 @@ def generate_invoice_pdf(invoice, template_name='invoice_template.tex'):
     # 3. Context Building
     context = {
         'invoice': invoice,
+        'currency': tex_safe(profile.currency), # ADDED THIS
         'logo_path': logo_path,
         'company_name': tex_safe(profile.company_name),
         'vat_number': tex_safe(profile.vat_number),
@@ -157,6 +158,7 @@ def render_invoice_tex(invoice, template_name='invoice_template.tex'):
     context = {
         'invoice': invoice,
         'logo_path': logo_path,
+        'currency': tex_safe(profile.currency), # This is the "Bridge"
         'company_name': tex_safe(profile.company_name),
         'vat_number': tex_safe(profile.vat_number),
         'tax_number': tex_safe(profile.tax_number),
@@ -232,7 +234,7 @@ def email_invoice_to_client(invoice):
         # Personalized Greeting
         body = (f"Hi {invoice.client.salutation},\n\n"
                 f"Please find attached invoice {invoice.number}.\n\n"
-                f"Total Due: R {invoice.total_amount:,.2f}\n"
+                f"Total Due: {profile.currency} {invoice.total_amount:,.2f}\n"
                 f"Due Date: {invoice.due_date}\n\n"
                 f"Regards,\n{profile.company_name}")
 
@@ -271,8 +273,8 @@ def email_receipt_to_client(invoice, amount_paid):
         
         # Personalized Greeting
         body = (f"Hi {invoice.client.salutation},\n\n"
-                f"Thank you for your payment of R {amount_paid:,.2f}.\n\n"
-                f"Balance remaining: R {invoice.balance_due:,.2f}.\n\n"
+                f"Thank you for your payment of {profile.currency} {amount_paid:,.2f}.\n\n"
+                f"Balance remaining: {profile.currency} {invoice.balance_due:,.2f}.\n\n"
                 f"Regards,\n{profile.company_name}")
 
         email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])

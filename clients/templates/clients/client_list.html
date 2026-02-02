@@ -58,7 +58,7 @@
                         <td>
                             {% if client.unpaid_total > 0 %}
                                 <div class="d-flex align-items-center">
-                                    <span class="text-danger fw-bold me-2">R {{ client.unpaid_total|floatformat:2|intcomma }}</span>
+                                    <span class="text-danger fw-bold me-2">{{ GLOBAL_CURRENCY }}{{ client.unpaid_total|floatformat:2|intcomma }}</span>
                                     <i class="bi bi-exclamation-circle text-danger small"></i>
                                 </div>
                             {% else %}

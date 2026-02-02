@@ -43,7 +43,7 @@
                                 <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
                             </td>
                             <td>{{ invoice.client.name }}</td>
-                            <td class="fw-bold text-primary">R {{ invoice.total_amount|intcomma }}</td>
+                            <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
                             <td>
                                 <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'PENDING' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">
                                     {% if invoice.status == 'PENDING' %}Sent{% else %}{{ invoice.get_status_display }}{% endif %}

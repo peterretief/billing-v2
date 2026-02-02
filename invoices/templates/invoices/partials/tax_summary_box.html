@@ -3,12 +3,12 @@
     
     <div class="mb-2">
         <span class="d-block small text-light opacity-75">Collected from Clients</span>
-        <span class="h5 fw-bold text-white">R {{ tax_summary.collected|default:"0.00"|floatformat:2 }}</span>
+        <span class="h5 fw-bold text-white">{{ GLOBAL_CURRENCY }}{{ tax_summary.collected|default:"0.00"|floatformat:2 }}</span>
     </div>
 
     <div class="mb-2">
         <span class="d-block small text-light opacity-75">Paid to SARS</span>
-        <span class="h5 fw-bold text-success">R {{ tax_summary.paid|default:"0.00"|floatformat:2 }}</span>
+        <span class="h5 fw-bold text-success">{{ GLOBAL_CURRENCY }}{{ tax_summary.paid|default:"0.00"|floatformat:2 }}</span>
     </div>
 
     <hr class="border-secondary">
@@ -16,7 +16,7 @@
     <div class="mb-0">
         <span class="d-block small text-light opacity-75">Net Liability (Owed)</span>
         <span class="h4 fw-bold {% if tax_summary.outstanding > 0 %}text-danger{% else %}text-info{% endif %}">
-            R {{ tax_summary.outstanding|default:"0.00"|floatformat:2 }}
+            {{ GLOBAL_CURRENCY }}{{ tax_summary.outstanding|default:"0.00"|floatformat:2 }}
         </span>
     </div>
 

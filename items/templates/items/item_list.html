@@ -39,7 +39,7 @@
                             <td class="text-muted">{{ item.date|date:"Y-m-d" }}</td>
                             <td class="fw-bold">{{ item.client.name }}</td>
                             <td>{{ item.description }}</td>
-                            <td class="fw-bold text-dark">R {{ item.total|floatformat:2 }}</td>
+                            <td class="fw-bold text-dark">{{ GLOBAL_CURRENCY }}{{ item.total|floatformat:2 }}</td>
                             <td class="text-end pe-4">
                                 <div class="btn-group btn-group-sm">
                                     <a href="{% url 'items:item_update' item.id %}" class="btn btn-outline-primary">Edit</a>
@@ -80,7 +80,7 @@
                     <tr>
                         <td class="ps-4 fw-bold text-info">{{ item.client.name }}</td>
                         <td>{{ item.description }}</td>
-                        <td>R {{ item.unit_price|floatformat:2 }}</td>
+                        <td>{{ GLOBAL_CURRENCY }}{{ item.unit_price|floatformat:2 }}</td>
 
                         <td class="text-center">
                             {% if not today %}
