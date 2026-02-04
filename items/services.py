@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 
 def import_recurring_to_invoices(user):
     today = timezone.now()
-    
+    # ... your logic ...
+    items_to_bill = Item.objects.filter(user=user, is_recurring=True)
+    print(f"DEBUG: Found {items_to_bill.count()} recurring items for {user.username}")
+
+
     # --- STEP 1: IDENTIFY DUE POLICIES ---
     # We use the 'due_today' manager we built to find which schedules trigger today
     due_policies = BillingPolicy.objects.filter(user=user).due_today()
