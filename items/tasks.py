@@ -7,7 +7,8 @@ from .services import import_recurring_to_invoices
 
 logger = logging.getLogger(__name__)
 
-@shared_task(name="tasks.run_automated_billing_cycle")
+
+@shared_task(name="run_automated_billing_cycle") # Use a clean, explicit name
 def run_automated_billing_cycle():
     """
     Heartbeat task: Runs once a day to process all 
