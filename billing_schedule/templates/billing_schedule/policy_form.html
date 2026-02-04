@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <h4 class="mb-0 fw-bold">
+                        {% if form.instance.pk %}Edit{% else %}Create{% endif %} Billing Schedule
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Schedule Name</label>
+                            {{ form.name }}
+                            <div class="form-text">Give this a name you'll recognize (e.g., "Standard Monthly Retainer").</div>
+                            {% if form.name.errors %}
+                                <div class="text-danger small">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Specific Day</label>
+                                {{ form.run_day }}
+                                <div class="form-text">1 to 31</div>
+                                {% if form.run_day.errors %}
+                                    <div class="text-danger small">{{ form.run_day.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Or Special Rule</label>
+                                {{ form.special_rule }}
+                                <div class="form-text">Overrides specific day</div>
+                                {% if form.special_rule.errors %}
+                                    <div class="text-danger small">{{ form.special_rule.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="form-check form-switch p-3 bg-light rounded border">
+                                <div class="float-end">
+                                    {{ form.is_active }}
+                                </div>
+                                <label class="form-check-label fw-bold" for="{{ form.is_active.id_for_label }}">
+                                    Enable Automation
+                                </label>
+                                <div class="small text-muted">If off, no invoices will be generated for this schedule.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                Save Schedule Configuration
+                            </button>
+                            <a href="{% url 'billing_schedule:policy_list' %}" class="btn btn-link text-muted">
+                                Cancel and Go Back
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="alert alert-info mt-4 border-0 shadow-sm" role="alert">
+                <h6 class="alert-heading fw-bold"><i class="bi bi-info-circle"></i> Picky Logic Guide:</h6>
+                <ul class="small mb-0">
+                    <li><strong>Exact Date:</strong> Runs precisely on that number every month.</li>
+                    <li><strong>1st Working Day:</strong> Skips weekends. If the 1st is Saturday, it runs on Monday the 3rd.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Styling to match the professional dashboard */
+    .form-control, .form-select {
+        border-radius: 8px;
+        padding: 10px 15px;
+    }
+    .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}

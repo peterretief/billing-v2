@@ -3,8 +3,11 @@
 {% block content %}
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2 class="fw-bold text-dark">Ad-hoc Unbilled Items</h2>
-        <a href="{% url 'items:item_create' %}" class="btn btn-primary btn-lg fw-bold">
+        <div>
+            <h2 class="fw-bold text-dark mb-0">Ad-hoc Unbilled Items</h2>
+            <p class="text-muted small">One-off items waiting to be manually invoiced.</p>
+        </div>
+        <a href="{% url 'items:item_create' %}" class="btn btn-primary btn-lg fw-bold shadow-sm">
             <i class="bi bi-plus-lg me-2"></i> Add New Item
         </a>
     </div>
@@ -13,16 +16,16 @@
         {% csrf_token %}
         <div class="card shadow-sm border-0 mb-5">
             <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4 border-bottom">
-                <span class="text-muted fw-bold text-uppercase small">Select to Invoice</span>
+                <span class="text-muted fw-bold text-uppercase small">Select Items to Invoice</span>
                 <div id="selectionActions" style="display: none;">
-                    <button type="submit" class="btn btn-success fw-bold px-4 shadow">
+                    <button type="submit" class="btn btn-success fw-bold px-4 shadow-sm animate__animated animate__fadeIn">
                         <i class="bi bi-receipt-cutoff me-2"></i> CREATE INVOICE (<span id="selectedCount">0</span>)
                     </button>
                 </div>
             </div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light small fw-bold text-uppercase">
+                    <thead class="table-light small fw-bold text-uppercase text-muted">
                         <tr>
                             <th class="ps-4" style="width: 50px;"><input type="checkbox" id="selectAll" class="form-check-input"></th>
                             <th>Date</th>
@@ -35,20 +38,27 @@
                     <tbody>
                         {% for item in one_off_items %}
                         <tr>
-                            <td class="ps-4"><input type="checkbox" name="selected_items" value="{{ item.id }}" class="form-check-input item-checkbox"></td>
-                            <td class="text-muted">{{ item.date|date:"Y-m-d" }}</td>
+                            <td class="ps-4">
+                                <input type="checkbox" name="selected_items" value="{{ item.id }}" class="form-check-input item-checkbox">
+                            </td>
+                            <td class="text-muted small">{{ item.date|date:"Y-m-d" }}</td>
                             <td class="fw-bold">{{ item.client.name }}</td>
                             <td>{{ item.description }}</td>
                             <td class="fw-bold text-dark">{{ GLOBAL_CURRENCY }}{{ item.total|floatformat:2 }}</td>
                             <td class="text-end pe-4">
                                 <div class="btn-group btn-group-sm">
-                                    <a href="{% url 'items:item_update' item.id %}" class="btn btn-outline-primary">Edit</a>
-                                    <a href="{% url 'items:item_delete' item.id %}" class="btn btn-outline-danger">Delete</a>
+                                    <a href="{% url 'items:item_update' item.id %}" class="btn btn-outline-primary px-3">Edit</a>
+                                    <a href="{% url 'items:item_delete' item.id %}" class="btn btn-outline-danger px-3">Delete</a>
                                 </div>
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="6" class="text-center py-5 text-muted">No ad-hoc items waiting for billing.</td></tr>
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox display-4 d-block mb-2 opacity-25"></i>
+                                No ad-hoc items waiting for billing.
+                            </td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -60,18 +70,18 @@
 
     <div class="mb-3">
         <h2 class="fw-bold text-info">Master Recurring Queue</h2>
-        <p class="text-muted small">These items are persistent templates and cannot be selected for manual invoicing here.</p>
+        <p class="text-muted">Persistent templates that generate invoices automatically based on their assigned schedule.</p>
     </div>
 
     <div class="card shadow-sm border-0 border-top border-info border-4">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead class="table-light small fw-bold text-uppercase">
+                <thead class="table-light small fw-bold text-uppercase text-muted">
                     <tr>
                         <th class="ps-4">Client</th>
                         <th>Service Description</th>
                         <th>Standard Rate</th>
-                        <th class="text-center">Monthly Status</th>
+                        <th>Billing Schedule</th> <th class="text-center">Monthly Status</th>
                         <th class="text-end pe-4">Queue Actions</th>
                     </tr>
                 </thead>
@@ -82,36 +92,69 @@
                         <td>{{ item.description }}</td>
                         <td>{{ GLOBAL_CURRENCY }}{{ item.unit_price|floatformat:2 }}</td>
 
+                        <td>
+                            {% if item.billing_policy %}
+                                {% if item.billing_policy.special_rule == 'WORK' %}
+                                    <span class="badge rounded-pill bg-info-subtle text-info border border-info-subtle px-3 py-2">
+                                        <i class="bi bi-briefcase-fill me-1"></i> 1st Work Day
+                                    </span>
+                                {% else %}
+                                    <span class="badge rounded-pill bg-light text-primary border border-primary-subtle px-3 py-2">
+                                        <i class="bi bi-calendar3 me-1"></i> Day {{ item.billing_policy.run_day }}
+                                    </span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge rounded-pill bg-warning-subtle text-warning border border-warning-subtle px-3 py-2">
+                                    <i class="bi bi-exclamation-triangle-fill me-1"></i> No Policy
+                                </span>
+                            {% endif %}
+                        </td>
+
                         <td class="text-center">
                             {% if not today %}
                                 <span class="badge bg-danger">DATE VAR MISSING</span>
                             {% elif item.last_billed_date and item.last_billed_date.month == today.month and item.last_billed_date.year == today.year %}
-                                <span class="badge bg-success" title="Billed on {{ item.last_billed_date|date:'Y-m-d' }}">
+                                <span class="badge bg-success shadow-sm px-3 py-2" title="Billed on {{ item.last_billed_date|date:'Y-m-d' }}">
                                     <i class="bi bi-check-circle-fill me-1"></i> BILLED
                                 </span>
                             {% else %}
-                                <span class="badge bg-light text-dark border" title="Not yet billed this month">
-                                    <i class="bi bi-clock me-1"></i> PENDING
+                                <span class="badge bg-white text-dark border px-3 py-2" title="Not yet billed this month">
+                                    <i class="bi bi-hourglass-split me-1"></i> PENDING
                                 </span>
                             {% endif %}
                         </td>
 
                         <td class="text-end pe-4">
                             <div class="btn-group btn-group-sm">
-                                <a href="{% url 'items:item_update' item.id %}" class="btn btn-primary fw-bold">
-                                    <i class="bi bi-gear-fill me-1"></i> Edit</a>
-                                <a href="{% url 'items:item_delete' item.id %}" class="btn btn-outline-danger">Delete</a>
+                                <a href="{% url 'items:item_update' item.id %}" class="btn btn-primary fw-bold px-3">
+                                    <i class="bi bi-pencil-square me-1"></i> Edit
+                                </a>
+                                <a href="{% url 'items:item_delete' item.id %}" class="btn btn-outline-danger px-3">
+                                    <i class="bi bi-trash"></i>
+                                </a>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5" class="text-center py-5 text-muted">The recurring queue is currently empty.</td></tr>
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            The recurring queue is currently empty. Recurring items will appear here once created.
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
+
+<style>
+    /* Modern UI Adjustments */
+    .bg-info-subtle { background-color: #e1f6ff !important; }
+    .bg-success-subtle { background-color: #e1f6eb !important; }
+    .bg-warning-subtle { background-color: #fff8e1 !important; }
+    .table-hover tbody tr:hover { background-color: #fbfcfe; }
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

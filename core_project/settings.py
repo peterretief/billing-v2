@@ -5,26 +5,12 @@ from celery.schedules import crontab
 from dotenv import load_dotenv
 
 CELERY_BEAT_SCHEDULE = {
-    # 1. Monthly Recurring Invoices (Runs every day at 8:00 AM)
-    # Note: The task logic handles the "First Business Day" check internally.
-    'generate-recurring-invoices-daily-check': {
-        'task': 'invoices.tasks.generate_recurring_monthly_invoices',
-        'schedule': crontab(hour=8, minute=0),
+    'daily-billing-automation': {
+        'task': 'tasks.run_automated_billing_cycle',
+        'schedule': crontab(hour=0, minute=1), # Runs at 12:01 AM every day
     },
-    
-    # 2. Gemini Financial Health Check (Runs on the 15th of every month at 9:00 AM)
-    'send-mid-month-report': {
-        'task': 'invoices.tasks.send_mid_month_financial_report',
-        'schedule': crontab(day_of_month=15, hour=9, minute=0),
-    },
-
-# --- ADD THIS TEMPORARY TEST TIMER ---
- #   'test-billing-trigger': {
- #       'task': 'invoices.tasks.generate_recurring_monthly_invoices',
- #       'schedule': 60.0, # Run every 60 seconds
- #   },
-
 }
+
 
 TIME_ZONE = 'Africa/Johannesburg'
 USE_TZ = True
@@ -71,6 +57,7 @@ CSRF_CHECK_REFERER = False
 
 # --- APPLICATION DEFINITION ---
 INSTALLED_APPS = [
+    'billing_schedule',
     'core',
     'anymail',
     'clients',

@@ -38,7 +38,8 @@ class Invoice(TenantModel):
     emailed_at = models.DateTimeField(null=True, blank=True)
     last_email_error = models.TextField(null=True, blank=True) # Great for debugging
 
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='invoices')
+    client = models.ForeignKey(Client, on_delete=models.CASCADE,
+                                related_name='invoices')
     number = models.CharField(max_length=50, blank=True)
     date_issued = models.DateField(default=date.today)
     due_date = models.DateField()
@@ -60,6 +61,13 @@ class Invoice(TenantModel):
     latex_content = models.TextField(blank=True, 
                                      help_text="The raw LaTeX source used to " \
                                      "generate the PDF.")
+
+    #notes = models.TextField(blank=True, 
+    #                        default=
+    #                       "Please use the invoice number as the payment reference.",
+    #                        help_text="Notes or terms for the invoice.")
+
+
     last_generated = models.DateTimeField(null=True, blank=True)
 
     objects = InvoiceManager()
@@ -131,7 +139,8 @@ class Invoice(TenantModel):
             # For now, we'll assume they are not individually taxable.
             taxable_subtotal = item_total
 
-        return (taxable_subtotal * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return (taxable_subtotal * rate).quantize(Decimal('0.01'), 
+                                                  rounding=ROUND_HALF_UP)
 
     @property
     def calculated_total(self):
@@ -146,7 +155,8 @@ class Invoice(TenantModel):
     @property
     def balance_due(self):
         # Ensure both values are Decimal for proper arithmetic
-        total = Decimal(str(self.total_amount)) if self.total_amount else Decimal('0.00')
+        total = Decimal(str(self.total_amount)) \
+              if self.total_amount else Decimal('0.00')
         return total - self.total_paid
     # --- Sync Snapshot Fields ---
 
@@ -176,17 +186,20 @@ class Invoice(TenantModel):
     
 
 class Payment(TenantModel):
-    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, 
+                                related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     date_paid = models.DateField(default=timezone.now)
-    reference = models.CharField(max_length=100, blank=True, null=True) # Ensure blank=True is here
+    reference = models.CharField(max_length=100, blank=True,
+                                  null=True) # Ensure blank=True is here
 
     def clean(self):
         from django.core.exceptions import ValidationError
         if self.amount > self.invoice.balance_due:
             currency = self.user.profile.currency
             raise ValidationError(
-                f"Payment amount ({currency} {self.amount}) cannot exceed the balance due ({currency} {self.invoice.balance_due})"
+                f"Payment amount ({currency} \
+                    {self.amount}) cannot exceed the balance due ({currency} {self.invoice.balance_due})"  # noqa: E501
             )
         if self.amount <= 0:
             raise ValidationError("Payment amount must be greater than zero")
@@ -227,9 +240,10 @@ class VATReport(TenantModel):
 class TaxPayment(TenantModel):
     payment_date = models.DateField(default=timezone.now)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    reference = models.CharField(max_length=100, help_text="e.g., VAT201 Period 2026/01")
-    tax_type = models.CharField(max_length=20, default='VAT', choices=[('VAT', 'VAT'), ('INCOME_TAX', 'Income Tax')])
+    reference = models.CharField(max_length=100, help_text="e.g., VAT201 Period 2026/01")  # noqa: E501
+    tax_type = models.CharField(max_length=20, default='VAT', 
+                                choices=[('VAT', 'VAT'), ('INCOME_TAX', 'Income Tax')])
 
     def __str__(self):
-        return f"{self.tax_type} Payment - {self.user.profile.currency} {self.amount} ({self.payment_date})"
+        return f"{self.tax_type} Payment - {self.user.profile.currency} {self.amount} ({self.payment_date})"  # noqa: E501
     

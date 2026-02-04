@@ -37,6 +37,8 @@ class UserProfileForm(forms.ModelForm):
             'company_name', 
             'business_email',
             'monthly_target',  # <-- IMPORTANT: Added this back in
+            'currency',
+            'invoice_footer',
             'is_vat_registered',
             'vat_rate', 
             'phone', 

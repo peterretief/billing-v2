@@ -1,0 +1,22 @@
+import datetime
+
+
+def is_first_working_day(today=None):
+    """
+    Returns True if 'today' is the first Mon-Fri of the month.
+    """
+    if today is None:
+        today = datetime.date.today()
+    
+    # If today is a weekend, it's definitely NOT the first working day
+    if today.weekday() >= 5: # 5=Sat, 6=Sun
+        return False
+    
+    # Check if there was any working day earlier this month
+    for day in range(1, today.day):
+        previous_day = today.replace(day=day)
+        if previous_day.weekday() < 5:
+            # Found an earlier weekday, so today isn't the first
+            return False
+            
+    return True

@@ -1,3 +1,6 @@
+[tool.ruff]
+line-length = 120
+
 [tool.ruff.lint]
 # This makes 'unsafe' fixes (like moving imports) 'safe' for your project
 extend-safe-fixes = ["I", "E402", "F811"]

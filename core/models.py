@@ -60,7 +60,9 @@ class UserProfile(models.Model):
     address = models.TextField(blank=True)
     logo = models.ImageField(upload_to='logos/', blank=True, null=True)
     currency = models.CharField(max_length=3, default='R', help_text="e.g. R, $, €")
-
+    invoice_footer = models.TextField(blank=True, 
+                                      default="Please use the invoice number as the payment reference.",  # noqa: E501
+                                      help_text="Footer notes for invoices.")
     # Tax & Registration
     is_vat_registered = models.BooleanField(default=False)
     vat_rate = models.DecimalField(max_digits=5, decimal_places=2, 

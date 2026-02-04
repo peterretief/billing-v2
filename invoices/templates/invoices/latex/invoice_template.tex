@@ -122,6 +122,14 @@
     \end{tabular}
 \end{minipage}
 
+% --- 5. NOTES & TERMS ---
+\vspace{1cm}
+{% if invoice.notes %}
+\begin{minipage}{\textwidth}
+    \lightheader{NOTES / TERMS:} \par \vspace{0.2cm}
+    \small {{ invoice.notes | linebreaksbr }}
+\end{minipage}
+{% endif %}
 
 
 \end{document}

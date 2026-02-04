@@ -3,8 +3,10 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -14,6 +16,7 @@ from invoices.models import Invoice
 
 from .forms import ItemForm
 from .models import Item
+from .services import import_recurring_to_invoices
 
 
 class ItemListView(LoginRequiredMixin, ListView):
@@ -45,6 +48,8 @@ class ItemListView(LoginRequiredMixin, ListView):
         
         return ctx
 
+# items/views.py
+
 class ItemCreateView(LoginRequiredMixin, CreateView):
     model = Item
     form_class = ItemForm
@@ -57,7 +62,11 @@ class ItemCreateView(LoginRequiredMixin, CreateView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
+        # Filter Clients
         form.fields['client'].queryset = form.fields['client'].queryset.filter(user=self.request.user)
+        # Filter Billing Policies
+        from billing_schedule.models import BillingPolicy
+        form.fields['billing_policy'].queryset = BillingPolicy.objects.filter(user=self.request.user)
         return form
 
 class ItemUpdateView(LoginRequiredMixin, UpdateView):
@@ -71,9 +80,13 @@ class ItemUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
+        # Filter Clients
         form.fields['client'].queryset = form.fields['client'].queryset.filter(user=self.request.user)
+        # Filter Billing Policies
+        from billing_schedule.models import BillingPolicy
+        form.fields['billing_policy'].queryset = BillingPolicy.objects.filter(user=self.request.user)
         return form
-
+    
 class ItemDeleteView(LoginRequiredMixin, DeleteView):
     model = Item
     template_name = 'items/item_confirm_delete.html'
@@ -139,13 +152,6 @@ def generate_invoice_from_items(request):
 
     return redirect('invoices:invoice_list')
 
-
-
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
-
-from .models import Item
-from .services import import_recurring_to_invoices
 
 
 @login_required

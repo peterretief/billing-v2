@@ -1,10 +1,10 @@
 import logging
 from datetime import timedelta
 
-from django.db import (
-    transaction,
-)
+from django.db import transaction
 from django.utils import timezone
+
+from billing_schedule.models import BillingPolicy  # Import the new policy model
 
 # Models
 from core.models import BillingAuditLog
@@ -20,24 +20,37 @@ logger = logging.getLogger(__name__)
 def import_recurring_to_invoices(user):
     today = timezone.now()
     
-    # 1. EMERGENCY RESET: Unlink any recurring items currently stuck to DRAFTS
+    # --- STEP 1: IDENTIFY DUE POLICIES ---
+    # We use the 'due_today' manager we built to find which schedules trigger today
+    due_policies = BillingPolicy.objects.filter(user=user).due_today()
+    
+    if not due_policies.exists():
+        logger.info(f"No billing policies are scheduled to run today for user {user.username}.")
+        return []
+
+    # --- STEP 2: EMERGENCY RESET ---
+    # Unlink any recurring items currently stuck to DRAFTS
     Item.objects.filter(
         user=user, 
         is_recurring=True, 
         invoice__status='DRAFT'
     ).update(invoice=None)
 
-    # 2. SELECTION: Get master templates not yet billed this month
+    # --- STEP 3: SELECTION (The Bridge) ---
+    # Filter templates that are:
+    # 1. Recurring
+    # 2. Linked to a policy that is due TODAY
+    # 3. Haven't been billed yet today
     templates = Item.objects.filter(
         user=user, 
-        is_recurring=True
+        is_recurring=True,
+        billing_policy__in=due_policies
     ).exclude(
-        last_billed_date__month=today.month, 
-        last_billed_date__year=today.year
+        last_billed_date=today.date()
     )
 
     if not templates.exists():
-        logger.info("Nothing to bill today.")
+        logger.info("No items match the current scheduled policies for today.")
         return []
 
     new_invoices = []
@@ -53,6 +66,7 @@ def import_recurring_to_invoices(user):
             days_to_due = getattr(client_obj, 'payment_terms', 30) or 30
             calculated_due_date = today.date() + timedelta(days=days_to_due)
             
+            # Generate the Invoice
             invoice = Invoice.objects.create(
                 user=user,
                 client=client_obj,
@@ -61,6 +75,7 @@ def import_recurring_to_invoices(user):
                 status='DRAFT'
             )
 
+            # Create specific line items for this specific invoice
             for t in client_templates:
                 Item.objects.create(
                     user=user, 
@@ -75,6 +90,7 @@ def import_recurring_to_invoices(user):
             Invoice.objects.update_totals(invoice)
             invoice.refresh_from_db()
 
+            # Audit logging
             is_huge = float(invoice.total_amount) > 10000
             BillingAuditLog.objects.create(
                 user=user, 
@@ -87,22 +103,20 @@ def import_recurring_to_invoices(user):
             if not is_huge:
                 new_invoices.append(invoice)
 
-    # 3. THE DISPATCH (Sending the emails)
-    # We maintain a list of successfully processed invoices to return to the task
+    # --- STEP 4: THE DISPATCH ---
     processed_invoices = []
 
     for inv in new_invoices:
         try:
             if email_item_invoice_to_client(inv):
-                # --- NEW LOGIC START ---
                 inv.status = 'PENDING' 
-                inv.is_emailed = True      # Stamping for the History Table
-                inv.emailed_at = today     # Accurate timestamp for ordering
+                inv.is_emailed = True      
+                inv.emailed_at = today     
                 inv.save()
                 
-                # Update the master template's last_billed_date so it leaves Table 1
+                # IMPORTANT: Update the master template's date so it doesn't fire again today
+                # We filter by client and policy to be precise
                 templates.filter(client=inv.client).update(last_billed_date=today.date())
-                # --- NEW LOGIC END ---
                 
                 logger.info(f"Successfully sent invoice {inv.id} to {inv.client.name}")
                 processed_invoices.append(inv)
@@ -111,5 +125,4 @@ def import_recurring_to_invoices(user):
         except Exception as e:
             logger.error(f"System error during dispatch for invoice {inv.id}: {str(e)}")
 
-    # Returning objects instead of IDs so the Celery task can access attributes
     return processed_invoices
