@@ -149,7 +149,7 @@
                 <tr>
                     <td><strong>{{ inv.number }}</strong></td>
                     <td>{{ inv.client.name }}</td>
-                    <td>${{ inv.total_amount }}</td>
+                    <td>{{ GLOBAL_CURRENCY }}{{ inv.total_amount }}</td>
                     <td>{{ inv.emailed_at|date:"M d, H:i" }}</td>
                     <td><span class="badge badge-success">Emailed Successfully</span></td>
                 </tr>

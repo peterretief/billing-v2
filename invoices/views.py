@@ -45,20 +45,18 @@ def get_payment_modal(request, pk):
 @login_required
 def dashboard(request):
     """Main overview for the business owner."""
-    invoices = Invoice.objects.filter(user=request.user)
-    VATReport.objects.filter(user=request.user).order_by('-year', '-month')
+    # We use select_related('client') to make the history table load faster
+    invoices = Invoice.objects.filter(user=request.user).select_related('client')
     
-    # AI Audit Context
+    # AI Audit Context - Look for anomalies in BOTH Drafts and Sent invoices
     flagged_count = BillingAuditLog.objects.filter(
         user=request.user,
-        is_anomaly=True,
-        invoice__status='DRAFT'
-    ).count()
+        is_anomaly=True
+    ).exclude(invoice__status='PAID').count()
 
     # WIP Calculations
     unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
         total_value=Sum(F('hours') * F('hourly_rate')),
-        total_hours=Sum('hours')
     )
     unbilled_items = Item.objects.filter(user=request.user, is_billed=False).aggregate(
         total_value=Sum(F('quantity') * F('unit_price'))
@@ -66,7 +64,6 @@ def dashboard(request):
 
     stats = invoices.aggregate(
         billed=Sum('total_amount'),
-        tax=Sum('tax_amount'),
         paid=Sum('payments__amount')  
     )
     
@@ -75,11 +72,16 @@ def dashboard(request):
         'total_billed': stats['billed'] or Decimal('0.00'),
         'total_outstanding': Invoice.objects.get_total_outstanding(request.user),
         'tax_summary': Invoice.objects.get_tax_summary(request.user),
+        
+        # This table shows the 5 most recent invoices regardless of status
         'recent_invoices': invoices.order_by('-date_issued', '-id')[:5],
         'flagged_count': flagged_count,
+        
+        # This is for your "Dispatched & Emailed" history section
+        'sent_history': invoices.filter(is_emailed=True).order_by('-emailed_at')[:10],
     }
-    return render(request, 'invoices/dashboard.html', context)
 
+    return render(request, 'invoices/dashboard.html', context)
 @login_required
 def invoice_list(request):
     invoice_queryset = Invoice.objects.filter(user=request.user).select_related('client').order_by('-date_issued', '-id')
