@@ -57,6 +57,7 @@ CSRF_CHECK_REFERER = False
 
 # --- APPLICATION DEFINITION ---
 INSTALLED_APPS = [
+    'ops',
     'billing_schedule',
     'core',
     'anymail',
