@@ -1,0 +1,8 @@
+{% extends "admin/base_site.html" %}
+
+{% block nav-global %}
+    {% if user.is_staff or user.is_superuser %}
+        <a href="{% url 'ops:dashboard' %}" style="padding-left: 20px; padding-top: 5px; color: #fff;">Ops Dashboard</a>
+    {% endif %}
+    {{ block.super }}
+{% endblock %}

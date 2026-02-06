@@ -1,0 +1,1 @@
+Invitation: Access your Billing Dashboard for {{ user.userprofile.company_name }}

@@ -16,5 +16,6 @@ urlpatterns = [
     path('notifications/', include('notifications.urls')),
     path('__debug__/', include('debug_toolbar.urls')),
     path('scheduler/', include('billing_schedule.urls')),
+    path('ops/', include('ops.urls')),
     
 ]

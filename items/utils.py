@@ -1,9 +1,30 @@
+import datetime
+
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.utils.timezone import now
 
 from invoices.utils import generate_invoice_pdf  # Reusing your safe LaTeX logic
 
+
+def is_first_working_day(date_to_check):
+    """
+    Checks if the given date is the first Monday-Friday of its month.
+    """
+    # 1. If it's Saturday (5) or Sunday (6), it's not a working day
+    if date_to_check.weekday() > 4:
+        return False
+
+    # 2. Check if any day earlier in this same month was a weekday
+    # We loop from the 1st of the month up to (but not including) today
+    for day in range(1, date_to_check.day):
+        test_date = datetime.date(date_to_check.year, date_to_check.month, day)
+        if test_date.weekday() <= 4:
+            # We found a weekday earlier in the month, so today isn't the first
+            return False
+
+    # 3. If we cleared those checks, it is the first working day
+    return True
 
 def email_item_invoice_to_client(invoice):
     """

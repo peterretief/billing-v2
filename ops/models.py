@@ -28,3 +28,26 @@ class BillingBatch(models.Model):
     def __str__(self):
         status = "✅ Done" if self.is_processed else "⏳ Pending"
         return f"{self.user.username} - {self.scheduled_date} ({status})"
+    
+
+class OpsAssignment(models.Model):
+    """Links an Ops Manager to the Tenants they are allowed to manage."""
+    ops_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='managed_tenants',
+        limit_choices_to={'is_staff': True} # Only staff can be Ops
+    )
+    tenant = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='assigned_ops'
+    )
+    assigned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('ops_user', 'tenant')
+        verbose_name = "Ops Assignment"
+
+    def __str__(self):
+        return f"{self.ops_user.username} managing {self.tenant.username}"
