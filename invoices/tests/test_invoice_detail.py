@@ -8,7 +8,18 @@ from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Client
+from datetime import timedelta
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.test import Client as DjangoClient
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from clients.models import Client
 from invoices.models import Invoice
+from items.models import Item
 
 User = get_user_model()
 
@@ -23,11 +34,20 @@ class InvoiceDetailViewTest(TestCase):
         self.invoice = Invoice.objects.create(
             user=self.user,
             client=self.client_model,
+            number='INV-001',
             status='DRAFT',
-            total_amount=Decimal('100.00'),
             date_issued=today,
             due_date=today + timedelta(days=14)
         )
+        Item.objects.create(
+            invoice=self.invoice,
+            user=self.user,
+            client=self.client_model,
+            description='Test Item',
+            quantity=1,
+            unit_price=Decimal('100.00')
+        )
+        self.invoice.save()  # Recalculate totals
         self.client = DjangoClient()
 
     def test_invoice_detail_page_renders(self):
@@ -38,6 +58,6 @@ class InvoiceDetailViewTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'invoices/invoice_detail.html')
-        self.assertContains(response, f'Invoice #{self.invoice.id}')
+        self.assertContains(response, f'Invoice #{self.invoice.number}')
         self.assertContains(response, self.client_model.name)
         self.assertContains(response, '100.00')

@@ -73,11 +73,17 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
 
     def get_total_outstanding(self, user):
-        stats = self.filter(user=user).active().totals()
+        users_to_filter = [user]
+        if user.is_ops:
+            users_to_filter.extend(list(user.added_users.all()))
+        stats = self.filter(user__in=users_to_filter).active().totals()
         return stats['billed'] - stats['paid']
 
     def get_dashboard_stats(self, user):
-        qs = self.filter(user=user)
+        users_to_filter = [user]
+        if user.is_ops:
+            users_to_filter.extend(list(user.added_users.all()))
+        qs = self.filter(user__in=users_to_filter)
         stats = qs.totals()
         
         return {
@@ -93,13 +99,16 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         # Local import to prevent Circular Import error if TaxPayment is in models.py
         from .models import TaxPayment
 
+        users_to_filter = [user]
+        if user.is_ops:
+            users_to_filter.extend(list(user.added_users.all()))
         # 1. Total VAT collected from customers (Only from PAID invoices)
-        collected = self.filter(user=user, status='PAID').aggregate(
+        collected = self.filter(user__in=users_to_filter, status='PAID').aggregate(
             res=Coalesce(Sum('tax_amount'), Decimal('0.00'))
         )['res']
 
        # 2. Total VAT already paid to SARS
-        paid = TaxPayment.objects.filter(user=user, tax_type='VAT').aggregate(
+        paid = TaxPayment.objects.filter(user__in=users_to_filter, tax_type='VAT').aggregate(
             res=Coalesce(Sum('amount'), Decimal('0.00'))
         )['res']
 
@@ -124,7 +133,10 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
     def get_tax_year_report(self, user):
         """Calculates total net revenue for the current income tax year."""
         start, end = self.get_tax_year_dates()
-        res = self.filter(user=user, date_issued__range=[start, end]).aggregate(
+        users_to_filter = [user]
+        if user.is_ops:
+            users_to_filter.extend(list(user.added_users.all()))
+        res = self.filter(user__in=users_to_filter, date_issued__range=[start, end]).aggregate(
             net_revenue=Sum('subtotal_amount'),
             total_vat=Sum('tax_amount')
         )

@@ -56,23 +56,23 @@
                                     </a>
                                     
                                     <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}" class="btn btn-outline-dark" target="_blank">
-                                        <i class="bi bi-file-pdf"></i> Classic
-                                    </a>
-                                    <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}?style=modern" class="btn btn-outline-dark" target="_blank">
-                                        <i class="bi bi-magic"></i> Modern
+                                        <i class="bi bi-file-pdf"></i> Pdf
                                     </a>
 
                                     {% if invoice.status != 'PAID' %}
-<button class="btn btn-sm btn-success"
-        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
-        hx-target="#paymentModalContent"
-        hx-trigger="click"
-        data-bs-toggle="modal" 
-        data-bs-target="#paymentModal"
-        title="Record Payment">
-    <i class="bi bi-cash-stack"></i> 
-    <span class="d-none d-md-inline">Pay</span>
-</button>                                    {% endif %}
+                                    <button class="btn btn-sm btn-success"
+                                            hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
+                                            hx-target="#paymentModalContent"
+                                            hx-trigger="click"
+                                            hx-on::after-request="
+                                              var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+                                              myModal.show();
+                                            "
+                                            title="Record Payment">
+                                        <i class="bi bi-cash-stack"></i>
+                                        <span class="d-none d-md-inline">Pay</span>
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>

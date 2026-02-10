@@ -168,6 +168,7 @@ def render_invoice_tex(invoice, template_name='invoice_template.tex'):
         'date_issued': invoice.date_issued,
         'due_date': invoice.due_date,
         'client_name': tex_safe(invoice.client.salutation),
+
         'client_vat_number': tex_safe(invoice.client.vat_number),
         'client_phone': tex_safe(invoice.client.phone),
         'bank_name': tex_safe(profile.bank_name),

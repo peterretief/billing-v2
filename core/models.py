@@ -16,6 +16,8 @@ class User(AbstractUser):
         blank=False, 
         error_messages={'unique': "A user with that email already exists."}
     )
+    is_ops = models.BooleanField(default=False)
+    added_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='added_users')
 
     REQUIRED_FIELDS = ['email'] 
 

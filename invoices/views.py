@@ -45,32 +45,45 @@ def get_payment_modal(request, pk):
 @login_required
 def dashboard(request):
     """Main overview for the business owner."""
-    # We use select_related('client') to make the history table load faster
-    invoices = Invoice.objects.filter(user=request.user).select_related('client')
-    
-    # AI Audit Context - Look for anomalies in BOTH Drafts and Sent invoices
-    flagged_count = BillingAuditLog.objects.filter(
-        user=request.user,
-        is_anomaly=True
-    ).exclude(invoice__status='PAID').count()
-
-    # WIP Calculations
-    unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
-        total_value=Sum(F('hours') * F('hourly_rate')),
-    )
-    unbilled_items = Item.objects.filter(user=request.user, is_billed=False).aggregate(
-        total_value=Sum(F('quantity') * F('unit_price'))
-    )
+    if request.user.is_ops:
+        # Ops users see data of users they added, plus their own
+        users_to_show = list(request.user.added_users.all()) + [request.user]
+        invoices = Invoice.objects.filter(user__in=users_to_show).select_related('client')
+        unbilled_ts = TimesheetEntry.objects.filter(user__in=users_to_show, is_billed=False).aggregate(
+            total_value=Sum(F('hours') * F('hourly_rate')),
+        )
+        unbilled_items = Item.objects.filter(user__in=users_to_show, is_billed=False).aggregate(
+            total_value=Sum(F('quantity') * F('unit_price'))
+        )
+        flagged_count = BillingAuditLog.objects.filter(
+            user__in=users_to_show,
+            is_anomaly=True
+        ).exclude(invoice__status='PAID').count()
+    else:
+        # Regular users see their own data
+        invoices = Invoice.objects.filter(user=request.user).select_related('client')
+        unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
+            total_value=Sum(F('hours') * F('hourly_rate')),
+        )
+        unbilled_items = Item.objects.filter(user=request.user, is_billed=False).aggregate(
+            total_value=Sum(F('quantity') * F('unit_price'))
+        )
+        flagged_count = BillingAuditLog.objects.filter(
+            user=request.user,
+            is_anomaly=True
+        ).exclude(invoice__status='PAID').count()
 
     stats = invoices.aggregate(
         billed=Sum('total_amount'),
         paid=Sum('payments__amount')  
     )
     
+    total_outstanding = Invoice.objects.get_total_outstanding(request.user)
+
     context = {
         'unbilled_value': (unbilled_ts['total_value'] or Decimal('0.00')) + (unbilled_items['total_value'] or Decimal('0.00')),
         'total_billed': stats['billed'] or Decimal('0.00'),
-        'total_outstanding': Invoice.objects.get_total_outstanding(request.user),
+        'total_outstanding': total_outstanding,
         'tax_summary': Invoice.objects.get_tax_summary(request.user),
         
         # This table shows the 5 most recent invoices regardless of status
@@ -84,7 +97,14 @@ def dashboard(request):
     return render(request, 'invoices/dashboard.html', context)
 @login_required
 def invoice_list(request):
-    invoice_queryset = Invoice.objects.filter(user=request.user).select_related('client').order_by('-date_issued', '-id')
+    if request.user.is_ops:
+        # Ops users see invoices of users they added
+        added_users = request.user.added_users.all()
+        invoice_queryset = Invoice.objects.filter(user__in=added_users).select_related('client').order_by('-date_issued', '-id')
+    else:
+        # Regular users see their own invoices
+        invoice_queryset = Invoice.objects.filter(user=request.user).select_related('client').order_by('-date_issued', '-id')
+    
     status_filter = request.GET.get('status')
     if status_filter == 'UNPAID':
         invoice_queryset = invoice_queryset.exclude(status='PAID')
