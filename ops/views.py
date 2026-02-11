@@ -8,9 +8,9 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-# Import models from your apps
-from invoices.models import Invoice
+from invoices.models import Invoice  # Import from your billing app
 
+# Import models from your apps
 from .forms import TenantInviteForm
 from .models import BillingBatch, OpsAssignment
 from .services import create_and_invite_tenant  # Using the new service
@@ -18,6 +18,30 @@ from .services import create_and_invite_tenant  # Using the new service
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+
+
+class GlobalRevenueDashboard(UserPassesTestMixin, TemplateView):
+    template_name = 'ops/global_revenue.html'
+
+    def test_func(self):
+        return self.request.user.is_superuser
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Global Aggregates
+        context['grand_total'] = Invoice.objects.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        context['invoice_count'] = Invoice.objects.count()
+        
+        # Revenue per Tenant (User)
+        # This joins the Invoice to the User/Profile to show who is earning the most
+        context['tenant_performance'] = (
+            Invoice.objects.values('user__profile__company_name')
+            .annotate(total_revenue=Sum('total_amount'))
+            .order_by('-total_revenue')
+        )
+        
+        return context
 
 def invite_tenant_view(request):
     if request.method == 'POST':

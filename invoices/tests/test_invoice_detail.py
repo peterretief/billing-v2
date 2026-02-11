@@ -8,16 +8,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Client
-from datetime import timedelta
-from decimal import Decimal
-
-from django.contrib.auth import get_user_model
-from django.test import Client as DjangoClient
-from django.test import TestCase
-from django.urls import reverse
-from django.utils import timezone
-
-from clients.models import Client
 from invoices.models import Invoice
 from items.models import Item
 

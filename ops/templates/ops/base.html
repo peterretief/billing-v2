@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block navbar %}
+<nav class="admin-nav" style="background: #2c3e50; color: white;">
+    <a href="{% url 'ops:global_revenue' %}">Global Revenue</a>
+    <a href="/admin/">Django Admin</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+    {% block ops_content %}{% endblock %}
+{% endblock %}
