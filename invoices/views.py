@@ -1,15 +1,17 @@
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import F, Sum
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 # AI Integration
@@ -195,7 +197,8 @@ def bulk_post(request):
                 inv.save()
                 inv.billed_items.all().update(is_billed=True)
                 item_desc = inv.billed_items.values_list('description', flat=True)
-                Item.objects.filter(user=request.user, client=inv.client, is_recurring=True, description__in=item_desc).update(last_billed_date=timezone.now().date())
+                Item.objects.filter(user=request.user, client=inv.client, is_recurring=True,
+                                     description__in=item_desc).update(last_billed_date=timezone.now().date())
                 try:
                     if email_invoice_to_client(inv): count += 1
                 except Exception: pass
@@ -229,38 +232,44 @@ def mark_invoice_paid(request, pk):
             
     return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
 
+
+
 @login_required
 def record_payment(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    next_url = request.META.get('HTTP_REFERER') or reverse('invoices:dashboard')
+
     if request.method == 'POST':
-        invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-        # ... your Decimal/Validation logic ...
-        amount_str = request.POST.get('amount', '0').replace(',', '')
-        amount = Decimal(amount_str)
         try:
+            amount_str = request.POST.get('amount', '0').replace(',', '').strip()
+            amount = Decimal(amount_str)
+            
             with transaction.atomic():
                 Payment.objects.create(
-                    user=request.user,  # CRITICAL: Must be here
+                    user=request.user,
                     invoice=invoice,
                     amount=amount,
                     reference=request.POST.get('reference', 'Manual Payment')
                 )
                 invoice.save()
-
-            # --- THE HTMX FIX ---
-            if request.headers.get('HX-Request'):
-                # Tell HTMX to refresh the entire page so you see the new status/payment
-                response = HttpResponse(status=204) # 204 = No Content (Success)
-                response['HX-Refresh'] = 'true' 
-                return response
             
-            messages.success(request, f"Payment of {request.user.profile.currency} {amount} recorded.")
-            return redirect('invoices:invoice_detail', pk=pk)
-
-        except Exception as e:
-            # If there's an error, send it back as text so it shows in the modal
+            messages.success(request, f"Payment of {amount} recorded.")
+            
+            # --- HTMX REDIRECT FIX ---
             if request.headers.get('HX-Request'):
-                return HttpResponse(f'<div class="alert alert-danger">{str(e)}</div>', status=422)
-            messages.error(request, str(e))
+                response = HttpResponse(status=204) # No Content
+                response['HX-Redirect'] = next_url
+                return response
+            # -------------------------
+            
+            return redirect(next_url)
+
+        except ValidationError as e:
+            messages.error(request, f"Error: {', '.join(e.messages)}")
+        except (InvalidOperation, ValueError):
+            messages.error(request, "Invalid numeric amount.")
+
+    return redirect(next_url)
 
 """
 @login_required

@@ -1,9 +1,12 @@
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from django.db import models
+from django.core.exceptions import ValidationError
+from django.db import models, transaction
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+#from pydantic_core import ValidationError
 from clients.models import Client
 from core.models import TenantModel
 
@@ -148,9 +151,41 @@ class Invoice(TenantModel):
 
     # --- Payment Logic ---
 
+#    @property
+#    def total_paid(self):
+#       return sum(payment.amount for payment in self.payments.all()) or Decimal('0.00')
+#    @property
+#    def total_paid(self):
+        # This hits the DB for the current truth, avoiding the cache trap
+#        return self.payments.aggregate(
+#            total=Coalesce(Sum('amount'), Decimal('0.00'))
+#         )['total']
+
     @property
     def total_paid(self):
-        return sum(payment.amount for payment in self.payments.all()) or Decimal('0.00')
+        from django.db.models import Sum
+ #       from django.db.models.functions import Coalesce
+    
+        # We use the Django Sum class, not the Python sum() function
+        result = self.payments.aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0.00'))
+        )
+        return result['total']
+
+# invoices/models.py
+
+# CHANGE THIS:
+# total=Coalesce(sum('amount'), Decimal('0.00'))
+
+# TO THIS (Ensure Sum is imported from django.db.models):
+
+
+#    @property
+#    def balance_due(self):
+#        # If this uses self.payments.aggregate, it's usually fine.
+#        # But if it relies on a manager method, ensure it's not being filtered by .active()
+#        paid = self.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+#        return self.total_amount - paid
 
     @property
     def balance_due(self):
@@ -174,11 +209,21 @@ class Invoice(TenantModel):
         self.tax_amount = self.calculated_vat
         self.total_amount = self.calculated_total
 
-    def save(self, *args, **kwargs):
-        # Automatically update snapshots whenever the invoice is saved
-        if self.pk: # Only sync if already created or items exist
-            self.sync_totals()
-        super().save(*args, **kwargs)
+# invoices/models.py (Invoice)
+
+def save(self, *args, **kwargs):
+    # Ensure we have default decimals to avoid NoneType errors
+    self.subtotal_amount = self.subtotal_amount or Decimal('0.00')
+    self.total_amount = self.total_amount or Decimal('0.00')
+    
+    super().save(*args, **kwargs)
+    
+    # If we have items but totals are zero, sync them
+    # We do this after super().save() so self.pk exists
+    if hasattr(self, 'billed_items') and self.billed_items.exists():
+        self.sync_totals()
+        # Save again to commit the new totals
+        super().save(update_fields=['subtotal_amount', 'tax_amount', 'total_amount'])
 
 
     def __str__(self):
@@ -193,25 +238,54 @@ class Payment(TenantModel):
     reference = models.CharField(max_length=100, blank=True,
                                   null=True) # Ensure blank=True is here
 
+
+#    def clean(self):
+#        super().clean()
+#        if self.invoice.status == 'DRAFT':
+#            raise ValidationError(
+#                "Cannot add a payment to a 'Draft' invoice. "
+#                "Please mark the invoice as 'Sent' or 'Pending' first."
+#        )
+
+   # def clean(self):
+   #     super().clean()
+   #     if self.invoice.status == 'DRAFT':
+   #         raise ValidationError(
+   #             "Cannot add a payment to a 'Draft' invoice. "
+   #             "Please mark the invoice as 'Sent' or 'Pending' first.",
+   #             line_errors=[]  # Satisfies the required argument
+    #    )
+
     def clean(self):
-        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.invoice.status == 'DRAFT':
+            raise ValidationError("Cannot add a payment to a 'Draft' invoice.")
+
         if self.amount > self.invoice.balance_due:
             currency = self.user.profile.currency
             raise ValidationError(
-                f"Payment amount ({currency} \
-                    {self.amount}) cannot exceed the balance due ({currency} {self.invoice.balance_due})"  # noqa: E501
+                f"Payment amount ({currency} {self.amount}) cannot exceed the "
+                f"balance due ({currency} {self.invoice.balance_due})"
             )
+
         if self.amount <= 0:
             raise ValidationError("Payment amount must be greater than zero")
 
+
+# invoices/models.py (Payment)
+
+
     def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
-        # Auto-update invoice status if balance is now zero
-        inv = self.invoice
-        if inv.balance_due <= 0:
-            inv.status = 'PAID'
-            inv.save()
+        # 1. Run the validation (clean)
+        self.full_clean() 
+    
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+        
+        # 2. Use the Manager to refresh the status
+        # This is cleaner than calling self.invoice.save()
+        Invoice.objects.update_totals(self.invoice)
+
 
     def __str__(self):
         return f"{self.user.profile.currency} {self.amount} for {self.invoice.number}"  

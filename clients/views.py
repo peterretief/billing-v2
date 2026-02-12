@@ -14,16 +14,7 @@ from .forms import ClientForm
 from .models import Client
 
 # views.py
-from .services import BrevoSenderService
 
-
-def onboard_tenant(request):
-    # ... validation ...
-    service = BrevoSenderService()
-    service.create_tenant_sender(tenant.name, tenant.email)
-    # ... return response ...
-
-    
 
 class ClientDetailView(LoginRequiredMixin, DetailView):
     model = Client

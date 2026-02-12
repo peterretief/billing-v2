@@ -59,20 +59,30 @@
                                         <i class="bi bi-file-pdf"></i> Pdf
                                     </a>
 
-                                    {% if invoice.status != 'PAID' %}
-                                    <button class="btn btn-sm btn-success"
-                                            hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
-                                            hx-target="#paymentModalContent"
-                                            hx-trigger="click"
-                                            hx-on::after-request="
-                                              var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
-                                              myModal.show();
-                                            "
-                                            title="Record Payment">
-                                        <i class="bi bi-cash-stack"></i>
-                                        <span class="d-none d-md-inline">Pay</span>
-                                    </button>
-                                    {% endif %}
+{% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
+<button class="btn btn-sm btn-success"
+        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
+        hx-target="#paymentModalContent"
+        hx-trigger="click"
+        hx-on::after-request="
+          var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+          myModal.show();
+        "
+        title="Record Payment">
+    <i class="bi bi-cash-stack"></i>
+    <span class="d-none d-md-inline">Pay</span>
+</button>
+{% elif invoice.status == 'DRAFT' %}
+<button class="btn btn-sm btn-outline-secondary" disabled title="Locked in Draft">
+    <i class="bi bi-lock"></i>
+    <span class="d-none d-md-inline">Draft</span>
+</button>
+{% endif %}
+
+
+
+
+
                                 </div>
                             </td>
                         </tr>

@@ -3,6 +3,7 @@
 
 {% block content %}
 <div class="container mt-4">
+    {# Header Section #}
     <div class="row mb-4 align-items-center">
         <div class="col-md-8">
             <h2 class="fw-bold mb-0">Business Dashboard</h2>
@@ -17,6 +18,7 @@
     </div>
 
     <div class="row g-4">
+        {# Left Column: Stats & Recent Invoices #}
         <div class="col-lg-8">
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
@@ -72,14 +74,24 @@
                                             <i class="bi bi-eye"></i> View
                                         </a>
                                         
-                                        {% if inv.status != 'PAID' %}
-                                        <button class="btn btn-outline-success"
-                                                hx-get="{% url 'invoices:get_payment_modal' inv.pk %}"
-                                                hx-target="#paymentModalContent"
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#paymentModal">
-                                            <i class="bi bi-cash-stack"></i> Pay
-                                        </button>
+                                        {% if inv.status != 'PAID' and inv.status != 'DRAFT' and inv.status != 'CANCELLED' %}
+                                            <button class="btn btn-sm btn-success"
+                                                    hx-get="{% url 'invoices:get_payment_modal' inv.pk %}"
+                                                    hx-target="#paymentModalContent"
+                                                    hx-trigger="click"
+                                                    hx-on::after-request="
+                                                      var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+                                                      myModal.show();
+                                                    "
+                                                    title="Record Payment">
+                                                <i class="bi bi-cash-stack"></i>
+                                                <span class="d-none d-md-inline">Pay</span>
+                                            </button>
+                                        {% elif inv.status == 'DRAFT' %}
+                                            <button class="btn btn-sm btn-outline-secondary" disabled title="Locked in Draft">
+                                                <i class="bi bi-lock"></i>
+                                                <span class="d-none d-md-inline">Draft</span>
+                                            </button>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -95,6 +107,7 @@
             </div>
         </div>
 
+        {# Right Column: Tools & Assessment #}
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm mb-4 bg-light">
                 <div class="card-body">
@@ -131,41 +144,47 @@
 </div>
 
 <hr>
-<h3 class="mt-4">✅ Dispatched & Emailed (History)</h3>
-<div class="card">
-    <div class="card-body">
-        <table class="table table-hover">
-            <thead class="thead-light">
-                <tr>
-                    <th>Invoice #</th>
-                    <th>Client</th>
-                    <th>Total</th>
-                    <th>Sent At</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for inv in sent_history %}
-                <tr>
-                    <td><strong>{{ inv.number }}</strong></td>
-                    <td>{{ inv.client.name }}</td>
-                    <td>{{ GLOBAL_CURRENCY }}{{ inv.total_amount }}</td>
-                    <td>{{ inv.emailed_at|date:"M d, H:i" }}</td>
-                    <td><span class="badge badge-success">Emailed Successfully</span></td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="text-center text-muted">No emails sent in the last 30 days.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+
+{# Sent History Section #}
+<div class="container mb-5">
+    <h3 class="mt-4">✅ Dispatched & Emailed (History)</h3>
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Invoice #</th>
+                        <th>Client</th>
+                        <th>Total</th>
+                        <th>Sent At</th>
+                        <th class="text-end pe-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inv in sent_history %}
+                    <tr>
+                        <td class="ps-3"><strong>{{ inv.number }}</strong></td>
+                        <td>{{ inv.client.name }}</td>
+                        <td>{{ GLOBAL_CURRENCY }}{{ inv.total_amount|intcomma }}</td>
+                        <td>{{ inv.emailed_at|date:"M d, H:i" }}</td>
+                        <td class="text-end pe-3"><span class="badge bg-success">Emailed Successfully</span></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted small">No emails sent in the last 30 days.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
+{# Modal Container #}
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" id="paymentModalContent">
-        </div>
+        {# Content loaded via HTMX #}
+    </div>
 </div>
 
 {% endblock %}
