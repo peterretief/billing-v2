@@ -1,0 +1,47 @@
+{% extends "admin/base_site.html" %}
+{% load humanize %}
+
+{% block content %}
+<div id="content-main">
+  <h1>Superuser Dashboard</h1>
+  
+  <div class="row">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Total Users</h5>
+          <p class="card-text">{{ total_users }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Total Revenue</h5>
+          <p class="card-text">{{ total_revenue|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Total Outstanding</h5>
+          <p class="card-text">{{ total_outstanding|intcomma }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-4">
+    <div class="card-header">
+      Recent Users
+    </div>
+    <ul class="list-group list-group-flush">
+      {% for user in recent_users %}
+        <li class="list-group-item">{{ user.username }} - {{ user.email }} (Joined: {{ user.date_joined|date:"Y-m-d" }})</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+</div>
+{% endblock %}

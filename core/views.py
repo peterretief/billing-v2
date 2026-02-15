@@ -50,6 +50,33 @@ def tenant_report_detail(request, tenant_id):
     })
 
 
+from invoices.models import Invoice
+from collections import defaultdict
+from decimal import Decimal
+
+@user_passes_test(lambda u: u.is_superuser)
+def superuser_dashboard(request):
+    """
+    Displays the superuser-specific dashboard with app-wide analytics.
+    """
+    total_users = User.objects.count()
+    recent_users = User.objects.order_by('-date_joined')[:5]
+
+    all_invoices = Invoice.objects.all()
+    
+    total_revenue = all_invoices.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    
+    # Calculate total outstanding by summing up balance_due of all invoices
+    total_outstanding = sum(invoice.balance_due for invoice in all_invoices)
+
+    context = {
+        'total_users': total_users,
+        'recent_users': recent_users,
+        'total_revenue': total_revenue,
+        'total_outstanding': total_outstanding,
+    }
+    return render(request, 'admin/index.html', context)
+
 @login_required
 def portfolio_summary(request):
     if not request.user.is_ops:

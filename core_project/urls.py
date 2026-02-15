@@ -1,9 +1,11 @@
 from django.contrib import admin
 from django.urls import include, path
+from core import views as core_views
 
 urlpatterns = [
     path('', include('core.urls')), # Set landing page as the entry point
 
+    path('admin/dashboard/', core_views.superuser_dashboard, name='admin_dashboard'),
     path('admin/', admin.site.urls),
     # This includes all built-in login/logout views
     path('accounts/', include('django.contrib.auth.urls')), 
