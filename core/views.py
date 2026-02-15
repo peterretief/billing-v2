@@ -1,3 +1,4 @@
+#import profile
 import secrets
 
 from django.conf import settings
@@ -6,15 +7,102 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
 from django.core.mail import send_mail  # <--- Added this
-from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.db.models import Sum
+from django.http import HttpResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+#from .decorators import setup_required  # Your custom gatekeeper
 from .forms import AdminUserCreationForm, AppInterestForm, UserProfileForm
-from .models import UserProfile
+from .models import (
+    OpsManager,  # Add OpsManager here
+    UserProfile,
+)
 
 User = get_user_model()
 
+
+@login_required
+def tenant_report_detail(request, tenant_id):
+    # 1. Use user__added_by as we discussed
+    tenant_profile = get_object_or_404(
+        UserProfile, 
+        id=tenant_id, 
+        user__added_by=request.user
+    )
+    
+    # 2. Change 'date_created' to 'created_at' (or 'date_issued')
+    # 3. Change 'invoice_number' to 'number' based on the "Choices" in your error
+    invoices = tenant_profile.user.invoice_related.all().order_by('-created_at')
+    
+    total_invoiced = sum(inv.total_amount for inv in invoices)
+    
+    # Note: If 'amount_paid' is also missing from your Invoice model, 
+    # use whatever field tracks payments, or calculate it from the payments relation.
+    total_paid = sum(inv.total_paid for inv in invoices) # Assuming total_paid is a property
+    total_outstanding = total_invoiced - total_paid
+
+    return render(request, 'core/tenant_report_detail.html', {
+        'tenant': tenant_profile,
+        'invoices': invoices,
+        'total_invoiced': total_invoiced,
+        'total_outstanding': total_outstanding,
+    })
+
+
+@login_required
+def portfolio_summary(request):
+    if not request.user.is_ops:
+        return redirect('invoices:dashboard')
+
+    manager = OpsManager.objects.get(pk=request.user.pk)
+    
+    # 1. Get all profiles in the portfolio
+    tenants = manager.get_portfolio().select_related('user')
+
+    currency_groups = {}
+    
+    for t in tenants:
+        # 2. Get all invoices for THIS specific tenant
+        # We use .filter() directly to avoid any BigAutoField lookup issues
+        tenant_invoices = t.user.invoice_related.all()
+        
+        # 3. Sum them up manually
+        # Replace 'total_amount' and 'amount_paid' with your actual field names if different
+        rev = sum(inv.total_amount for inv in tenant_invoices)
+        
+        # If 'balance_due' is a property, we use it here!
+        out = sum(inv.balance_due for inv in tenant_invoices)
+        
+        t.total_revenue = rev
+        t.total_outstanding = out
+        
+        curr = t.currency
+        if curr not in currency_groups:
+            currency_groups[curr] = {'revenue': 0, 'outstanding': 0}
+        
+        currency_groups[curr]['revenue'] += rev
+        currency_groups[curr]['outstanding'] += out
+
+    return render(request, 'core/portfolio_summary.html', {
+        'tenants': tenants,
+        'stats': currency_groups.items(),
+    })
+
+@login_required
+def view_tenant_readonly(request, tenant_id):
+    """
+    Allows a manager to view a specific tenant's dashboard without edit rights.
+    """
+    # Fetch the tenant user, ensuring they were added by the current logged-in manager
+    tenant_user = get_object_or_404(User, id=tenant_id, added_by=request.user)
+    
+    # Show the standard dashboard, but pass the read_only flag
+    return render(request, 'invoices/dashboard.html', {
+        'target_tenant': tenant_user.profile,
+        'read_only': True,
+        'is_manager_view': True
+    })
 # --- Public Views ---
 
 @login_required
@@ -31,6 +119,30 @@ def dismiss_onboarding(request):
     # Return empty so HTMX removes the element immediately
     return HttpResponse("")
 
+@login_required
+def initial_setup(request):
+    # 1. Always fetch the profile first
+    user_profile = request.user.profile 
+
+    if request.method == 'POST':
+        dropdown_val = request.POST.get('currency_dropdown')
+        custom_val = request.POST.get('currency_custom')
+        # Check for the VAT switch
+        is_vat = request.POST.get('is_vat') == 'on'
+
+        if dropdown_val == 'OTHER' and custom_val:
+            user_profile.currency = custom_val[:3]
+        else:
+            user_profile.currency = dropdown_val
+
+        user_profile.is_vat_registered = is_vat
+        user_profile.initial_setup_complete = True
+        user_profile.save()
+        
+        return redirect('invoices:dashboard')
+
+    # 2. THE MISSING PIECE: Handle the GET request (showing the form)
+    return render(request, 'core/initial_setup.html', {'profile': user_profile})
 
 def contact_signup(request):
     """
@@ -185,5 +297,48 @@ def edit_profile(request):
 def update_profile(request):
     """Alias for edit_profile."""
     return edit_profile(request)
+
+
+@login_required
+def manager_create_tenant(request):
+    """
+    Allows an OpsManager to create a new tenant user, automatically assigning
+    the tenant to their portfolio.
+    """
+    if not request.user.is_ops:
+        return HttpResponseForbidden("You do not have permission to access this page.")
+
+    form = AdminUserCreationForm(request.POST or None)
+    
+    if request.method == 'POST' and form.is_valid():
+        email = form.cleaned_data['email']
+        username = form.cleaned_data['username']
+        
+        if User.objects.filter(email=email).exists():
+            messages.error(request, 'A user with this email already exists.')
+        else:
+            # 1. Create user with a random password AND link to manager
+            User.objects.create_user(
+                username=username, 
+                email=email, 
+                password=secrets.token_urlsafe(32),
+                added_by=request.user  # This links the tenant to the manager
+            )
+            
+            # 2. Send Invite via Password Reset system
+            reset_form = PasswordResetForm(data={'email': email})
+            if reset_form.is_valid():
+                reset_form.save(
+                    request=request,
+                    use_https=request.is_secure(),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    subject_template_name='registration/password_reset_subject.txt',
+                    email_template_name='registration/password_reset_email.html',
+                )
+            
+            messages.success(request, f'Tenant {username} created and invite sent.')
+            return redirect('core:portfolio_summary') # Redirect back to portfolio
+
+    return render(request, 'core/manager_create_tenant.html', {'form': form})
 
 

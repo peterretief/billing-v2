@@ -33,6 +33,7 @@ class DeletedInvoiceReportTest(TestCase):
         self.profile, _ = UserProfile.objects.get_or_create(user=self.user)
         self.profile.company_name = "Test Company"
         self.profile.monthly_target = Decimal('10000.00')
+        self.profile.initial_setup_complete = True
         self.profile.save()
         
         self.client_obj = Client.objects.create(

@@ -6,7 +6,7 @@
     {# Header Section #}
     <div class="row mb-4 align-items-center">
         <div class="col-md-8">
-            <h2 class="fw-bold mb-0">Business Dashboard</h2>
+            <h2 class="fw-bold mb-0">{% if is_manager_view %}{{ target_tenant.company_name|default:target_tenant.user.username }}'s {% endif %}Business Dashboard</h2>
         </div>
         {% if flagged_count > 0 %}
         <div class="col-md-4 text-end">
@@ -24,19 +24,19 @@
                 <div class="col-md-4">
                     <div class="card border-0 shadow-sm bg-primary text-white p-3">
                         <small class="text-uppercase opacity-75">Unbilled WIP</small>
-                        <h3 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ unbilled_value|floatformat:2|intcomma }}</h3>
+                        <h3 class="fw-bold mb-0">{{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ unbilled_value|floatformat:2|intcomma }}</h3>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card border-0 shadow-sm bg-dark text-white p-3">
                         <small class="text-uppercase opacity-75">Total Billed</small>
-                        <h3 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ total_billed|floatformat:2|intcomma }}</h3>
+                        <h3 class="fw-bold mb-0">{{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ total_billed|floatformat:2|intcomma }}</h3>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="card border-0 shadow-sm bg-danger text-white p-3">
                         <small class="text-uppercase opacity-75">Outstanding</small>
-                        <h3 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ total_outstanding|floatformat:2|intcomma }}</h3>
+                        <h3 class="fw-bold mb-0">{{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ total_outstanding|floatformat:2|intcomma }}</h3>
                     </div>
                 </div>
             </div>
@@ -60,7 +60,7 @@
                             <tr>
                                 <td class="ps-3">
                                     <span class="fw-bold">#{{ inv.number }}</span>
-                                    <div class="small text-muted">{{ GLOBAL_CURRENCY }}{{ inv.total_amount|intcomma }}</div>
+                                    <div class="small text-muted">{{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ inv.total_amount|intcomma }}</div>
                                 </td>
                                 <td>{{ inv.client.name }}</td>
                                 <td>
@@ -74,7 +74,7 @@
                                             <i class="bi bi-eye"></i> View
                                         </a>
                                         
-                                        {% if inv.status != 'PAID' and inv.status != 'DRAFT' and inv.status != 'CANCELLED' %}
+                                        {% if inv.status != 'PAID' and inv.status != 'DRAFT' and inv.status != 'CANCELLED' and not is_manager_view %}
                                             <button class="btn btn-sm btn-success"
                                                     hx-get="{% url 'invoices:get_payment_modal' inv.pk %}"
                                                     hx-target="#paymentModalContent"
@@ -126,6 +126,7 @@
                 </div>
             </div>
 
+            {% if not is_manager_view %}
             <div class="card border-0 shadow-sm">
                 <div class="card-body text-center py-4">
                     <i class="bi bi-robot fs-1 text-primary mb-2"></i>
@@ -139,6 +140,7 @@
                     <div id="assessment-results" class="mt-3 small text-start"></div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -165,7 +167,7 @@
                     <tr>
                         <td class="ps-3"><strong>{{ inv.number }}</strong></td>
                         <td>{{ inv.client.name }}</td>
-                        <td>{{ GLOBAL_CURRENCY }}{{ inv.total_amount|intcomma }}</td>
+                        <td>{{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ inv.total_amount|intcomma }}</td>
                         <td>{{ inv.emailed_at|date:"M d, H:i" }}</td>
                         <td class="text-end pe-3"><span class="badge bg-success">Emailed Successfully</span></td>
                     </tr>

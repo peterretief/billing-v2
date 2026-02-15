@@ -16,6 +16,12 @@ class PaymentValidationTest(TestCase):
     """Full test suite for Payment validation and Invoice status synchronization."""
     
 def setUp(self):
+    self.user = User.objects.create_user(username='tester', password='pin')
+    # Manually complete the setup so the decorator lets the test pass
+    self.profile = self.user.profile
+    self.profile.initial_setup_complete = True
+    self.profile.save()
+
     self.user = User.objects.create_user(username='test_user', password='password')
     self.client_obj = Client.objects.create(user=self.user, name="Test", client_code="TST")
     
@@ -45,7 +51,7 @@ def setUp(self):
     # This reloads the 'total_amount' field so balance_due is no longer R0.00
     self.invoice.refresh_from_db()
 
-    
+
     def test_payment_under_balance_succeeds(self):
         """Verify that payments under balance due are accepted."""
         self.assertEqual(self.invoice.balance_due, Decimal('500.00'))

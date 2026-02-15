@@ -16,9 +16,9 @@
         <div class="card bg-dark text-white shadow-sm">
             <div class="card-body text-center">
                 <h6 class="text-uppercase small text-warning">Annual Revenue Forecast</h6>
-                <h2 class="fw-bold mb-0">R {{ profile.annual_revenue_forecast|intcomma }}</h2>
+                <h2 class="fw-bold mb-0">{{ profile.currency }} {{ profile.annual_revenue_forecast|intcomma }}</h2>
                 <hr class="border-secondary">
-                <p class="small text-muted mb-0">Based on your R {{ profile.monthly_target|intcomma }} monthly goal.</p>
+                <p class="small text-muted mb-0">Based on your {}} {{ profile.monthly_target|intcomma }} monthly goal.</p>
             </div>
         </div>
     </div>

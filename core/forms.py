@@ -63,6 +63,15 @@ class UserProfileForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
+        # Check if this profile has already completed initial setup
+        if self.instance and self.instance.initial_setup_complete:
+            self.fields['currency'].disabled = True
+            self.fields['is_vat_registered'].disabled = True
+            
+            # Add a help text to explain why
+            self.fields['currency'].help_text = "Locked for accounting integrity."
+            self.fields['is_vat_registered'].help_text = "Consult an expert before changing VAT status."
+
         # 1. Automatic Bootstrap Styling for ALL fields
         for name, field in self.fields.items():
             css_class = 'form-check-input' if \
@@ -74,5 +83,5 @@ class UserProfileForm(forms.ModelForm):
             # Note: Ensure annual_revenue_forecast is defined in your UserProfile model
             forecast = self.instance.annual_revenue_forecast
             self.fields['monthly_target'].help_text = (
-                f"Your current annual forecast is **R {intcomma(forecast)}**."
+                f"Your current annual forecast is {self.instance.currency} {intcomma(forecast)}**."
             )

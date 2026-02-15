@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">Portfolio Summary</h2>
+        <a href="{% url 'core:manager_create_tenant' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add New Tenant
+        </a>
+    </div>
+
+    <!-- Portfolio-wide Stats by Currency -->
+    <div class="row mb-4">
+        {% for currency, currency_stats in stats %}
+        <div class="col-md-4 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light fw-bold fs-5">{{ currency }}</div>
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Total Revenue</h5>
+                    <p class="card-text fs-4 fw-bold">{{ currency_stats.revenue|default:0|floatformat:2|intcomma }}</p>
+                    <hr>
+                    <h5 class="card-title text-muted">Total Outstanding</h5>
+                    <p class="card-text fs-4 fw-bold text-danger">{{ currency_stats.outstanding|default:0|floatformat:2|intcomma }}</p>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center text-muted">
+                    No financial data to display yet.
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Tenant List -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Managed Tenants</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Business / User</th>
+                        <th>Email</th>
+                        <th>Currency</th>
+                        <th>Tax Status</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tenant in tenants %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-primary">{{ tenant.company_name|default:tenant.user.username }}</div>
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ tenant.user.email }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-dark">{{ tenant.currency }}</span>
+                        </td>
+                        <td>
+                            {% if tenant.is_vat_registered %}
+                                <span class="badge bg-info">VAT Registered</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Non-VAT</span>
+                            {% endif %}
+                        </td>
+
+
+
+<td class="text-end">
+<a href="{% url 'core:tenant_report_detail' tenant.id %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-file-earmark-bar-graph"></i> Report
+</a>
+
+</td>
+
+
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">No tenants found in your portfolio. Use the "Add New Tenant" button to get started.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

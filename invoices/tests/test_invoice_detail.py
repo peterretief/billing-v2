@@ -19,6 +19,10 @@ class InvoiceDetailViewTest(TestCase):
     def setUp(self):
         """Set up data for the tests."""
         self.user = User.objects.create_user(username='testuser', password='password')
+        from core.models import UserProfile
+        profile, _ = UserProfile.objects.get_or_create(user=self.user)
+        profile.initial_setup_complete = True
+        profile.save()
         self.client_model = Client.objects.create(user=self.user, name='Test Client')
         today = timezone.now().date()
         self.invoice = Invoice.objects.create(

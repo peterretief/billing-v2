@@ -18,6 +18,7 @@ from django.utils import timezone
 from google import genai
 
 from clients.models import Client
+from core.decorators import setup_required
 from core.models import BillingAuditLog, UserProfile
 from items.models import Item
 from timesheets.models import TimesheetEntry
@@ -39,12 +40,14 @@ InvoiceItemFormSet = inlineformset_factory(
 
 
 @login_required
+@setup_required
 def get_payment_modal(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     return render(request, 'invoices/partials/payment_modal_content.html', {'invoice': invoice})
 
 
 @login_required
+@setup_required  # This ensures they can't see stats until setup is done
 def dashboard(request):
     """Main overview for the business owner."""
     if request.user.is_ops:
@@ -98,14 +101,11 @@ def dashboard(request):
 
     return render(request, 'invoices/dashboard.html', context)
 @login_required
+@setup_required
 def invoice_list(request):
-    if request.user.is_ops:
-        # Ops users see invoices of users they added
-        added_users = request.user.added_users.all()
-        invoice_queryset = Invoice.objects.filter(user__in=added_users).select_related('client').order_by('-date_issued', '-id')
-    else:
-        # Regular users see their own invoices
-        invoice_queryset = Invoice.objects.filter(user=request.user).select_related('client').order_by('-date_issued', '-id')
+    # All users, including Ops managers, should only see their own invoices here.
+    # The portfolio view is for managing tenant invoices.
+    invoice_queryset = Invoice.objects.filter(user=request.user).select_related('client').order_by('-date_issued', '-id')
     
     status_filter = request.GET.get('status')
     if status_filter == 'UNPAID':
@@ -116,11 +116,13 @@ def invoice_list(request):
     return render(request, 'invoices/invoice_list.html', {'invoices': page_obj})
 
 @login_required
+@setup_required
 def invoice_detail(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     return render(request, 'invoices/invoice_detail.html', {'invoice': invoice})
 
 @login_required
+@setup_required
 def invoice_create(request):
     initial_data = {}
     client_id = request.GET.get('client_id')
@@ -146,6 +148,7 @@ def invoice_create(request):
     return render(request, 'invoices/invoice_form.html', {'form': form, 'formset': formset, 'is_edit': False})
 
 @login_required
+@setup_required
 def invoice_edit(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     if invoice.status != 'DRAFT':
@@ -167,6 +170,7 @@ def invoice_edit(request, pk):
     return render(request, 'invoices/invoice_form.html', {'form': form, 'formset': formset, 'is_edit': True})
 
 @login_required
+@setup_required
 def duplicate_invoice(request, pk):
     original = get_object_or_404(Invoice, pk=pk, user=request.user)
     with transaction.atomic():
@@ -186,6 +190,7 @@ def duplicate_invoice(request, pk):
     return redirect('invoices:invoice_edit', pk=new_invoice.pk)
 
 @login_required
+@setup_required
 def bulk_post(request):
     if request.method == 'POST':
         invoice_ids = request.POST.getlist('invoice_ids')
@@ -206,6 +211,7 @@ def bulk_post(request):
     return redirect('invoices:invoice_list')
 
 @login_required
+@setup_required
 def mark_invoice_paid(request, pk):
     """Settle an invoice fully by creating a Payment record."""
     if request.method != "POST":
@@ -235,6 +241,7 @@ def mark_invoice_paid(request, pk):
 
 
 @login_required
+@setup_required
 def record_payment(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     next_url = request.META.get('HTTP_REFERER') or reverse('invoices:dashboard')
@@ -297,6 +304,7 @@ def record_payment(request, pk):
 
 
 @login_required
+@setup_required
 def generate_invoice_pdf_view(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     requested_style = request.GET.get('style', 'default')
@@ -311,6 +319,7 @@ def generate_invoice_pdf_view(request, pk):
         return redirect('invoices:invoice_detail', pk=pk)
 
 @login_required
+@setup_required
 def resend_invoice(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     if invoice.status == 'DRAFT':

@@ -122,7 +122,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in invoice.items.all %}
+                        {% for item in invoice.billed_items.all %}
                         <tr class="align-middle">
                             <td class="ps-4">{{ item.description }}</td>
                             <td class="text-end">{{ item.quantity }}</td>

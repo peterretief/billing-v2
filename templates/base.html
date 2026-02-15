@@ -9,9 +9,7 @@
     <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
-    
     <script src="{% static 'js/htmx.min.js' %}"></script>
-    
 </head>
 
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
@@ -32,10 +30,25 @@
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link {% if 'invoices' in request.path %}active{% endif %}" href="{% url 'invoices:invoice_list' %}">Invoices</a></li>
                     <li class="nav-item"><a class="nav-link {% if 'clients' in request.path %}active{% endif %}" href="{% url 'clients:client_list' %}">Clients</a></li>
-                    <li class="nav-item"><a class="nav-link {% if 'items' in request.path %}active{% endif %}" href="{% url 'items:item_list' %}">Items</a></li>
-                    <li class="nav-item"><a class="nav-link {% if 'timesheets' in request.path %}active{% endif %}" href="{% url 'timesheets:timesheet_list' %}">Timesheets</a></li>
-                    <li class="nav-item"><a class="nav-link {% if 'policies' in request.path %}active{% endif %}" href="{% url 'billing_schedule:policy_list' %}">Billing Schedule(Items)</a></li>
-                    <li class="nav-item"><a class="nav-link {% if 'categories/manage' in request.path %}active{% endif %}" href="{% url 'timesheets:manage_categories' %}">Work Categories(Timesheets)</a></li>
+                    
+                    {% if user.is_ops %}
+                    <li class="nav-item ms-lg-3">
+                        <a class="nav-link fw-bold text-primary" href="{% url 'core:portfolio_summary' %}">
+                            <i class="bi bi-briefcase-fill me-1"></i> Portfolio
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Tools</a>
+                        <ul class="dropdown-menu shadow">
+                            <li><a class="dropdown-item" href="{% url 'items:item_list' %}">Items</a></li>
+                            <li><a class="dropdown-item" href="{% url 'timesheets:timesheet_list' %}">Timesheets</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'billing_schedule:policy_list' %}">Billing Schedule</a></li>
+                            <li><a class="dropdown-item" href="{% url 'timesheets:manage_categories' %}">Work Categories</a></li>
+                        </ul>
+                    </li>
                 </ul>
 
                 <ul class="navbar-nav ms-auto align-items-center">
@@ -47,13 +60,13 @@
                             <span class="d-none d-sm-inline">{{ user.email }}</span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2">
-                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Management</li>
+                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Account</li>
                             <li><a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-person-gear me-2 text-muted"></i> Profile</a></li>
                             
-                            {% if user.is_superuser %}
+                            {% if user.is_superuser or user.is_ops %}
                             <li><hr class="dropdown-divider"></li>
-                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Admin</li>
-                            <li><a class="dropdown-item" href="{% url 'core:admin_create_user' %}"><i class="bi bi-person-plus-fill me-2 text-muted"></i> Create User</a></li>
+                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Admin Tools</li>
+                            <li><a class="dropdown-item" href="{% url 'core:admin_create_user' %}"><i class="bi bi-person-plus-fill me-2 text-muted"></i> Create New Tenant</a></li>
                             {% endif %}
 
                             <li><hr class="dropdown-divider"></li>
@@ -75,28 +88,24 @@
         </div>
     </nav>
 
+    {% if show_onboarding_bar and not read_only %}
     <div id="onboarding-wrapper">
-        {% if show_onboarding_bar %}
         <div class="bg-white border-bottom shadow-sm mb-4" id="onboarding-bar">
             <div class="container py-2 d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
                     <i class="bi bi-rocket-takeoff text-primary me-2"></i>
-                    <span class="text-muted small fw-bold text-uppercase me-3 d-none d-md-inline">Setup Steps:</span>
+                    <span class="text-muted small fw-bold text-uppercase me-3 d-none d-md-inline">Quick Setup:</span>
                     <div class="d-flex gap-2">
                         {% for task in onboarding_tasks %}
                         <span class="badge bg-primary px-3 py-2 shadow-sm">{{ task.message }}</span>
                         {% endfor %}
                     </div>
                 </div>
-                
-                <button type="button" class="btn-close ms-3" 
-                        data-bs-toggle="modal" data-bs-target="#dismissModal"
-                        title="Dismiss options">
-                </button>
+                <button type="button" class="btn-close ms-3" data-bs-toggle="modal" data-bs-target="#dismissModal"></button>
             </div>
         </div>
-        {% endif %}
     </div>
+    {% endif %}
 
     <div class="container mt-3">
         {% if messages %}
@@ -113,53 +122,9 @@
         </main>
     </div>
 
+    {% include 'includes/modals.html' %} 
+
     <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
     {% block extra_js %}{% endblock %}
-
-    <div class="modal fade" id="dismissModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-sm modal-dialog-centered">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header bg-light">
-                    <h6 class="modal-title fw-bold">Dismiss Steps?</h6>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <p class="small text-muted mb-3">Hide these setup steps?</p>
-                    
-                    <div class="form-check form-switch d-inline-block mb-3">
-                        <input class="form-check-input" type="checkbox" id="permCheck" style="cursor: pointer;">
-                        <label class="form-check-label small fw-bold" for="permCheck" style="cursor: pointer;">
-                            Make Permanent
-                        </label>
-                    </div>
-
-                    <button type="button" 
-                            class="btn btn-primary btn-sm w-100"
-                            hx-post="{% url 'core:hide_onboarding' %}" 
-                            hx-vals='js:{"permanent": document.getElementById("permCheck").checked}'
-                            hx-target="#onboarding-bar" 
-                            hx-swap="outerHTML"
-                            data-bs-dismiss="modal">
-                        Confirm
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Generic Modal for HTMX -->
-    <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="paymentModalLabel">Record Payment</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body" id="paymentModalContent">
-            <!-- Content will be loaded here by HTMX -->
-          </div>
-        </div>
-      </div>
-    </div>
 </body>
 </html>

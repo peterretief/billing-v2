@@ -1,0 +1,46 @@
+<div class="modal fade" id="dismissModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold">Dismiss Steps?</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p class="small text-muted mb-3">Hide these setup steps?</p>
+                
+                <div class="form-check form-switch d-inline-block mb-3">
+                    <input class="form-check-input" type="checkbox" id="permCheck" style="cursor: pointer;">
+                    <label class="form-check-label small fw-bold" for="permCheck" style="cursor: pointer;">
+                        Make Permanent
+                    </label>
+                </div>
+
+                <button type="button" 
+                        class="btn btn-primary btn-sm w-100"
+                        hx-post="{% url 'core:hide_onboarding' %}" 
+                        hx-vals='js:{"permanent": document.getElementById("permCheck").checked}'
+                        hx-target="#onboarding-bar" 
+                        hx-swap="outerHTML"
+                        data-bs-dismiss="modal">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="paymentModalLabel">Action Required</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="paymentModalContent">
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
