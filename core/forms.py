@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.humanize.templatetags.humanize import intcomma
 
-from .models import User, UserProfile
+from .models import GroupMember, User, UserProfile
 
 
 class AppInterestForm(forms.Form):
@@ -85,3 +85,141 @@ class UserProfileForm(forms.ModelForm):
             self.fields['monthly_target'].help_text = (
                 f"Your current annual forecast is {self.instance.currency} {intcomma(forecast)}**."
             )
+
+
+class UserGroupForm(forms.Form):
+    """Form for adding a test user to the staff user's group."""
+    
+    add_user_email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'User email'}),
+        label='User Email'
+    )
+    add_user_username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'}),
+        label='Username'
+    )
+    
+    def clean_add_user_email(self):
+        """Check if email already exists."""
+        email = self.cleaned_data['add_user_email']
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError(f'A user with email {email} already exists.')
+        return email
+    
+    def clean_add_user_username(self):
+        """Check if username already exists."""
+        username = self.cleaned_data['add_user_username']
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError(f'Username {username} is already taken.')
+        return username
+
+
+class AddGroupMemberForm(forms.ModelForm):
+    """Form for adding members to a group."""
+    
+    class Meta:
+        model = GroupMember
+        fields = ['user', 'role']
+        widgets = {
+            'user': forms.Select(attrs={'class': 'form-control'}),
+            'role': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, group=None, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.group = group
+        self.user = user
+        
+        # Restrict user choices based on permissions
+        if group:
+            existing_members = GroupMember.objects.filter(
+                group=group
+            ).values_list('user_id', flat=True)
+            
+            if user and not user.is_superuser:
+                # Managers can only add bound tenant users (non-staff)
+                queryset = User.objects.filter(
+                    is_staff=False,
+                    is_superuser=False
+                ).exclude(id__in=existing_members)
+            else:
+                # Superuser can add any non-superuser
+                queryset = User.objects.filter(
+                    is_superuser=False
+                ).exclude(id__in=existing_members)
+            
+            self.fields['user'].queryset = queryset
+            
+            if not queryset.exists():
+                # Add a helpful message if no users available
+                self.fields['user'].help_text = 'No available users to add. Create new tenant users first.'
+    
+    def clean(self):
+        """Validate that user is not already in group."""
+        cleaned_data = super().clean()
+        user = cleaned_data.get('user')
+        
+        if user and self.group:
+            if GroupMember.objects.filter(group=self.group, user=user).exists():
+                raise forms.ValidationError('This user is already a member of this group.')
+        
+        return cleaned_data
+
+
+class StaffCreateAndAddUserForm(forms.Form):
+    """Form for staff to create a new user and add to group in one step."""
+    
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control'}),
+        label='Email Address'
+    )
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        label='Username'
+    )
+    
+    def clean_email(self):
+        """Check if email already exists."""
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError('A user with this email already exists.')
+        return email
+    
+    def clean_username(self):
+        """Check if username already exists."""
+        username = self.cleaned_data['username']
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError('This username is already taken.')
+        return username
+
+
+class BulkAddGroupMembersForm(forms.Form):
+    """Form for bulk adding users to a group via email addresses."""
+    
+    emails = forms.CharField(
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'rows': 5,
+            'placeholder': 'One email per line'
+        }),
+        help_text='Enter email addresses of users to add to this group (one per line)',
+        label='User Emails'
+    )
+    
+    role = forms.ChoiceField(
+        choices=GroupMember._meta.get_field('role').choices,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        initial='TENANT'
+    )
+
+    def clean_emails(self):
+        """Validate and parse email list."""
+        emails_text = self.cleaned_data.get('emails', '')
+        emails = [e.strip().lower() for e in emails_text.split('\n') if e.strip()]
+        
+        if not emails:
+            raise forms.ValidationError('Please provide at least one email address.')
+        
+        return emails

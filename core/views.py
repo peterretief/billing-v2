@@ -6,23 +6,40 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
+from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail  # <--- Added this
 from django.db.models import Sum
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from django.views.decorators.http import require_POST
 
 #from .decorators import setup_required  # Your custom gatekeeper
-from .forms import AdminUserCreationForm, AppInterestForm, UserProfileForm
+from .forms import (
+    AdminUserCreationForm,
+    AppInterestForm,
+    StaffCreateAndAddUserForm,
+    UserGroupForm,
+    UserProfileForm,
+)
 from .models import (
+    GroupMember,
     OpsManager,  # Add OpsManager here
+    UserGroup,
     UserProfile,
 )
 
 User = get_user_model()
 
+# Define a helper check for reusability
+def is_staff_or_admin(user):
+    return user.is_active and (user.is_staff or user.is_superuser)
+
 
 @login_required
+@user_passes_test(is_staff_or_admin)
 def tenant_report_detail(request, tenant_id):
     # 1. Use user__added_by as we discussed
     tenant_profile = get_object_or_404(
@@ -50,9 +67,7 @@ def tenant_report_detail(request, tenant_id):
     })
 
 
-from invoices.models import Invoice
-from collections import defaultdict
-from decimal import Decimal
+
 
 @user_passes_test(lambda u: u.is_superuser)
 def superuser_dashboard(request):
@@ -78,8 +93,9 @@ def superuser_dashboard(request):
     return render(request, 'admin/index.html', context)
 
 @login_required
+@user_passes_test(is_staff_or_admin)
 def portfolio_summary(request):
-    if not request.user.is_ops:
+    if not request.user.is_staff:
         return redirect('invoices:dashboard')
 
     manager = OpsManager.objects.get(pk=request.user.pk)
@@ -117,6 +133,7 @@ def portfolio_summary(request):
     })
 
 @login_required
+@user_passes_test(is_staff_or_admin)
 def view_tenant_readonly(request, tenant_id):
     """
     Allows a manager to view a specific tenant's dashboard without edit rights.
@@ -327,12 +344,13 @@ def update_profile(request):
 
 
 @login_required
+@user_passes_test(is_staff_or_admin)
 def manager_create_tenant(request):
     """
     Allows an OpsManager to create a new tenant user, automatically assigning
     the tenant to their portfolio.
     """
-    if not request.user.is_ops:
+    if not request.user.is_staff:
         return HttpResponseForbidden("You do not have permission to access this page.")
 
     form = AdminUserCreationForm(request.POST or None)
@@ -367,5 +385,181 @@ def manager_create_tenant(request):
             return redirect('core:portfolio_summary') # Redirect back to portfolio
 
     return render(request, 'core/manager_create_tenant.html', {'form': form})
+
+
+# --- Group Management Views (Staff Only) ---
+
+@user_passes_test(lambda u: u.is_staff)
+def staff_groups_list(request):
+    """
+    List all groups managed by the current staff member.
+    """
+    groups = UserGroup.objects.filter(manager=request.user)
+    context = {
+        'groups': groups,
+    }
+    return render(request, 'core/staff_groups_list.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+def staff_group_create(request):
+    """
+    Add a test user to the staff user's group.
+    Group is auto-created with staff user's name if it doesn't exist.
+    """
+    form = UserGroupForm(request.POST or None)
+    
+    if request.method == 'POST' and form.is_valid():
+        # Get or create group for staff user
+        group, created = UserGroup.objects.get_or_create(
+            manager=request.user,
+            defaults={'name': f"{request.user.first_name or request.user.username}'s Group"}
+        )
+        
+        email = form.cleaned_data['add_user_email']
+        username = form.cleaned_data['add_user_username']
+        
+        # Create the new user
+        new_user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=secrets.token_urlsafe(32)
+        )
+        
+        # Add user to group with TENANT role
+        member = GroupMember.objects.create(
+            group=group,
+            user=new_user,
+            role='TENANT',
+            added_by=request.user
+        )
+        
+        # Send welcome email
+        try:
+            # Generate password reset token and URL
+            uid = urlsafe_base64_encode(force_bytes(new_user.pk))
+            token = default_token_generator.make_token(new_user)
+            reset_url = request.build_absolute_uri(
+                reverse('password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
+            )
+            
+            send_mail(
+                subject=f"Welcome to {group.name}",
+                message=(
+                    f"Hello {new_user.first_name or new_user.username},\n\n"
+                    f"You have been added to the group '{group.name}'.\n\n"
+                    f"Click the link below to set your password:\n"
+                    f"{reset_url}\n\n"
+                    f"Best regards"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[new_user.email],
+                fail_silently=False,
+            )
+        except Exception:
+            messages.warning(request, 'User created but welcome email could not be sent.')
+        
+        group_status = "created" if created else "updated"
+        messages.success(request, f'Group "{group.name}" {group_status} and user {username} added.')
+        return redirect('core:staff_groups_list')
+    
+    context = {
+        'form': form,
+        'page_title': 'Add User',
+    }
+    return render(request, 'core/staff_group_form.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+def staff_group_detail(request, group_id):
+    """
+    View group details and members (staff can only view their own groups).
+    """
+    group = get_object_or_404(UserGroup, id=group_id, manager=request.user)
+    members = group.members.all()
+    
+    context = {
+        'group': group,
+        'members': members,
+    }
+    return render(request, 'core/staff_group_detail.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+def staff_add_group_member(request, group_id):
+    """
+    Add a member to a group (staff can only add to their own groups).
+    All added users get TENANT role.
+    """
+    group = get_object_or_404(UserGroup, id=group_id, manager=request.user)
+    form = StaffCreateAndAddUserForm(request.POST or None)
+    
+    if request.method == 'POST' and form.is_valid():
+        email = form.cleaned_data['email']
+        username = form.cleaned_data['username']
+        
+        # Create the new user with a random password
+        new_user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=secrets.token_urlsafe(32)
+        )
+        
+        # Add user to group with TENANT role
+        member = GroupMember.objects.create(
+            group=group,
+            user=new_user,
+            role='TENANT',
+            added_by=request.user
+        )
+        
+        # Send welcome email to the new user
+        try:
+            # Generate password reset token and URL
+            uid = urlsafe_base64_encode(force_bytes(new_user.pk))
+            token = default_token_generator.make_token(new_user)
+            reset_url = request.build_absolute_uri(
+                reverse('password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
+            )
+            
+            send_mail(
+                subject=f"Welcome to {group.name}",
+                message=(
+                    f"Hello {new_user.first_name or new_user.username},\n\n"
+                    f"You have been added to the group '{group.name}'.\n\n"
+                    f"Click the link below to set your password:\n"
+                    f"{reset_url}\n\n"
+                    f"Best regards"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[new_user.email],
+                fail_silently=False,
+            )
+        except Exception:
+            messages.warning(request, 'User created but welcome email could not be sent.')
+        
+        messages.success(request, f'User {username} created and added to group {group.name}.')
+        return redirect('core:staff_group_detail', group_id=group.id)
+    
+    context = {
+        'form': form,
+        'group': group,
+        'page_title': f'Add Member to {group.name}',
+    }
+    return render(request, 'core/staff_add_member_form.html', context)
+
+
+@user_passes_test(lambda u: u.is_staff)
+@require_POST
+def staff_remove_group_member(request, group_id, member_id):
+    """
+    Remove a member from a group (staff can only remove from their own groups).
+    """
+    group = get_object_or_404(UserGroup, id=group_id, manager=request.user)
+    member = get_object_or_404(GroupMember, id=member_id, group=group)
+    username = member.user.username
+    member.delete()
+    messages.success(request, f'User {username} removed from group {group.name}.')
+    return redirect('core:staff_group_detail', group_id=group.id)
 
 

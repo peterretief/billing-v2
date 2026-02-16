@@ -81,6 +81,7 @@ def invite_tenant_view(request):
 
     return render(request, 'ops/invite_tenant.html', {'form': form})
 
+
 class OpsDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = 'ops/dashboard.html'
 

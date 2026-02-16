@@ -155,3 +155,82 @@ class BillingAuditLog(models.Model):
     def __str__(self):
         return f"{self.action_type} - {self.created_at.date()} - " \
            f"Anomaly: {self.is_anomaly}"
+
+
+class UserGroup(models.Model):
+    """
+    Represents a group of users managed by an ops manager or superuser.
+    Allows for hierarchical organization of tenant users.
+    """
+    name = models.CharField(max_length=255)
+    manager = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='managed_groups',
+        help_text="The manager who owns this group. Leave blank for superuser-only groups."
+    )
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('name', 'manager')
+        verbose_name = "User Group"
+        verbose_name_plural = "User Groups"
+
+    def __str__(self):
+        if self.manager:
+            return f"{self.name} (Manager: {self.manager.username})"
+        return f"{self.name} (Global)"
+
+    def can_add_member(self, user):
+        """Check if a user can add members to this group."""
+        if user.is_superuser:
+            return True
+        if self.manager and self.manager.id == user.id:
+            return True
+        return False
+
+
+class GroupMember(models.Model):
+    """
+    Represents membership of a user in a group.
+    Bound tenant users belong to specific groups managed by ops managers.
+    """
+    group = models.ForeignKey(
+        UserGroup, 
+        on_delete=models.CASCADE, 
+        related_name='members'
+    )
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='group_memberships'
+    )
+    role = models.CharField(
+        max_length=20,
+        choices=[
+            ('TENANT', 'Tenant'),
+            ('MANAGER', 'Manager'),
+            ('ADMIN', 'Admin'),
+        ],
+        default='TENANT',
+        help_text="Role of this user within the group"
+    )
+    added_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='added_group_members'
+    )
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('group', 'user')
+        verbose_name = "Group Member"
+        verbose_name_plural = "Group Members"
+
+    def __str__(self):
+        return f"{self.user.username} in {self.group.name} ({self.role})"

@@ -31,7 +31,8 @@
                     <li class="nav-item"><a class="nav-link {% if 'invoices' in request.path %}active{% endif %}" href="{% url 'invoices:invoice_list' %}">Invoices</a></li>
                     <li class="nav-item"><a class="nav-link {% if 'clients' in request.path %}active{% endif %}" href="{% url 'clients:client_list' %}">Clients</a></li>
                     
-                    {% if user.is_ops %}
+                    {# Updated: Changed is_ops to is_staff/superuser for visibility #}
+                    {% if user.is_staff or user.is_superuser %}
                     <li class="nav-item ms-lg-3">
                         <a class="nav-link fw-bold text-primary" href="{% url 'core:portfolio_summary' %}">
                             <i class="bi bi-briefcase-fill me-1"></i> Portfolio
@@ -51,6 +52,8 @@
                     </li>
                 </ul>
 
+
+                
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" data-bs-toggle="dropdown">
@@ -62,11 +65,12 @@
                         <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2">
                             <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Account</li>
                             <li><a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-person-gear me-2 text-muted"></i> Profile</a></li>
-                            
-                            {% if user.is_superuser or user.is_ops %}
+
+                            {# Added: Portfolio and Admin links inside the dropdown for staff convenience #}
+                            {% if user.is_staff or user.is_superuser %}
                             <li><hr class="dropdown-divider"></li>
-                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Admin Tools</li>
-                            <li><a class="dropdown-item" href="{% url 'core:admin_create_user' %}"><i class="bi bi-person-plus-fill me-2 text-muted"></i> Create New Tenant</a></li>
+                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Staff Admin</li>
+                            <li><a class="dropdown-item" href="{% url 'core:portfolio_summary' %}"><i class="bi bi-briefcase-fill me-2 text-primary"></i> Portfolio Dashboard</a></li>
                             {% endif %}
 
                             <li><hr class="dropdown-divider"></li>

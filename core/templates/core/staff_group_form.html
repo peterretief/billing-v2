@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">{{ page_title }}</h5>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- User Email -->
+                        <div class="mb-3">
+                            <label for="id_add_user_email" class="form-label">User Email *</label>
+                            <input type="email" name="add_user_email" id="id_add_user_email" class="form-control" required>
+                            {% if form.add_user_email.errors %}
+                                <div class="text-danger small mt-1">{{ form.add_user_email.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- User Username -->
+                        <div class="mb-3">
+                            <label for="id_add_user_username" class="form-label">Username *</label>
+                            <input type="text" name="add_user_username" id="id_add_user_username" class="form-control" maxlength="150" required>
+                            {% if form.add_user_username.errors %}
+                                <div class="text-danger small mt-1">{{ form.add_user_username.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary flex-grow-1">
+                                <i class="bi bi-plus-circle"></i> Add User
+                            </button>
+                            <a href="{% url 'core:staff_groups_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
