@@ -13,7 +13,7 @@
     <div class="card shadow-sm border-0">
         <form action="{% url 'invoices:bulk_post' %}" method="post">
             {% csrf_token %}
-            
+
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light text-uppercase small fw-bold">
@@ -25,6 +25,7 @@
                             <th>Client</th>
                             <th>Total Due</th>
                             <th>Status</th>
+                            <th>Email</th>
                             <th class="text-end pe-4">Actions</th>
                         </tr>
                     </thead>
@@ -33,62 +34,86 @@
                         <tr>
                             <td class="ps-4">
                                 {% if invoice.status == 'DRAFT' %}
-                                    <input type="checkbox" name="invoice_ids" value="{{ invoice.id }}" class="form-check-input invoice-checkbox border-2">
+                                <input type="checkbox" name="invoice_ids" value="{{ invoice.id }}" class="form-check-input invoice-checkbox border-2">
                                 {% endif %}
                             </td>
+
                             <td>
                                 <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="text-decoration-none fw-bold text-dark">
                                     {{ invoice.number|default:"[DRAFT]" }}
                                 </a>
                                 <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
                             </td>
+
                             <td>{{ invoice.client.name }}</td>
+
                             <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
+
                             <td>
-                                <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'PENDING' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">
+                                <span class="badge rounded-pill
+                                    {% if invoice.status == 'PAID' %}bg-success
+                                    {% elif invoice.status == 'PENDING' %}bg-info text-dark
+                                    {% elif invoice.status == 'CANCELLED' %}bg-danger
+                                    {% else %}bg-warning text-dark
+                                    {% endif %}">
                                     {% if invoice.status == 'PENDING' %}Sent{% else %}{{ invoice.get_status_display }}{% endif %}
                                 </span>
                             </td>
+
+                            <td>
+                                {% with email_log=invoice.delivery_logs.first %}
+                                {% if email_log %}
+                                    <span class="badge rounded-pill
+                                        {% if email_log.status == 'delivered' %}bg-success
+                                        {% elif email_log.status == 'clicked' %}bg-primary
+                                        {% elif email_log.status == 'opened' %}bg-info text-dark
+                                        {% elif email_log.status == 'sent' %}bg-secondary
+                                        {% elif email_log.status == 'request' %}bg-light text-dark border
+                                        {% elif email_log.status == 'bounced' %}bg-danger
+                                        {% elif email_log.status == 'spam' %}bg-warning text-dark
+                                        {% elif email_log.status == 'unsubscribed' %}bg-dark
+                                        {% elif email_log.status == 'deferred' %}bg-warning text-dark
+                                        {% else %}bg-light text-dark border
+                                        {% endif %}"
+                                        title="{{ email_log.created_at|date:'d M, H:i' }}">
+                                        <i class="bi bi-envelope me-1"></i>{{ email_log.status|upper }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                                {% endwith %}
+                            </td>
+
                             <td class="text-end pe-4">
                                 <div class="btn-group btn-group-sm shadow-sm">
                                     <a href="{% url 'timesheets:export_metadata_pdf' invoice.id %}" class="btn btn-outline-secondary" title="Work Log">
                                         <i class="bi bi-file-earmark-pdf"></i> Log
                                     </a>
-                                    
-                                    <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}" class="btn btn-outline-dark" target="_blank">
+                                    <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}" class="btn btn-outline-dark" target="_blank" title="View PDF">
                                         <i class="bi bi-file-pdf"></i> Pdf
                                     </a>
-
-{% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
-<button class="btn btn-sm btn-success"
-        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
-        hx-target="#paymentModalContent"
-        hx-trigger="click"
-        hx-on::after-request="
-          var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
-          myModal.show();
-        "
-        title="Record Payment">
-    <i class="bi bi-cash-stack"></i>
-    <span class="d-none d-md-inline">Pay</span>
-</button>
-{% elif invoice.status == 'DRAFT' %}
-<button class="btn btn-sm btn-outline-secondary" disabled title="Locked in Draft">
-    <i class="bi bi-lock"></i>
-    <span class="d-none d-md-inline">Draft</span>
-</button>
-{% endif %}
-
-
-
-
-
+                                    {% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
+                                    <button class="btn btn-sm btn-success"
+                                        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
+                                        hx-target="#paymentModalContent"
+                                        hx-trigger="click"
+                                        hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
+                                        title="Record Payment">
+                                        <i class="bi bi-cash-stack"></i>
+                                        <span class="d-none d-md-inline"> Pay</span>
+                                    </button>
+                                    {% elif invoice.status == 'DRAFT' %}
+                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Locked in Draft">
+                                        <i class="bi bi-lock"></i>
+                                        <span class="d-none d-md-inline"> Draft</span>
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted italic">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-2 d-block mb-2"></i>
                                 No invoices found matching your criteria.
                             </td>
@@ -113,15 +138,13 @@
     <nav class="mt-4">
         <ul class="pagination justify-content-center">
             {% if invoices.has_previous %}
-                <li class="page-item"><a class="page-link shadow-sm" href="?page=1">First</a></li>
-                <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.previous_page_number }}">Previous</a></li>
+            <li class="page-item"><a class="page-link shadow-sm" href="?page=1">First</a></li>
+            <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.previous_page_number }}">Previous</a></li>
             {% endif %}
-
             <li class="page-item active"><span class="page-link shadow-sm">{{ invoices.number }}</span></li>
-
             {% if invoices.has_next %}
-                <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.next_page_number }}">Next</a></li>
-                <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.paginator.num_pages }}">Last</a></li>
+            <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.next_page_number }}">Next</a></li>
+            <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.paginator.num_pages }}">Last</a></li>
             {% endif %}
         </ul>
     </nav>
@@ -129,7 +152,6 @@
 </div>
 
 <script>
-    // Logic to select all and enable/disable the post button
     const selectAll = document.getElementById('selectAll');
     const checkboxes = document.querySelectorAll('.invoice-checkbox');
     const postBtn = document.getElementById('postBtn');
@@ -141,13 +163,11 @@
         countDisplay.textContent = count > 0 ? `${count} invoice(s) selected` : "";
     }
 
-    selectAll.onclick = function() {
+    selectAll.onclick = function () {
         checkboxes.forEach(cb => cb.checked = selectAll.checked);
         updateCounter();
     }
 
-    checkboxes.forEach(cb => {
-        cb.onclick = updateCounter;
-    });
+    checkboxes.forEach(cb => cb.onclick = updateCounter);
 </script>
 {% endblock %}

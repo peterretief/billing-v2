@@ -25,6 +25,9 @@ from timesheets.models import TimesheetEntry
 
 from .forms import InvoiceForm, VATPaymentForm
 
+from django.db.models import Prefetch
+from invoices.models import Invoice, InvoiceEmailStatusLog
+
 # Local Apps
 from .models import Invoice, Payment, VATReport
 from .utils import email_invoice_to_client, generate_invoice_pdf
@@ -100,20 +103,28 @@ def dashboard(request):
     }
 
     return render(request, 'invoices/dashboard.html', context)
+
+
 @login_required
 @setup_required
 def invoice_list(request):
-    # All users, including Ops managers, should only see their own invoices here.
-    # The portfolio view is for managing tenant invoices.
-    invoice_queryset = Invoice.objects.filter(user=request.user).select_related('client').order_by('-date_issued', '-id')
-    
+    invoice_queryset = Invoice.objects.filter(
+        user=request.user
+    ).select_related('client').prefetch_related(
+        Prefetch(
+            'delivery_logs',  # ← matches your model
+            queryset=InvoiceEmailStatusLog.objects.order_by('-created_at'),
+        )
+    ).order_by('-date_issued', '-id')
+
     status_filter = request.GET.get('status')
     if status_filter == 'UNPAID':
         invoice_queryset = invoice_queryset.exclude(status='PAID')
-    
-    paginator = Paginator(invoice_queryset, 10) 
+
+    paginator = Paginator(invoice_queryset, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'invoices/invoice_list.html', {'invoices': page_obj})
+
 
 @login_required
 @setup_required

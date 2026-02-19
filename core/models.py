@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import pytz
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -23,6 +24,13 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.username
+    def save(self, *args, **kwargs):
+        # The Bridge: If is_ops is true, they MUST be staff 
+        # to access the portfolio and admin features.
+        if self.is_ops:
+            self.is_staff = True
+            
+        super().save(*args, **kwargs)
 
 
 class OpsManager(User):
@@ -89,6 +97,13 @@ class UserProfile(models.Model):
     Tenant Settings: Tax rates, banking, and branding.
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    
+    timezone = models.CharField(
+        max_length=32, 
+        default='Africa/Johannesburg',
+        choices=[(tz, tz) for tz in pytz.common_timezones]
+    )
+    
     show_onboarding_tips = models.BooleanField(default=True)
     monthly_target = models.DecimalField(
         max_digits=10, 

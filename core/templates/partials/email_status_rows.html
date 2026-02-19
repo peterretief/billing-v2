@@ -1,0 +1,49 @@
+{% for invoice, logs in grouped_data.items %}
+{% with latest=logs.0 %}
+<tbody id="rows-{{ invoice.id }}">
+
+    <tr id="row-{{ invoice.id }}">
+        <td class="ps-4">
+            <button class="btn btn-sm p-0 me-2" type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#history-{{ invoice.id }}"
+                aria-expanded="false">
+                <i class="bi bi-chevron-right" style="transition: transform 0.2s;"></i>
+            </button>
+            <strong>#{{ invoice.number }}</strong>
+        </td>
+        <td>
+            <span class="badge rounded-pill
+                {% if latest.status == 'delivered' %}bg-success
+                {% elif latest.status == 'clicked' %}bg-primary
+                {% elif latest.status == 'opened' %}bg-info text-dark
+                {% elif latest.status == 'sent' %}bg-secondary
+                {% elif latest.status == 'request' %}bg-light text-dark
+                {% elif latest.status == 'bounced' %}bg-danger
+                {% elif latest.status == 'spam' %}bg-warning text-dark
+                {% elif latest.status == 'unsubscribed' %}bg-dark
+                {% elif latest.status == 'deferred' %}bg-warning text-dark
+                {% else %}bg-light text-dark
+                {% endif %}">
+                {{ latest.status|upper }}
+            </span>
+        </td>
+        <td>
+            <span class="text-muted small">{{ latest.created_at|date:"d M, H:i" }}</span>
+        </td>
+    </tr>
+
+    <tr class="collapse" id="history-{{ invoice.id }}">
+        <td colspan="3" class="bg-light ps-5 py-2">
+            <h6 class="small fw-bold text-muted mb-2">Audit Trail</h6>
+            {% for history in logs %}
+            <div class="small text-muted mb-1">
+                <i class="bi bi-dot"></i> {{ history.status|upper }} — {{ history.created_at|date:"d M, H:i" }}
+            </div>
+            {% endfor %}
+        </td>
+    </tr>
+
+</tbody>
+{% endwith %}
+{% endfor %}

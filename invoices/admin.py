@@ -1,8 +1,15 @@
+
+# /opt/billing_v2/invoices/admin.py
 from django.contrib import admin
 
-from invoices.models import Invoice
+from .models import Invoice, InvoiceEmailStatusLog  # Update this name
 
 
+@admin.register(InvoiceEmailStatusLog)
+class InvoiceEmailStatusLogAdmin(admin.ModelAdmin):
+    list_display = ('invoice', 'status', 'created_at') # Ensure this is created_at
+
+    
 # Register your models here.
 # invoices/admin.py
 @admin.register(Invoice)

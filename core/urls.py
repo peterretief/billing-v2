@@ -26,4 +26,9 @@ urlpatterns = [
     path('staff/groups/<int:group_id>/', views.staff_group_detail, name='staff_group_detail'),
     path('staff/groups/<int:group_id>/add-member/', views.staff_add_group_member, name='staff_add_group_member'),
     path('staff/groups/<int:group_id>/member/<int:member_id>/remove/', views.staff_remove_group_member, name='staff_remove_group_member'),
-]
+# core/urls.py
+    path('email-status/', views.email_status_view, name='email_status'), # MAIN PAGE
+    path('email-status/rows/', views.email_status_rows, name='email_status_rows'), # PARTIAL
+    path('email-status/sync/<int:invoice_id>/', views.sync_invoice_status, name='sync_invoice_status'),
+    ]
+

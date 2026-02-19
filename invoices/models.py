@@ -12,6 +12,21 @@ from core.models import TenantModel
 
 from .managers import InvoiceManager
 
+# invoices/models.py
+
+class InvoiceEmailStatusLog(TenantModel): 
+    invoice = models.ForeignKey('Invoice', on_delete=models.CASCADE, related_name='delivery_logs')
+    brevo_message_id = models.CharField(max_length=255, db_index=True)
+    status = models.CharField(max_length=50)
+    
+    # created_at and updated_at are inherited from TenantModel
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Invoice {self.invoice_id} - {self.status} ({self.created_at})"    
+
 
 class Invoice(TenantModel):
     class TaxMode(models.TextChoices):
@@ -65,11 +80,6 @@ class Invoice(TenantModel):
                                      help_text="The raw LaTeX source used to " \
                                      "generate the PDF.")
 
-    #notes = models.TextField(blank=True, 
-    #                        default=
-    #                       "Please use the invoice number as the payment reference.",
-    #                        help_text="Notes or terms for the invoice.")
-
 
     last_generated = models.DateTimeField(null=True, blank=True)
 
@@ -113,7 +123,6 @@ class Invoice(TenantModel):
     
         return timesheet_total
 
-
     @property
     def calculated_vat(self):
         from decimal import Decimal
@@ -148,6 +157,10 @@ class Invoice(TenantModel):
     @property
     def calculated_total(self):
         return self.calculated_subtotal + self.calculated_vat
+
+
+
+
 
     # --- Payment Logic ---
 

@@ -10,9 +10,48 @@
     <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
     <script src="{% static 'js/htmx.min.js' %}"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        
+    <style>
+        /* 2. Better HTMX Indicator Logic */
+        .htmx-indicator {
+            display: none;
+            opacity: 0;
+            transition: opacity 200ms ease-in;
+        }
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+            opacity: 1;
+        }
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+            opacity: 1;
+        }
+
+        /* 3. Give the Sync button a visible presence even if icon fails */
+        .btn-sync-status {
+            min-width: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* User Avatar styling */
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: #0d6efd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+    </style>
+
 </head>
 
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
         <div class="container">
@@ -48,6 +87,8 @@
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{% url 'billing_schedule:policy_list' %}">Billing Schedule</a></li>
                             <li><a class="dropdown-item" href="{% url 'timesheets:manage_categories' %}">Work Categories</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'core:email_status' %}">Email Status</a></li>
                         </ul>
                     </li>
                 </ul>

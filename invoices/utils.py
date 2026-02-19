@@ -1,3 +1,4 @@
+import email
 import os
 import subprocess
 from decimal import ROUND_HALF_UP, Decimal
@@ -218,7 +219,7 @@ def render_invoice_tex(invoice, template_name='invoice_template.tex'):
 
 def email_invoice_to_client(invoice):
     """Standard method for sending out new invoices."""
-    from .models import Invoice
+    from .models import Invoice, InvoiceEmailStatusLog
     try:
         latex_source = render_invoice_tex(invoice)
         profile = invoice.user.profile
@@ -245,18 +246,40 @@ def email_invoice_to_client(invoice):
         backend = getattr(settings, 'INVOICE_EMAIL_BACKEND', None)
         if backend:
             conn = get_connection(backend=backend)
-            conn.send_messages([email])
+
+            email.connection = conn  # ← attach connection to the message
+            email.send()             # ← use send() so Anymail populates anymail_status
+            sent_messages = conn.send_messages([email])
         else:
-            email.send()
+            sent_messages = email.send()
+
+
+        # Now anymail_status will actually be populated
+        anymail_status = getattr(email, 'anymail_status', None)
+        message_id = anymail_status.message_id if anymail_status else None
+
+        print(f"DEBUG: Anymail Status Object: {anymail_status}")
+        print(f"DEBUG: Captured Message ID: {message_id}")
+
+        
+        # Create the tracking record (One record only)
+        InvoiceEmailStatusLog.objects.create(
+            user=invoice.user,
+            invoice=invoice,
+            brevo_message_id=message_id,
+            status="sent"
+        )
 
         invoice.last_generated = now()
         invoice.status = Invoice.Status.PENDING
         invoice.save(update_fields=['last_generated', 'status'])
         return True
     except Exception as e:
+        # This will catch if anymail_status is missing or DB fails
         print(f"Email Error: {e}")
         return False
-
+    
+    
 def email_receipt_to_client(invoice, amount_paid):
     """Method for sending updated invoices as receipts."""
     try:

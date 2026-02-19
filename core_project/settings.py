@@ -22,7 +22,8 @@ load_dotenv(BASE_DIR / '.env')
 
 # --- CORE SETTINGS ---
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-b9=kayw#kvdwn!5mo=7#tsyxph)6j2&gu$nswyx(20deuyt5wl')
-DEBUG = False
+DEBUG = True
+
 
 ALLOWED_HOSTS = [
     'peterretief.org',
@@ -89,6 +90,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
+    'core.middleware.UserTimezoneMiddleware', # Add at the bottom
 ]
 
 
@@ -138,6 +140,9 @@ EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
 ANYMAIL = {"BREVO_API_KEY": os.environ.get("BREVO_API_KEY")}
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'peter@diode.co.za')
 SERVER_EMAIL = "info@peterretief.org"
+BREVO_WEBHOOK_SECRET = os.environ.get("BREVO_WEBHOOK_SECRET")
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+
 
 # --- REDIS & CELERY ---
 REDIS_PASSWORD = {"REDIS_PASSWORD": os.environ.get("REDIS_PASSWORD")}
@@ -161,3 +166,29 @@ DEBUG_TOOLBAR_CONFIG = {
 }
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'tmp', 'email_status.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'core.views': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}

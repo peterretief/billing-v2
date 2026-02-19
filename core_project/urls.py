@@ -2,8 +2,11 @@ from django.contrib import admin
 from django.urls import include, path
 
 from core import views as core_views
+from core.views import brevo_webhook  # Import the view from your core app
 
 urlpatterns = [
+    path('webhooks/brevo/', brevo_webhook, name='brevo_webhook'),
+
     path('', include('core.urls')), # Set landing page as the entry point
 
     path('admin/dashboard/', core_views.superuser_dashboard, name='admin_dashboard'),

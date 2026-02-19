@@ -78,3 +78,4 @@ class AssetsTestCase(TestCase):
                 if os.path.exists(os.path.join(settings.STATIC_ROOT, file_path)):
                     found = True
             self.assertTrue(found, f"{file_path} is missing from static folders!")
+
