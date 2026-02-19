@@ -1,4 +1,3 @@
-import email
 import os
 import subprocess
 from decimal import ROUND_HALF_UP, Decimal

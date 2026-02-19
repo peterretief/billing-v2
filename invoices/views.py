@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import F, Sum
+from django.db.models import BooleanField, Case, F, Prefetch, Q, Sum, When
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -20,16 +20,14 @@ from google import genai
 from clients.models import Client
 from core.decorators import setup_required
 from core.models import BillingAuditLog, UserProfile
+from invoices.models import Invoice, InvoiceEmailStatusLog
 from items.models import Item
 from timesheets.models import TimesheetEntry
 
 from .forms import InvoiceForm, VATPaymentForm
 
-from django.db.models import Prefetch
-from invoices.models import Invoice, InvoiceEmailStatusLog
-
 # Local Apps
-from .models import Invoice, Payment, VATReport
+from .models import Payment, VATReport
 from .utils import email_invoice_to_client, generate_invoice_pdf
 
 # --- FORMSET DEFINITION ---
@@ -108,12 +106,23 @@ def dashboard(request):
 @login_required
 @setup_required
 def invoice_list(request):
+    today = timezone.now().date()
+
     invoice_queryset = Invoice.objects.filter(
         user=request.user
     ).select_related('client').prefetch_related(
         Prefetch(
-            'delivery_logs',  # ← matches your model
+            'delivery_logs',
             queryset=InvoiceEmailStatusLog.objects.order_by('-created_at'),
+        )
+    ).annotate(
+        is_overdue=Case(
+            When(
+                Q(due_date__lt=today) & ~Q(status__in=['PAID', 'DRAFT', 'CANCELLED']),
+                then=True
+            ),
+            default=False,
+            output_field=BooleanField()
         )
     ).order_by('-date_issued', '-id')
 
@@ -121,10 +130,21 @@ def invoice_list(request):
     if status_filter == 'UNPAID':
         invoice_queryset = invoice_queryset.exclude(status='PAID')
 
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
+        invoice_queryset = invoice_queryset.filter(
+            Q(number__icontains=search_query) |
+            Q(client__name__icontains=search_query) |
+            Q(client__email__icontains=search_query)
+        )
+
     paginator = Paginator(invoice_queryset, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'invoices/invoice_list.html', {'invoices': page_obj})
-
+    return render(request, 'invoices/invoice_list.html', {
+        'invoices': page_obj,
+        'search_query': search_query,
+        'status_filter': status_filter,
+    })
 
 @login_required
 @setup_required
@@ -261,7 +281,7 @@ def record_payment(request, pk):
         try:
             amount_str = request.POST.get('amount', '0').replace(',', '').strip()
             amount = Decimal(amount_str)
-            
+
             with transaction.atomic():
                 Payment.objects.create(
                     user=request.user,
@@ -269,17 +289,16 @@ def record_payment(request, pk):
                     amount=amount,
                     reference=request.POST.get('reference', 'Manual Payment')
                 )
-                invoice.save()
-            
+                # Payment.save() already calls update_totals and handles
+                # status — do NOT call invoice.save() here as it overwrites it
+
             messages.success(request, f"Payment of {amount} recorded.")
-            
-            # --- HTMX REDIRECT FIX ---
+
             if request.headers.get('HX-Request'):
-                response = HttpResponse(status=204) # No Content
+                response = HttpResponse(status=204)
                 response['HX-Redirect'] = next_url
                 return response
-            # -------------------------
-            
+
             return redirect(next_url)
 
         except ValidationError as e:
@@ -289,30 +308,7 @@ def record_payment(request, pk):
 
     return redirect(next_url)
 
-"""
-@login_required
-def record_payment(request, pk):
-    if request.method == 'POST':
-        invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-        try:
-            amount_str = request.POST.get('amount', '0').replace(',', '')
-            amount = Decimal(amount_str)
-            
-            if amount > 0:
-                with transaction.atomic():
-                    Payment.objects.create(
-                        user=request.user,  # <--- This is the missing piece!
-                        invoice=invoice, 
-                        amount=amount, 
-                        reference=request.POST.get('reference', 'Manual Payment')
-                    )
-                messages.success(request, f"Payment of R {amount} recorded.")
-        except Exception as e:
-            messages.error(request, f"Error recording payment: {str(e)}")
-            
-    return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
-"""
-
+    
 
 @login_required
 @setup_required

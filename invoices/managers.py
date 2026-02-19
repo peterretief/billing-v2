@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+import profile
 
 from django.db import models
 from django.db.models import DecimalField, OuterRef, Subquery, Sum
@@ -32,61 +33,58 @@ class InvoiceQuerySet(models.QuerySet):
 class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
     def update_totals(self, invoice):
-        # 1. Guard Gate: Allow updates for DRAFT and SENT, 
-        # but block for finalized/archived states.
-        if invoice.status in ['PAID', 'CANCELLED']:
+        # Guard: only block CANCELLED, not PAID — we need to reach PAID from PENDING
+        if invoice.status == 'CANCELLED':
             return
 
-        profile = getattr(invoice.user, 'profile', None)
+        #profile = getattr(invoice.user, 'profile', None)
         is_registered = getattr(profile, 'is_vat_registered', False)
-        # Pull custom VAT rate from profile, fallback to 15.00 if missing
         custom_vat_rate = getattr(profile, 'vat_rate', None) or Decimal('15.00')
-    
+
         subtotal = Decimal('0.00')
-    
-        # --- LOGIC GATE START: Calculate Subtotal ---
-    
+
         # A. Primary Source: Billed Items
         has_items = False
         if hasattr(invoice, 'billed_items') and invoice.billed_items.exists():
             items = invoice.billed_items.all()
             subtotal += sum((item.quantity * item.unit_price for item in items), Decimal('0.00'))
             has_items = True
-    
-        # B. Fallback Source: Timesheets (ONLY if no items found)
+
+        # B. Fallback Source: Timesheets
         if not has_items and hasattr(invoice, 'billed_timesheets'):
             timesheets = invoice.billed_timesheets.all()
             subtotal += sum((ts.hours * ts.hourly_rate for ts in timesheets), Decimal('0.00'))
 
-        # C. Custom Items (Always adds to total)
+        # C. Custom Items
         if hasattr(invoice, 'custom_lines'):
             subtotal += sum((line.total for line in invoice.custom_lines.all()), Decimal('0.00'))
-    
-        # --- LOGIC GATE END ---
 
-        # 2. Tax Calculation
+        # Tax Calculation
         tax_amount = Decimal('0.00')
         if is_registered and invoice.tax_mode != 'NONE':
             rate = custom_vat_rate / Decimal('100.00')
             tax_amount = subtotal * rate
 
-        # 3. Finalize Value Assignments
         invoice.subtotal_amount = subtotal
         invoice.tax_amount = tax_amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         invoice.total_amount = subtotal + invoice.tax_amount
-    
-        # 4. Status Sync (The "Paid Up" Logic)
-        # Check if balance is zero. Since we just updated total_amount, 
-        # balance_due will calculate based on this new total.
-        if invoice.status == 'SENT' and invoice.balance_due <= 0:
+
+        # Status Sync — calculate balance directly from DB payments
+        # to avoid stale in-memory values
+        from django.db.models import Sum
+        total_paid = invoice.payments.aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0.00'))
+        )['total']
+
+        balance = invoice.total_amount - total_paid
+
+        if invoice.status == 'PENDING' and balance <= 0:
             invoice.status = 'PAID'
 
-        # 5. Atomic Save
-        # Make sure 'status' is in update_fields so the PAID flip persists!
         invoice.save(update_fields=[
-            'subtotal_amount', 
-            'tax_amount', 
-            'total_amount', 
+            'subtotal_amount',
+            'tax_amount',
+            'total_amount',
             'status'
         ])
 

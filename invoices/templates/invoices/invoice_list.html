@@ -1,173 +1,230 @@
 {% extends "base.html" %}
 {% load humanize %}
-
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-4 align-items-center">
-        <div class="col-md-7">
-            <h2 class="fw-bold mb-1">Invoices & Reports</h2>
-            <p class="text-muted small">Manage billing cycles, download reports, and settle accounts.</p>
-        </div>
-    </div>
-
-    <div class="card shadow-sm border-0">
-        <form action="{% url 'invoices:bulk_post' %}" method="post">
-            {% csrf_token %}
-
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light text-uppercase small fw-bold">
-                        <tr>
-                            <th class="ps-4" style="width: 40px;">
-                                <input type="checkbox" id="selectAll" class="form-check-input border-2">
-                            </th>
-                            <th>Invoice Details</th>
-                            <th>Client</th>
-                            <th>Total Due</th>
-                            <th>Status</th>
-                            <th>Email</th>
-                            <th class="text-end pe-4">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for invoice in invoices %}
-                        <tr>
-                            <td class="ps-4">
-                                {% if invoice.status == 'DRAFT' %}
-                                <input type="checkbox" name="invoice_ids" value="{{ invoice.id }}" class="form-check-input invoice-checkbox border-2">
-                                {% endif %}
-                            </td>
-
-                            <td>
-                                <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="text-decoration-none fw-bold text-dark">
-                                    {{ invoice.number|default:"[DRAFT]" }}
-                                </a>
-                                <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
-                            </td>
-
-                            <td>{{ invoice.client.name }}</td>
-
-                            <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
-
-                            <td>
-                                <span class="badge rounded-pill
-                                    {% if invoice.status == 'PAID' %}bg-success
-                                    {% elif invoice.status == 'PENDING' %}bg-info text-dark
-                                    {% elif invoice.status == 'CANCELLED' %}bg-danger
-                                    {% else %}bg-warning text-dark
-                                    {% endif %}">
-                                    {% if invoice.status == 'PENDING' %}Sent{% else %}{{ invoice.get_status_display }}{% endif %}
-                                </span>
-                            </td>
-
-                            <td>
-                                {% with email_log=invoice.delivery_logs.first %}
-                                {% if email_log %}
-                                    <span class="badge rounded-pill
-                                        {% if email_log.status == 'delivered' %}bg-success
-                                        {% elif email_log.status == 'clicked' %}bg-primary
-                                        {% elif email_log.status == 'opened' %}bg-info text-dark
-                                        {% elif email_log.status == 'sent' %}bg-secondary
-                                        {% elif email_log.status == 'request' %}bg-light text-dark border
-                                        {% elif email_log.status == 'bounced' %}bg-danger
-                                        {% elif email_log.status == 'spam' %}bg-warning text-dark
-                                        {% elif email_log.status == 'unsubscribed' %}bg-dark
-                                        {% elif email_log.status == 'deferred' %}bg-warning text-dark
-                                        {% else %}bg-light text-dark border
-                                        {% endif %}"
-                                        title="{{ email_log.created_at|date:'d M, H:i' }}">
-                                        <i class="bi bi-envelope me-1"></i>{{ email_log.status|upper }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted small">—</span>
-                                {% endif %}
-                                {% endwith %}
-                            </td>
-
-                            <td class="text-end pe-4">
-                                <div class="btn-group btn-group-sm shadow-sm">
-                                    <a href="{% url 'timesheets:export_metadata_pdf' invoice.id %}" class="btn btn-outline-secondary" title="Work Log">
-                                        <i class="bi bi-file-earmark-pdf"></i> Log
-                                    </a>
-                                    <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}" class="btn btn-outline-dark" target="_blank" title="View PDF">
-                                        <i class="bi bi-file-pdf"></i> Pdf
-                                    </a>
-                                    {% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
-                                    <button class="btn btn-sm btn-success"
-                                        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
-                                        hx-target="#paymentModalContent"
-                                        hx-trigger="click"
-                                        hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
-                                        title="Record Payment">
-                                        <i class="bi bi-cash-stack"></i>
-                                        <span class="d-none d-md-inline"> Pay</span>
-                                    </button>
-                                    {% elif invoice.status == 'DRAFT' %}
-                                    <button class="btn btn-sm btn-outline-secondary" disabled title="Locked in Draft">
-                                        <i class="bi bi-lock"></i>
-                                        <span class="d-none d-md-inline"> Draft</span>
-                                    </button>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
-                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                                No invoices found matching your criteria.
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="container mt-4">
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-7">
+                <h2 class="fw-bold mb-1">Invoices & Reports</h2>
+                <p class="text-muted small">Manage billing cycles, download reports, and settle accounts.</p>
             </div>
-
-            <div class="card-footer bg-light border-0 py-3 px-4">
-                <div class="d-flex align-items-center">
-                    <button type="submit" id="postBtn" class="btn btn-primary fw-bold shadow-sm px-4" disabled>
-                        <i class="bi bi-send-fill me-2"></i>Post Selected Drafts
+            <div class="col-md-5">
+                <form method="get" action="">
+                    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-search text-muted"></i>
+                        </span>
+                        <input type="text"
+                               name="q"
+                               value="{{ search_query }}"
+                               class="form-control border-start-0 ps-0"
+                               placeholder="Search invoice or client...">
+                        {% if search_query %}
+                            <a href="?{% if status_filter %}status={{ status_filter }}{% endif %}"
+                               class="btn btn-outline-secondary"
+                               title="Clear search">
+                                <i class="bi bi-x-lg"></i>
+                            </a>
+                        {% endif %}
+                        <button class="btn btn-primary" type="submit">Search</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% if search_query %}
+            <p class="text-muted small mb-3">
+                Showing results for <strong>"{{ search_query }}"</strong> —
+                <a href="?{% if status_filter %}status={{ status_filter }}{% endif %}">clear</a>
+            </p>
+        {% endif %}
+        <div class="card shadow-sm border-0">
+            <form action="{% url 'invoices:bulk_post' %}" method="post">
+                {% csrf_token %}
+                <div class="d-flex align-items-center px-4 py-3 border-bottom bg-light">
+                    <button type="submit"
+                            id="postBtn"
+                            class="btn btn-primary fw-bold shadow-sm px-4"
+                            disabled>
+                        <i class="bi bi-send-fill me-2"></i>Email Selected Invoice Drafts
                     </button>
                     <span id="selectedCount" class="ms-3 text-muted small"></span>
                 </div>
-            </div>
-        </form>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-uppercase small fw-bold">
+                            <tr>
+                                <th class="ps-4" style="width: 40px;">
+                                    <input type="checkbox" id="selectAll" class="form-check-input border-2">
+                                </th>
+                                <th>Invoice Details</th>
+                                <th>Client</th>
+                                <th>Total Due</th>
+                                <th>Status</th>
+                                <th>Email</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in invoices %}
+                                <tr>
+                                    <td class="ps-4">
+                                        {% if invoice.status == 'DRAFT' %}
+                                            <input type="checkbox"
+                                                   name="invoice_ids"
+                                                   value="{{ invoice.id }}"
+                                                   class="form-check-input invoice-checkbox border-2">
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'invoices:invoice_detail' invoice.pk %}"
+                                           class="text-decoration-none fw-bold text-dark">
+                                            {{ invoice.number|default:"[DRAFT]" }}
+                                        </a>
+                                        <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
+                                    </td>
+                                    <td>{{ invoice.client.name }}</td>
+                                    <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
+                                    <td>
+                                        {% if invoice.is_overdue %}
+                                            <span class="badge rounded-pill bg-danger">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>OVERDUE
+                                            </span>
+                                        {% else %}
+                                            <span class="badge rounded-pill {% if invoice.status == 'PAID' %}bg-success {% elif invoice.status == 'PENDING' %}bg-info text-dark {% elif invoice.status == 'CANCELLED' %}bg-danger {% else %}bg-warning text-dark {% endif %}">
+                                                {% if invoice.status == 'PENDING' %}
+                                                    Sent
+                                                {% else %}
+                                                    {{ invoice.get_status_display }}
+                                                {% endif %}
+                                            </span>
+                                        {% endif %}
+                                        {% if invoice.due_date and not invoice.is_overdue and invoice.status != 'PAID' %}
+                                            <div class="small text-muted mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
+                                        {% elif invoice.is_overdue %}
+                                            <div class="small text-danger mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% with email_log=invoice.delivery_logs.first %}
+                                            {% if email_log %}
+                                                <span class="badge rounded-pill {% if email_log.status == 'delivered' %}bg-success {% elif email_log.status == 'clicked' %}bg-primary {% elif email_log.status == 'opened' %}bg-info text-dark {% elif email_log.status == 'sent' %}bg-secondary {% elif email_log.status == 'request' %}bg-light text-dark border {% elif email_log.status == 'bounced' %}bg-danger {% elif email_log.status == 'spam' %}bg-warning text-dark {% elif email_log.status == 'unsubscribed' %}bg-dark {% elif email_log.status == 'deferred' %}bg-warning text-dark {% else %}bg-light text-dark border {% endif %}"
+                                                      title="{{ email_log.created_at|date:'d M, H:i' }}">
+                                                    <i class="bi bi-envelope me-1"></i>{{ email_log.status|upper }}
+                                                </span>
+                                            {% else %}
+                                                <span class="text-muted small">—</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="btn-group btn-group-sm shadow-sm">
+                                            {% if invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
+                                                <a href="{% url 'invoices:resend_invoice' invoice.pk %}"
+                                                   class="btn btn-outline-primary btn-sm"
+                                                   title="Resend Invoice Email"
+                                                   onclick="return confirm('Resend invoice {{ invoice.number }} to {{ invoice.client.email }}?')">
+                                                    <i class="bi bi-envelope-arrow-up"></i>
+                                                    <span class="d-none d-md-inline">Resend</span>
+                                                </a>
+                                            {% endif %}
+                                            <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}"
+                                               class="btn btn-outline-dark"
+                                               target="_blank"
+                                               title="View PDF">
+                                                <i class="bi bi-file-pdf"></i> Pdf
+                                            </a>
+                                            {% if invoice.status == 'PAID' or invoice.status == 'CANCELLED' or invoice.status == 'DRAFT' %}
+                                                <button class="btn btn-sm btn-outline-secondary"
+                                                        disabled
+                                                        title="{% if invoice.status == 'PAID' %}Already paid{% elif invoice.status == 'CANCELLED' %}Invoice cancelled{% elif invoice.status == 'DRAFT' %}Not yet sent{% endif %}">
+                                                    <i class="bi bi-{% if invoice.status == 'PAID' %}check-circle{% elif invoice.status == 'CANCELLED' %}x-circle{% else %}lock{% endif %}"></i>
+                                                    <span class="d-none d-md-inline">
+                                                        {% if invoice.status == 'PAID' %}
+                                                            Paid
+                                                        {% elif invoice.status == 'CANCELLED' %}
+                                                            Cancelled
+                                                        {% else %}
+                                                            Draft
+                                                        {% endif %}
+                                                    </span>
+                                                </button>
+                                            {% else %}
+                                                <button class="btn btn-sm btn-success"
+                                                        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
+                                                        hx-target="#paymentModalContent"
+                                                        hx-trigger="click"
+                                                        hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
+                                                        title="Record Payment">
+                                                    <i class="bi bi-cash-stack"></i>
+                                                    <span class="d-none d-md-inline">Pay</span>
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                        {% if search_query %}
+                                            No invoices found for <strong>"{{ search_query }}"</strong>.
+                                        {% else %}
+                                            No invoices found matching your criteria.
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+        </div>
+        {% if invoices.has_other_pages %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if invoices.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link shadow-sm" href="?q={{ search_query }}&page=1">First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link shadow-sm"
+                               href="?q={{ search_query }}&page={{ invoices.previous_page_number }}">Previous</a>
+                        </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link shadow-sm">{{ invoices.number }}</span>
+                    </li>
+                    {% if invoices.has_next %}
+                        <li class="page-item">
+                            <a class="page-link shadow-sm"
+                               href="?q={{ search_query }}&page={{ invoices.next_page_number }}">Next</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link shadow-sm"
+                               href="?q={{ search_query }}&page={{ invoices.paginator.num_pages }}">Last</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
     </div>
+    <script>
+        const selectAll = document.getElementById('selectAll');
+        const checkboxes = document.querySelectorAll('.invoice-checkbox');
+        const postBtn = document.getElementById('postBtn');
+        const countDisplay = document.getElementById('selectedCount');
 
-    {% if invoices.has_other_pages %}
-    <nav class="mt-4">
-        <ul class="pagination justify-content-center">
-            {% if invoices.has_previous %}
-            <li class="page-item"><a class="page-link shadow-sm" href="?page=1">First</a></li>
-            <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.previous_page_number }}">Previous</a></li>
-            {% endif %}
-            <li class="page-item active"><span class="page-link shadow-sm">{{ invoices.number }}</span></li>
-            {% if invoices.has_next %}
-            <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.next_page_number }}">Next</a></li>
-            <li class="page-item"><a class="page-link shadow-sm" href="?page={{ invoices.paginator.num_pages }}">Last</a></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
-</div>
+        function updateCounter() {
+            const count = document.querySelectorAll('.invoice-checkbox:checked').length;
+            postBtn.disabled = count === 0;
+            countDisplay.textContent = count > 0 ? `${count} invoice(s) selected` : "";
+        }
 
-<script>
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.invoice-checkbox');
-    const postBtn = document.getElementById('postBtn');
-    const countDisplay = document.getElementById('selectedCount');
+        selectAll.onclick = function() {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateCounter();
+        }
 
-    function updateCounter() {
-        const count = document.querySelectorAll('.invoice-checkbox:checked').length;
-        postBtn.disabled = count === 0;
-        countDisplay.textContent = count > 0 ? `${count} invoice(s) selected` : "";
-    }
-
-    selectAll.onclick = function () {
-        checkboxes.forEach(cb => cb.checked = selectAll.checked);
-        updateCounter();
-    }
-
-    checkboxes.forEach(cb => cb.onclick = updateCounter);
-</script>
+        checkboxes.forEach(cb => cb.onclick = updateCounter);
+    </script>
 {% endblock %}
