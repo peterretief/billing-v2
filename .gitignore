@@ -21,3 +21,5 @@ staticfiles/
 *.out
 *.toc
 *.pdf
+*.deb
+tmp/
