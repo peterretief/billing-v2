@@ -1,0 +1,29 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{longtable}
+\usepackage{booktabs}
+\begin{document}
+
+\begin{center}
+    \LARGE Timesheet Report for Invoice {{ invoice.number|default:"[DRAFT]" }} \\
+    \large Client: {{ invoice.client.name }} \\
+    \large Date Issued: {{ invoice.date_issued }}
+\end{center}
+
+\vspace{1em}
+
+\begin{longtable}{@{}lllll@{}}
+\toprule
+Date & Category & Hours & Rate & Description \\
+\midrule
+\endhead
+{% for entry in timesheets %}
+{{ entry.date }} & {{ entry.category.name|default:"-" }} & {{ entry.hours }} & {{ entry.hourly_rate }} & {{ entry.formatted_metadata|default:"" }} \\
+{% endfor %}
+\bottomrule
+\end{longtable}
+
+\vspace{1em}
+\textbf{Total Hours:} {{ timesheets|length }}
+
+\end{document}

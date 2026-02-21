@@ -1,231 +1,242 @@
 {% extends "base.html" %}
 {% load humanize %}
-
 {% block content %}
-<div class="container mt-4">
-    <div class="row mb-4 align-items-center">
-        <div class="col-md-7">
-            <h2 class="fw-bold mb-1">Work Log</h2>
-            <p class="text-muted small">Manage your hours and generate invoices for your time.</p>
-        </div>
-        <div class="col-md-5 text-md-end">
-            <button type="button" class="btn btn-primary shadow-sm fw-bold px-4" data-bs-toggle="modal" data-bs-target="#logTimeModal">
-                <i class="bi bi-plus-lg me-2"></i> Log New Hours
-            </button>
-        </div>
-    </div>
-
-    <div class="row mb-4 g-3">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm bg-dark text-white p-4">
-                <h6 class="text-uppercase small opacity-75 fw-bold">Monthly Hours</h6>
-                <h2 class="fw-bold mb-0">{{ total_hours|default:"0" }} <small class="h6">hrs</small></h2>
+    <div class="container mt-4">
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-7">
+                <h2 class="fw-bold mb-1">Work Log</h2>
+                <p class="text-muted small">Manage your hours and generate invoices for your time.</p>
+            </div>
+            <div class="col-md-5 text-md-end">
+                <button type="button"
+                        class="btn btn-primary shadow-sm fw-bold px-4"
+                        data-bs-toggle="modal"
+                        data-bs-target="#logTimeModal">
+                    <i class="bi bi-plus-lg me-2"></i> Log New Hours
+                </button>
             </div>
         </div>
-        <div class="col-md-8">
-            <div class="card border-0 shadow-sm p-4 h-100 d-flex flex-column justify-content-center">
-                <div class="d-flex justify-content-between mb-2">
-                    <h6 class="text-uppercase small text-muted fw-bold">Revenue Target Progress</h6>
-                    <span class="fw-bold text-primary">{{ request.user.profile.currency }} {{ total_value|floatformat:2|intcomma }} / {{ request.user.profile.currency }} {{ target_amount|floatformat:0|intcomma }}</span>
-                </div>
-                <div class="progress" style="height: 20px; border-radius: 10px;">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" style="width: {{ progress_percent }}%"></div>
+        <div class="row mb-4 g-3">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm bg-dark text-white p-4">
+                    <h6 class="text-uppercase small opacity-75 fw-bold">Monthly Hours</h6>
+                    <h2 class="fw-bold mb-0">
+                        {{ total_hours|default:"0" }} <small class="h6">hrs</small>
+                    </h2>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-4">
-            <h6 class="fw-bold text-uppercase text-muted small mb-4">
-                <i class="bi bi-person-check me-2"></i>Client Workload (This Week)
-            </h6>
-            <div class="row row-cols-1 row-cols-md-3 g-4">
-                {% for stat in client_stats %}
-                <div class="col">
+            <div class="col-md-8">
+                <div class="card border-0 shadow-sm p-4 h-100 d-flex flex-column justify-content-center">
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="small fw-bold text-dark">{{ stat.client.name }}</span>
-                        <span class="small text-muted">{{ stat.weekly_actual }} / {{ stat.weekly_target }}h</span>
+                        <h6 class="text-uppercase small text-muted fw-bold">Revenue Target Progress</h6>
+                        <span class="fw-bold text-primary">{{ request.user.profile.currency }} {{ total_value|floatformat:2|intcomma }} / {{ request.user.profile.currency }} {{ target_amount|floatformat:0|intcomma }}</span>
                     </div>
-                    <div class="progress" style="height: 8px; border-radius: 4px;">
-                        <div class="progress-bar {% if stat.weekly_percent >= 100 %}bg-success{% else %}bg-primary{% endif %}" 
-                             style="width: {{ stat.weekly_percent }}%">
+                    <div class="progress" style="height: 20px; border-radius: 10px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-info"
+                             style="width: {{ progress_percent }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold text-uppercase text-muted small mb-4">
+                    <i class="bi bi-person-check me-2"></i>Client Workload (This Week)
+                </h6>
+                <div class="row row-cols-1 row-cols-md-3 g-4">
+                    {% for stat in client_stats %}
+                        <div class="col">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="small fw-bold text-dark">{{ stat.client.name }}</span>
+                                <span class="small text-muted">{{ stat.weekly_actual }} / {{ stat.weekly_target }}h</span>
+                            </div>
+                            <div class="progress" style="height: 8px; border-radius: 4px;">
+                                <div class="progress-bar {% if stat.weekly_percent >= 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                     style="width: {{ stat.weekly_percent }}%"></div>
+                            </div>
                         </div>
+                    {% empty %}
+                        <div class="col-12 text-center py-3 text-muted small italic">No targets set for this week.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <form action="{% url 'timesheets:generate_invoice_bulk' %}" method="post">
+            {% csrf_token %}
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4">
+                    <h5 class="mb-0 fw-bold">Recent Work Entries</h5>
+                    <div id="selectionActions" style="display: none;">
+                        <button type="submit" class="btn btn-success fw-bold px-3 shadow-sm">
+                            <i class="bi bi-receipt-cutoff me-2"></i> Create Invoices (<span id="selectedCount">0</span>)
+                        </button>
                     </div>
                 </div>
-                {% empty %}
-                <div class="col-12 text-center py-3 text-muted small italic">No targets set for this week.</div>
-                {% endfor %}
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 table-hover">
+                            <thead class="table-light text-uppercase small fw-bold">
+                                <tr>
+                                    <th class="ps-4">
+                                        <input type="checkbox" id="selectAll" class="form-check-input border-2">
+                                    </th>
+                                    <th>Date</th>
+                                    <th>Client</th>
+                                    <th>Description</th>
+                                    <th>Hours</th>
+                                    <th class="text-end pe-4">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in entries %}
+                                    <tr>
+                                        <td class="ps-4">
+                                            <input type="checkbox"
+                                                   name="selected_entries"
+                                                   value="{{ entry.id }}"
+                                                   class="form-check-input entry-checkbox border-2">
+                                        </td>
+                                        <td>{{ entry.date|date:"d M" }}</td>
+                                        <td>
+                                            <strong>{{ entry.client.name }}</strong>
+                                        </td>
+                                        <td>
+                                            <div class="text-dark">
+                                                <strong>{{ entry.category.name|default:"General Work" }}</strong>
+                                            </div>
+                                            {% if entry.metadata %}
+                                                <div class="small text-muted">
+                                                    {% for key, val in entry.metadata.items %}
+                                                        <span class="badge bg-light text-dark border me-1">{{ key }}: {{ val }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td class="fw-bold">{{ entry.hours }}h</td>
+                                        <td class="text-end pe-4">
+                                            <div class="btn-group btn-group-sm shadow-sm">
+                                                <button type="button"
+                                                        class="btn btn-outline-primary"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#logTimeModal"
+                                                        data-is-edit="true"
+                                                        data-id="{{ entry.id }}"
+                                                        data-client="{{ entry.client.id }}"
+                                                        data-date="{{ entry.date|date:'Y-m-d' }}"
+                                                        data-hours="{{ entry.hours }}"
+                                                        data-rate="{{ entry.hourly_rate }}"
+                                                        data-category="{{ entry.category_id|default:'' }}"
+                                                        data-metadata='{{ entry.metadata_json|safe }}'>
+                                                    <i class="bi bi-pencil me-1"></i> Edit
+                                                </button>
+                                                {% if not entry.is_billed %}
+                                                    <a href="{% url 'timesheets:delete_entry' entry.id %}"
+                                                       class="btn btn-outline-danger"
+                                                       onclick="return confirm('Delete this work entry?');">
+                                                        <i class="bi bi-trash me-1"></i> Delete
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-5 text-muted">
+                                            <i class="bi bi-clock-history fs-2 d-block mb-2"></i>
+                                            No time entries recorded for this period.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </div>
+        </form>
     </div>
+    {% include "timesheets/includes/log_time_modal.html" %}
+    <script>
+        // JS logic remains unchanged to preserve your modal/HTMX functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const logModal = document.getElementById('logTimeModal');
+            const form = document.getElementById('logTimeForm');
+            const dynamicFieldsContainer = document.getElementById('dynamicFieldsContainer');
+            const dynamicFieldsTarget = document.getElementById('dynamicFields');
 
-    <form action="{% url 'timesheets:generate_invoice_bulk' %}" method="post">
-        {% csrf_token %}
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3 px-4">
-                <h5 class="mb-0 fw-bold">Recent Work Entries</h5>
-                
-                <div id="selectionActions" style="display: none;">
-                    <button type="submit" class="btn btn-success fw-bold px-3 shadow-sm">
-                        <i class="bi bi-receipt-cutoff me-2"></i> Create Invoices (<span id="selectedCount">0</span>)
-                    </button>
-                </div>
-            </div>
+            logModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                if (!button || !button.getAttribute('data-is-edit')) {
+                    form.reset();
+                    form.action = "{% url 'timesheets:log_time' %}";
+                    if (dynamicFieldsTarget) dynamicFieldsTarget.innerHTML = '';
+                    if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'none';
+                    return;
+                }
 
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table align-middle mb-0 table-hover">
-                        <thead class="table-light text-uppercase small fw-bold">
-                            <tr>
-                                <th class="ps-4"><input type="checkbox" id="selectAll" class="form-check-input border-2"></th>
-                                <th>Date</th>
-                                <th>Client</th>
-                                <th>Description</th>
-                                <th>Hours</th>
-                                <th class="text-end pe-4">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for entry in entries %}
-                            <tr>
-                                <td class="ps-4">
-                                    <input type="checkbox" name="selected_entries" value="{{ entry.id }}" class="form-check-input entry-checkbox border-2">
-                                </td>
-                                <td>{{ entry.date|date:"d M" }}</td>
-                                <td><strong>{{ entry.client.name }}</strong></td>
-                                <td>
-                                    <div class="text-dark">{{ entry.description|truncatechars:40 }}</div>
-                                    {% if entry.metadata %}
-                                        <div class="small text-muted">
-                                            {% for key, val in entry.metadata.items %}
-                                                <span class="badge bg-light text-dark border me-1">{{ key }}: {{ val }}</span>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </td>
-                                <td class="fw-bold">{{ entry.hours }}h</td>
-                                <td class="text-end pe-4">
-                                    <div class="btn-group btn-group-sm shadow-sm">
-                                        <button type="button" class="btn btn-outline-primary" 
-                                                data-bs-toggle="modal" data-bs-target="#logTimeModal"
-                                                data-is-edit="true" data-id="{{ entry.id }}"
-                                                data-client="{{ entry.client.id }}" data-date="{{ entry.date|date:'Y-m-d' }}"
-                                                data-hours="{{ entry.hours }}" data-rate="{{ entry.hourly_rate }}"
-                                                data-category="{{ entry.category_id|default:'' }}"
-                                                data-desc="{{ entry.description }}"
-                                                data-metadata='{{ entry.metadata_json|safe }}'>
-                                            <i class="bi bi-pencil me-1"></i> Edit
-                                        </button>
-                                        
-                                        {% if not entry.is_billed %}
-                                        <a href="{% url 'timesheets:delete_entry' entry.id %}" 
-                                           class="btn btn-outline-danger"
-                                           onclick="return confirm('Delete this work entry?');">
-                                            <i class="bi bi-trash me-1"></i> Delete
-                                        </a>
-                                        {% endif %}
-                                    </div>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
-                                    <i class="bi bi-clock-history fs-2 d-block mb-2"></i>
-                                    No time entries recorded for this period.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </form>
-</div>
+                const entryId = button.getAttribute('data-id');
+                const catId = button.getAttribute('data-category');
+                const metadataString = button.getAttribute('data-metadata');
 
-{% include "timesheets/includes/log_time_modal.html" %}
+                form.action = `/timesheets/${entryId}/edit/`;
+                form.querySelector('[name="client"]').value = button.getAttribute('data-client');
+                form.querySelector('[name="date"]').value = button.getAttribute('data-date');
+                form.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
+                form.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate');
+                form.querySelector('[name="description"]').value = button.getAttribute('data-desc');
 
-<script>
-// JS logic remains unchanged to preserve your modal/HTMX functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const logModal = document.getElementById('logTimeModal');
-    const form = document.getElementById('logTimeForm');
-    const dynamicFieldsContainer = document.getElementById('dynamicFieldsContainer');
-    const dynamicFieldsTarget = document.getElementById('dynamicFields');
+                if (catId || (metadataString && metadataString !== '{}')) {
+                    if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'block';
+                    const activeCatId = (catId && catId !== "") ? catId : "1";
+                    const catSelect = form.querySelector('[name="category"]');
+                    if (catSelect && catId) catSelect.value = catId;
 
-    logModal.addEventListener('show.bs.modal', function(event) {
-        const button = event.relatedTarget;
-        if (!button || !button.getAttribute('data-is-edit')) {
-            form.reset();
-            form.action = "{% url 'timesheets:log_time' %}";
-            if (dynamicFieldsTarget) dynamicFieldsTarget.innerHTML = '';
-            if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'none';
-            return;
-        }
-
-        const entryId = button.getAttribute('data-id');
-        const catId = button.getAttribute('data-category');
-        const metadataString = button.getAttribute('data-metadata');
-
-        form.action = `/timesheets/${entryId}/edit/`;
-        form.querySelector('[name="client"]').value = button.getAttribute('data-client');
-        form.querySelector('[name="date"]').value = button.getAttribute('data-date');
-        form.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
-        form.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate');
-        form.querySelector('[name="description"]').value = button.getAttribute('data-desc');
-
-        if (catId || (metadataString && metadataString !== '{}')) {
-            if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'block';
-            const activeCatId = (catId && catId !== "") ? catId : "1"; 
-            const catSelect = form.querySelector('[name="category"]');
-            if (catSelect && catId) catSelect.value = catId;
-
-            htmx.ajax('GET', `{% url "timesheets:get_category_fields" %}?category=${activeCatId}`, {
-                target: '#dynamicFields',
-                swap: 'innerHTML'
-            }).then(() => {
-                try {
-                    const metadata = JSON.parse(metadataString || '{}');
-                    setTimeout(() => {
-                        Object.keys(metadata).forEach(key => {
-                            const val = metadata[key];
-                            const input = form.querySelector(`[name="meta_${key}"]`) || 
-                                          form.querySelector(`[name="meta_${key.replace(/_/g, ' ')}"]`);
-                            if (input) input.value = val;
-                        });
-                    }, 250);
-                } catch (e) { console.error("Metadata Parse Error", e); }
+                    htmx.ajax('GET', `{% url "timesheets:get_category_fields" %}?category=${activeCatId}`, {
+                        target: '#dynamicFields',
+                        swap: 'innerHTML'
+                    }).then(() => {
+                        try {
+                            const metadata = JSON.parse(metadataString || '{}');
+                            setTimeout(() => {
+                                Object.keys(metadata).forEach(key => {
+                                    const val = metadata[key];
+                                    const input = form.querySelector(`[name="meta_${key}"]`) ||
+                                        form.querySelector(`[name="meta_${key.replace(/_/g, ' ')}"]`);
+                                    if (input) input.value = val;
+                                });
+                            }, 250);
+                        } catch (e) {
+                            console.error("Metadata Parse Error", e);
+                        }
+                    });
+                }
             });
-        }
-    });
 
-    document.body.addEventListener('change', function(e) {
-        if (e.target.id === 'selectAll' || e.target.classList.contains('entry-checkbox')) {
-            if (e.target.id === 'selectAll') {
-                document.querySelectorAll('.entry-checkbox').forEach(cb => cb.checked = e.target.checked);
-            }
-            const count = document.querySelectorAll('.entry-checkbox:checked').length;
-            const selectionActions = document.getElementById('selectionActions');
-            const selectedCountSpan = document.getElementById('selectedCount');
-            if (selectedCountSpan) selectedCountSpan.innerText = count;
-            if (selectionActions) selectionActions.style.display = count > 0 ? 'block' : 'none';
-        }
+            document.body.addEventListener('change', function(e) {
+                if (e.target.id === 'selectAll' || e.target.classList.contains('entry-checkbox')) {
+                    if (e.target.id === 'selectAll') {
+                        document.querySelectorAll('.entry-checkbox').forEach(cb => cb.checked = e.target.checked);
+                    }
+                    const count = document.querySelectorAll('.entry-checkbox:checked').length;
+                    const selectionActions = document.getElementById('selectionActions');
+                    const selectedCountSpan = document.getElementById('selectedCount');
+                    if (selectedCountSpan) selectedCountSpan.innerText = count;
+                    if (selectionActions) selectionActions.style.display = count > 0 ? 'block' : 'none';
+                }
 
-        if (e.target.id === 'id_client' || e.target.name === 'client') {
-            const selectedOption = e.target.options[e.target.selectedIndex];
-            const rate = selectedOption.getAttribute('data-rate');
-            const rateInput = form.querySelector('[name="hourly_rate"]');
-            if (rate && rateInput) rateInput.value = rate;
-        }
-    });
+                if (e.target.id === 'id_client' || e.target.name === 'client') {
+                    const selectedOption = e.target.options[e.target.selectedIndex];
+                    const rate = selectedOption.getAttribute('data-rate');
+                    const rateInput = form.querySelector('[name="hourly_rate"]');
+                    if (rate && rateInput) rateInput.value = rate;
+                }
+            });
 
-    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
-        if (evt.detail.target.id === "dynamicFields") {
-            const hasContent = evt.detail.xhr.responseText.trim() !== "";
-            if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = hasContent ? 'block' : 'none';
-        }
-    });
-});
-</script>
+            document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+                if (evt.detail.target.id === "dynamicFields") {
+                    const hasContent = evt.detail.xhr.responseText.trim() !== "";
+                    if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = hasContent ? 'block' : 'none';
+                }
+            });
+        });
+    </script>
 {% endblock %}

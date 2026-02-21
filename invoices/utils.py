@@ -241,6 +241,12 @@ def email_invoice_to_client(invoice):
 
         email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])
         email.attach(f"Invoice_{invoice.number or 'Draft'}.pdf", pdf_bytes, 'application/pdf')
+        # Attach timesheet PDF if requested
+        if invoice.attach_timesheet_to_email:
+            from .utils import generate_timesheet_pdf
+            timesheet_pdf = generate_timesheet_pdf(invoice)
+            if timesheet_pdf:
+                email.attach(f"Timesheet_{invoice.number or 'Draft'}.pdf", timesheet_pdf, 'application/pdf')
 
         backend = getattr(settings, 'INVOICE_EMAIL_BACKEND', None)
         if backend:
@@ -313,3 +319,47 @@ def email_receipt_to_client(invoice, amount_paid):
     except Exception as e:
         print(f"Receipt Error: {e}")
         return False
+
+def generate_timesheet_pdf(invoice):
+    """
+    Generates a PDF report of all timesheets billed to the invoice.
+    Returns PDF bytes or None if no timesheets.
+    """
+    from timesheets.models import TimesheetEntry
+    from django.template.loader import render_to_string
+    from django.template import TemplateDoesNotExist
+    from tempfile import TemporaryDirectory
+    import os
+    timesheets = invoice.billed_timesheets.all()
+    if not timesheets:
+        return None
+
+    profile = invoice.user.profile
+    total_hours = sum(ts.hours for ts in timesheets)
+    total_value = sum(ts.total_value for ts in timesheets)
+
+    context = {
+        'invoice': invoice,
+        'timesheets': timesheets,
+        'total_hours': total_hours,
+        'total_value': total_value,
+        'profile': profile,
+    }
+    try:
+        latex_content = render_to_string('timesheets/timesheet_report.tex', context)
+    except TemplateDoesNotExist:
+        return None
+    with TemporaryDirectory() as tempdir:
+        tex_file_path = os.path.join(tempdir, 'timesheet_report.tex')
+        with open(tex_file_path, 'w', encoding='utf-8') as f:
+            f.write(latex_content)
+        # Compile LaTeX
+        import subprocess
+        subprocess.run([
+            'xelatex', '-interaction=nonstopmode', '-output-directory', tempdir, tex_file_path
+        ], capture_output=True, text=True, timeout=30)
+        pdf_path = os.path.join(tempdir, 'timesheet_report.pdf')
+        if os.path.exists(pdf_path):
+            with open(pdf_path, 'rb') as f:
+                return f.read()
+    return None

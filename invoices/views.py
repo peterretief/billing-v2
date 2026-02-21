@@ -1,4 +1,29 @@
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from datetime import date, timedelta
+
+@login_required
+@require_POST
+def toggle_attach_timesheet(request, pk):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Toggle timesheet: pk={pk}, user={request.user}")
+    try:
+        invoice = Invoice.objects.get(pk=pk, user=request.user)
+        logger.info(f"Found invoice: id={invoice.id}, user={invoice.user}, attach_timesheet_to_email={invoice.attach_timesheet_to_email}")
+        invoice.attach_timesheet_to_email = not invoice.attach_timesheet_to_email
+        invoice.save()
+        logger.info(f"Updated invoice: id={invoice.id}, attach_timesheet_to_email={invoice.attach_timesheet_to_email}")
+        if request.headers.get('HX-Request'):
+            from django.template.loader import render_to_string
+            html = render_to_string('invoices/partials/timesheet_attach_toggle_form.html', {'invoice': invoice})
+            return HttpResponse(html)
+        return redirect('invoices:invoice_list')
+    except Invoice.DoesNotExist:
+        logger.error(f"Invoice not found: pk={pk}, user={request.user}")
+        if request.headers.get('HX-Request'):
+            return HttpResponse(f'<div class="alert alert-danger">Invoice not found: pk={pk}, user={request.user}</div>')
+        return redirect('invoices:invoice_list')
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -20,13 +45,12 @@ from google import genai
 from clients.models import Client
 from core.decorators import setup_required
 from core.models import BillingAuditLog, UserProfile
+from core.utils import get_anomaly_status
 from invoices.models import Invoice, InvoiceEmailStatusLog
 from items.models import Item
 from timesheets.models import TimesheetEntry
 
 from .forms import InvoiceForm, VATPaymentForm
-
-# Local Apps
 from .models import Payment, VATReport
 from .utils import email_invoice_to_client, generate_invoice_pdf
 
@@ -48,11 +72,18 @@ def get_payment_modal(request, pk):
 
 
 @login_required
-@setup_required  # This ensures they can't see stats until setup is done
+@setup_required
+def get_resend_modal(request, pk):
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    return render(request, 'invoices/partials/resend_modal_content.html', {'invoice': invoice})
+
+
+
+@login_required
+@setup_required
 def dashboard(request):
     """Main overview for the business owner."""
     if request.user.is_ops:
-        # Ops users see data of users they added, plus their own
         users_to_show = list(request.user.added_users.all()) + [request.user]
         invoices = Invoice.objects.filter(user__in=users_to_show).select_related('client')
         unbilled_ts = TimesheetEntry.objects.filter(user__in=users_to_show, is_billed=False).aggregate(
@@ -66,7 +97,6 @@ def dashboard(request):
             is_anomaly=True
         ).exclude(invoice__status='PAID').count()
     else:
-        # Regular users see their own data
         invoices = Invoice.objects.filter(user=request.user).select_related('client')
         unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
             total_value=Sum(F('hours') * F('hourly_rate')),
@@ -81,9 +111,9 @@ def dashboard(request):
 
     stats = invoices.aggregate(
         billed=Sum('total_amount'),
-        paid=Sum('payments__amount')  
+        paid=Sum('payments__amount')
     )
-    
+
     total_outstanding = Invoice.objects.get_total_outstanding(request.user)
 
     context = {
@@ -91,13 +121,8 @@ def dashboard(request):
         'total_billed': stats['billed'] or Decimal('0.00'),
         'total_outstanding': total_outstanding,
         'tax_summary': Invoice.objects.get_tax_summary(request.user),
-        
-        # This table shows the 5 most recent invoices regardless of status
         'recent_invoices': invoices.order_by('-date_issued', '-id')[:5],
         'flagged_count': flagged_count,
-        
-        # This is for your "Dispatched & Emailed" history section
-        'sent_history': invoices.filter(is_emailed=True).order_by('-emailed_at')[:10],
     }
 
     return render(request, 'invoices/dashboard.html', context)
@@ -140,17 +165,23 @@ def invoice_list(request):
 
     paginator = Paginator(invoice_queryset, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
+    # Attach latest delivery status to each invoice for display
+    for invoice in page_obj:
+        invoice.latest_delivery_status = invoice.get_latest_delivery_status()
+
     return render(request, 'invoices/invoice_list.html', {
         'invoices': page_obj,
         'search_query': search_query,
         'status_filter': status_filter,
     })
 
+
 @login_required
 @setup_required
 def invoice_detail(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     return render(request, 'invoices/invoice_detail.html', {'invoice': invoice})
+
 
 @login_required
 @setup_required
@@ -171,12 +202,27 @@ def invoice_create(request):
                 formset.instance = invoice
                 formset.save()
                 Invoice.objects.update_totals(invoice)
+                invoice.refresh_from_db()
+
+                is_anomaly, comment = get_anomaly_status(request.user, invoice)
+                BillingAuditLog.objects.create(
+                    user=request.user,
+                    invoice=invoice,
+                    is_anomaly=is_anomaly,
+                    ai_comment=comment,
+                    details={
+                        "total": float(invoice.total_amount),
+                        "source": "manual_create"
+                    }
+                )
+
             messages.success(request, "Invoice created.")
             return redirect('invoices:invoice_detail', pk=invoice.pk)
     else:
         form = InvoiceForm(initial=initial_data)
         formset = InvoiceItemFormSet()
     return render(request, 'invoices/invoice_form.html', {'form': form, 'formset': formset, 'is_edit': False})
+
 
 @login_required
 @setup_required
@@ -200,6 +246,7 @@ def invoice_edit(request, pk):
         formset = InvoiceItemFormSet(instance=invoice)
     return render(request, 'invoices/invoice_form.html', {'form': form, 'formset': formset, 'is_edit': True})
 
+
 @login_required
 @setup_required
 def duplicate_invoice(request, pk):
@@ -220,6 +267,7 @@ def duplicate_invoice(request, pk):
     messages.success(request, f"Duplicated as Draft #{new_invoice.id}")
     return redirect('invoices:invoice_edit', pk=new_invoice.pk)
 
+
 @login_required
 @setup_required
 def bulk_post(request):
@@ -233,18 +281,38 @@ def bulk_post(request):
                 inv.save()
                 inv.billed_items.all().update(is_billed=True)
                 item_desc = inv.billed_items.values_list('description', flat=True)
-                Item.objects.filter(user=request.user, client=inv.client, is_recurring=True,
-                                     description__in=item_desc).update(last_billed_date=timezone.now().date())
+                Item.objects.filter(
+                    user=request.user,
+                    client=inv.client,
+                    is_recurring=True,
+                    description__in=item_desc
+                ).update(last_billed_date=timezone.now().date())
+
+                is_anomaly, comment = get_anomaly_status(request.user, inv)
+                BillingAuditLog.objects.create(
+                    user=request.user,
+                    invoice=inv,
+                    is_anomaly=is_anomaly,
+                    ai_comment=comment,
+                    details={
+                        "total": float(inv.total_amount),
+                        "source": "bulk_post"
+                    }
+                )
+
                 try:
-                    if email_invoice_to_client(inv): count += 1
-                except Exception: pass
+                    if email_invoice_to_client(inv):
+                        count += 1
+                except Exception:
+                    pass
+
         messages.success(request, f"Processed {count} invoices.")
     return redirect('invoices:invoice_list')
+
 
 @login_required
 @setup_required
 def mark_invoice_paid(request, pk):
-    """Settle an invoice fully by creating a Payment record."""
     if request.method != "POST":
         return redirect('invoices:invoice_detail', pk=pk)
 
@@ -254,21 +322,17 @@ def mark_invoice_paid(request, pk):
     if balance > 0:
         try:
             with transaction.atomic():
-                # FIX: Match the fields in your Payment model exactly
                 Payment.objects.create(
-                    user=request.user,  # <--- This is the missing piece!
-                    invoice=invoice, 
-                    amount=balance, 
+                    user=request.user,
+                    invoice=invoice,
+                    amount=balance,
                     reference="Marked Paid (Full)"
                 )
-                # Note: Your model's save() method will auto-update 
-                # invoice status to 'PAID' if balance is 0.
             messages.success(request, f"Invoice #{invoice.number} settled.")
         except Exception as e:
             messages.error(request, f"Payment error: {str(e)}")
-            
-    return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
 
+    return redirect(request.META.get('HTTP_REFERER', 'invoices:dashboard'))
 
 
 @login_required
@@ -289,8 +353,6 @@ def record_payment(request, pk):
                     amount=amount,
                     reference=request.POST.get('reference', 'Manual Payment')
                 )
-                # Payment.save() already calls update_totals and handles
-                # status — do NOT call invoice.save() here as it overwrites it
 
             messages.success(request, f"Payment of {amount} recorded.")
 
@@ -308,7 +370,6 @@ def record_payment(request, pk):
 
     return redirect(next_url)
 
-    
 
 @login_required
 @setup_required
@@ -325,6 +386,7 @@ def generate_invoice_pdf_view(request, pk):
         messages.error(request, f"PDF Error: {str(e)}")
         return redirect('invoices:invoice_detail', pk=pk)
 
+
 @login_required
 @setup_required
 def resend_invoice(request, pk):
@@ -336,25 +398,33 @@ def resend_invoice(request, pk):
             messages.success(request, "Invoice resent.")
     return redirect(request.META.get('HTTP_REFERER', 'invoices:invoice_detail'))
 
+
 @login_required
 def financial_assessment(request):
     today = date.today()
     start_of_month = today.replace(day=1)
-    actual_billed = Invoice.objects.filter(user=request.user, date_issued__gte=start_of_month).exclude(status='CANCELLED').aggregate(total=Sum('subtotal_amount'))['total'] or Decimal('0.00')
+    actual_billed = Invoice.objects.filter(
+        user=request.user, date_issued__gte=start_of_month
+    ).exclude(status='CANCELLED').aggregate(total=Sum('subtotal_amount'))['total'] or Decimal('0.00')
     unbilled_qs = TimesheetEntry.objects.filter(user=request.user, is_billed=False)
     total_unbilled = unbilled_qs.aggregate(val=Sum(F('hours') * F('hourly_rate')))['val'] or Decimal('0.00')
     user_profile, _ = UserProfile.objects.get_or_create(user=request.user)
     target = user_profile.monthly_target or Decimal('50000.00')
-    
+
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
     currency = user_profile.currency
     prompt = f"Target: {currency} {target}. Invoiced: {currency} {actual_billed}. WIP: {currency} {total_unbilled}. Assess in 2 sentences."
     try:
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         assessment_text = response.text
-    except:
+    except Exception:
         assessment_text = "Assessment unavailable."
-    return render(request, 'invoices/partials/assessment_result.html', {'assessment': assessment_text, 'target': target, 'total_progress': actual_billed + total_unbilled})
+    return render(request, 'invoices/partials/assessment_result.html', {
+        'assessment': assessment_text,
+        'target': target,
+        'total_progress': actual_billed + total_unbilled
+    })
+
 
 @login_required
 def record_vat_payment(request):
@@ -364,8 +434,13 @@ def record_vat_payment(request):
             payment = form.save(commit=False)
             payment.user = request.user
             payment.save()
-            return render(request, 'invoices/partials/tax_summary_box.html', {'tax_summary': Invoice.objects.get_tax_summary(request.user)})
-    return render(request, 'invoices/partials/vat_payment_form.html', {'form': VATPaymentForm(initial={'tax_type': 'VAT'})})
+            return render(request, 'invoices/partials/tax_summary_box.html', {
+                'tax_summary': Invoice.objects.get_tax_summary(request.user)
+            })
+    return render(request, 'invoices/partials/vat_payment_form.html', {
+        'form': VATPaymentForm(initial={'tax_type': 'VAT'})
+    })
+
 
 @login_required
 def generate_vat_report(request):
@@ -373,18 +448,22 @@ def generate_vat_report(request):
     year = int(request.GET.get('year', timezone.now().year))
     invoices = Invoice.objects.filter(user=request.user, date_issued__month=month, date_issued__year=year)
     totals = invoices.aggregate(net=Sum('subtotal_amount'), vat=Sum('tax_amount'))
-    VATReport.objects.update_or_create(user=request.user, month=month, year=year, defaults={'net_total': totals['net'] or 0, 'vat_total': totals['vat'] or 0})
+    VATReport.objects.update_or_create(
+        user=request.user, month=month, year=year,
+        defaults={'net_total': totals['net'] or 0, 'vat_total': totals['vat'] or 0}
+    )
     messages.success(request, "Report generated.")
     return redirect('invoices:dashboard')
 
+
 @login_required
 def download_vat_latex(request, pk):
-    """Downloads raw LaTeX source for a VAT Report."""
     report = get_object_or_404(VATReport, pk=pk, user=request.user)
     response = HttpResponse(report.latex_source, content_type='text/plain')
     filename = f"VAT_Report_{report.year}_{report.month:02d}.tex"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
 
 @login_required
 def delete_invoice(request, pk):
@@ -400,24 +479,15 @@ def delete_invoice(request, pk):
 
 @login_required
 def billing_audit_report(request):
-    """
-    Provides a high-level summary of AI performance and billing volume.
-    """
-    # Get all logs for the current user
     logs = BillingAuditLog.objects.filter(user=request.user).order_by('-created_at')
-    
-    # 1. AI Catch Rate
+
     total_logs = logs.count()
     anomalies_caught = logs.filter(is_anomaly=True).count()
     catch_rate = (anomalies_caught / total_logs * 100) if total_logs > 0 else 0
-    
-    # 2. Financial Impact (Value of caught anomalies)
-    # Note: We extract the total from the JSON details field
+
     anomaly_details = logs.filter(is_anomaly=True).values_list('details', flat=True)
     potential_errors_value = sum([Decimal(str(d.get('total', 0))) for d in anomaly_details])
 
-    # 3. Success vs. Intervention
-    # Draft = Intervened, Pending/Paid = Successful
     success_count = logs.filter(invoice__status__in=['PENDING', 'PAID']).count()
 
     context = {
@@ -426,6 +496,9 @@ def billing_audit_report(request):
         'catch_rate': round(catch_rate, 1),
         'potential_errors_value': potential_errors_value,
         'success_count': success_count,
-        'recent_logs': logs[:20],  # Show last 20 events
+        'recent_logs': logs[:20],
+        'manual_count': logs.filter(details__source='manual_create').count(),
+        'bulk_count': logs.filter(details__source='bulk_post').count(),
+        'scheduler_count': logs.filter(details__source='recurring_scheduler').count(),
     }
     return render(request, 'invoices/audit_report.html', context)

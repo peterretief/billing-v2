@@ -1,0 +1,63 @@
+\documentclass{article}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage[T1]{fontenc}
+\usepackage{helvet}
+\renewcommand{\familydefault}{\sfdefault}
+
+% Table packages
+\usepackage{tabularx}
+\usepackage{booktabs} % For professional looking tables
+\usepackage[table]{xcolor} % For coloring table cells
+
+% Currency symbols
+\usepackage{eurosym}
+
+\begin{document}
+
+% --- HEADER ---
+\begin{center}
+    {\Huge\bfseries Timesheet Report\par}
+    \vspace{0.2cm}
+    {\large For Invoice \#{{ invoice.number | default:'N/A' }}\par}
+\end{center}
+
+\vspace{1cm}
+
+% --- CLIENT INFO ---
+\noindent\begin{tabularx}{\textwidth}{@{}lX@{}}
+    \textbf{Client:} & {{ invoice.client.name }} \\
+    \textbf{Date:} & {{ invoice.date_issued|date:"F j, Y" }} \\
+\end{tabularx}
+
+\vspace{1cm}
+
+% --- TIMESHEET TABLE ---
+\rowcolors{2}{gray!10}{white} % Alternate row colors for readability
+\begin{tabularx}{\textwidth}{ l l >{\raggedright\arraybackslash}X r r r }
+\toprule
+\textbf{Date} & \textbf{Category} & \textbf{Details} & \textbf{Hours} & \textbf{Rate} & \textbf{Total} \\
+\midrule
+{% for entry in timesheets %}
+{{ entry.date|date:"Y-m-d" }} & 
+{{ entry.category.name | default:'' }} & 
+{{ entry.formatted_metadata | default:'' }} & 
+{{ entry.hours | floatformat:2 }} & 
+{{ entry.hourly_rate | floatformat:2 }} & 
+{{ entry.total_value | floatformat:2 }} \\
+{% endfor %}
+\bottomrule
+\end{tabularx}
+
+\vspace{1cm}
+
+% --- TOTALS ---
+\begin{flushright}
+    \begin{tabular}{lr}
+        \textbf{Total Hours:} & {{ total_hours | floatformat:2 }} \\
+        \addlinespace
+        \textbf{Total Value:} & \textbf{{ profile.currency }} {{ total_value | floatformat:2 }} \\
+    \end{tabular}
+\end{flushright}
+
+\end{document}

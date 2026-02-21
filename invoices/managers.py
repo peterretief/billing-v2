@@ -1,6 +1,6 @@
+import profile
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
-import profile
 
 from django.db import models
 from django.db.models import DecimalField, OuterRef, Subquery, Sum

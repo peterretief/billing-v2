@@ -5,6 +5,7 @@ from . import views
 app_name = 'invoices'
 
 urlpatterns = [
+        path('<int:pk>/toggle-attach-timesheet/', views.toggle_attach_timesheet, name='toggle_attach_timesheet'),
     # Dashboard & Lists
     path('<int:pk>/pdf/', views.generate_invoice_pdf_view, name='generate_invoice_pdf_view'),
     path('<int:pk>/pay/', views.mark_invoice_paid, name='mark_as_paid'),
@@ -24,6 +25,7 @@ urlpatterns = [
     # PDF & Email
     path('<int:pk>/pdf/', views.generate_invoice_pdf_view, name='invoice_pdf'),
     path('<int:pk>/resend/', views.resend_invoice, name='resend_invoice'),
+    path('<int:pk>/resend-modal/', views.get_resend_modal, name='get_resend_modal'),
 
     # VAT Reporting
     path('vat/generate/', views.generate_vat_report, name='generate_vat_report'),

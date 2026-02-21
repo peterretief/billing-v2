@@ -10,6 +10,15 @@ from core.models import TenantModel
 from .managers import TimesheetManager  # Import your new file
 
 
+# Global default categories editable by staff
+class DefaultWorkCategory(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    metadata_schema = models.JSONField(default=list, blank=True, help_text="List of extra field names")
+
+    def __str__(self):
+        return self.name
+
+
 def get_unbilled_total(self):
     from timesheets.models import TimesheetEntry
     return TimesheetEntry.objects.filter(
@@ -35,10 +44,6 @@ class TimesheetEntry(TenantModel):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='timesheets')
     category = models.ForeignKey(WorkCategory, on_delete=models.SET_NULL, null=True, blank=True)
     date = models.DateField(default=timezone.now)
-    
-    # Kept as CharField to match your previous form logic
-    description = models.CharField(max_length=255)
-    
     hours = models.DecimalField(max_digits=6, decimal_places=2)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
     

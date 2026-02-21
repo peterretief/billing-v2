@@ -43,7 +43,7 @@
                             <tr>
                                 <td>{{ entry.date|date:"d M Y" }}</td>
                                 <td>
-                                    <div class="fw-bold">{{ entry.description }}</div>
+                                    <div class="fw-bold">{{ entry.category.name|default:"General Work" }}</div>
                                     {% if entry.metadata %}
                                         <div class="mt-1">
                                             {% for key, val in entry.metadata.items %}

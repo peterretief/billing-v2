@@ -1,0 +1,14 @@
+<div class="modal-header">
+    <h5 class="modal-title">Resend Invoice</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<div class="modal-body">
+    <p>Are you sure you want to resend invoice <strong>#{{ invoice.number }}</strong> to <strong>{{ invoice.client.email }}</strong>?</p>
+    <p class="text-muted small">This will send a new email to the client with the latest version of the invoice attached.</p>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <a href="{% url 'invoices:resend_invoice' invoice.pk %}" class="btn btn-primary">
+        <i class="bi bi-envelope-arrow-up"></i> Confirm Resend
+    </a>
+</div>

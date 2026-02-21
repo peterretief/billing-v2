@@ -6,6 +6,7 @@ from collections import defaultdict
 
 import requests
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
@@ -44,15 +45,27 @@ def get_grouped_logs(user, invoice_id=None):
     """
     logs_query = InvoiceEmailStatusLog.objects.filter(
         user=user
-    ).select_related('invoice').order_by('-created_at')
+    ).select_related('invoice')
 
     if invoice_id:
         logs_query = logs_query.filter(invoice_id=invoice_id)
 
+    # Define status priority (higher index = higher priority)
+    status_priority = {
+        'DELIVERED': 3,
+        'SENT': 2,
+        'REQUEST': 1,
+        # Add more statuses as needed
+    }
+
     grouped_logs = defaultdict(list)
     for log in logs_query:
         grouped_logs[log.invoice].append(log)
-    
+
+    # For each invoice, sort logs by status priority (desc), then by created_at (desc)
+    for invoice, logs in grouped_logs.items():
+        logs.sort(key=lambda l: (status_priority.get(l.status.upper(), 0), l.created_at), reverse=True)
+
     return dict(grouped_logs)
 
 # --- Email Status Views ---
@@ -355,16 +368,19 @@ def manager_create_tenant(request):
     form = AdminUserCreationForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         email = form.cleaned_data['email']
-        username = form.cleaned_data['username']
+        username = email  # Use email as username for uniqueness
         if User.objects.filter(email=email).exists():
-            messages.error(request, 'Email already exists.')
+            messages.error(request, 'A user with this email already exists.')
         else:
-            User.objects.create_user(username=username, email=email, password=secrets.token_urlsafe(32), added_by=request.user)
-            reset_form = PasswordResetForm(data={'email': email})
-            if reset_form.is_valid():
-                reset_form.save(request=request, from_email=settings.DEFAULT_FROM_EMAIL)
-            messages.success(request, f'Tenant {username} created.')
-            return redirect('core:portfolio_summary')
+            try:
+                user = User.objects.create_user(username=username, email=email, password=secrets.token_urlsafe(32), added_by=request.user)
+                reset_form = PasswordResetForm(data={'email': email})
+                if reset_form.is_valid():
+                    reset_form.save(request=request, from_email=settings.DEFAULT_FROM_EMAIL)
+                messages.success(request, f'Tenant {email} created.')
+                return redirect('core:portfolio_summary')
+            except Exception as e:
+                messages.error(request, f"Could not create user: {str(e)}")
     return render(request, 'core/manager_create_tenant.html', {'form': form})
 
 # --- Group Management (Staff) ---

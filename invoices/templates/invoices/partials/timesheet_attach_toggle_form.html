@@ -1,0 +1,10 @@
+<select class="form-select form-select-sm w-auto d-inline"
+        hx-post="{% url 'invoices:toggle_attach_timesheet' invoice.pk %}"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+    <option value="true"
+            {% if invoice.attach_timesheet_to_email %}selected{% endif %}>Attach Timesheet PDF</option>
+    <option value="false"
+            {% if not invoice.attach_timesheet_to_email %}selected{% endif %}>Do Not Attach</option>
+</select>

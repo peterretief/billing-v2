@@ -43,9 +43,23 @@ class ClientListView(LoginRequiredMixin, ListView):
     template_name = 'clients/client_list.html'
     context_object_name = 'clients'
 
+    paginate_by = 20
+
     def get_queryset(self):
-        # This uses the smart manager method we wrote earlier!
-        return Client.objects.filter(user=self.request.user).with_balances()
+        qs = Client.objects.filter(user=self.request.user).with_balances()
+        q = self.request.GET.get('q', '').strip()
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q) |
+                Q(client_code__icontains=q) |
+                Q(email__icontains=q)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['search_query'] = self.request.GET.get('q', '')
+        return context
 
 # --- 2. EDIT/ADD VIEW (Combined Function) ---
 @login_required

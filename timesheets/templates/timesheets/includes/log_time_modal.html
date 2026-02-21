@@ -2,31 +2,31 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i><span>Log Work Hours</span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title">
+                    <i class="bi bi-clock-history me-2"></i><span>Log Work Hours</span>
+                </h5>
+                <button type="button"
+                        class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
             </div>
-            
-            <form action="{% url 'timesheets:log_time' %}" method="post" id="logTimeForm">
+            <form action="{% url 'timesheets:log_time' %}"
+                  method="post"
+                  id="logTimeForm">
                 {% csrf_token %}
                 <div class="modal-body p-4">
                     <div class="mb-4">
                         <label class="form-label text-muted small fw-bold text-uppercase">Client</label>
-                        <select name="client" 
-                                class="form-select" 
-                                required 
+                        <select name="client"
+                                class="form-select"
+                                required
                                 id="id_client"
                                 hx-get="{% url 'timesheets:get_client_rate' %}"
                                 hx-target="#rate-input-wrapper"
                                 hx-trigger="change">
                             <option value="" selected disabled>Choose a client...</option>
-                            {% for client in clients %}
-                                <option value="{{ client.id }}">
-                                    {{ client.name }}
-                                </option>
-                            {% endfor %}
+                            {% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}
                         </select>
                     </div>
-
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <label class="small fw-bold text-muted text-uppercase">Date</label>
@@ -38,46 +38,37 @@
                         </div>
                         <div class="col-md-4">
                             <label class="small fw-bold text-muted text-uppercase">Rate ({{ request.user.profile.currency }})</label>
-                            <div id="rate-input-wrapper">
-                                {{ timesheet_form.hourly_rate }}
-                            </div>
+                            <div id="rate-input-wrapper">{{ timesheet_form.hourly_rate }}</div>
                         </div>
                     </div>
-
-                    <div class="mb-4">
-                        <label class="small fw-bold text-muted text-uppercase">Work Description</label>
-                        {{ timesheet_form.description }}
-                    </div>
-
                     <hr class="my-4 opacity-25">
-
                     <div class="mb-3">
                         <label class="form-label text-dark fw-bold small text-uppercase">Work Category</label>
-                        <select name="category" 
-                                id="id_category" 
+                        <select name="category"
+                                id="id_category"
                                 class="form-select"
-                                hx-get="{% url 'timesheets:get_category_fields' %}" 
-                                hx-target="#dynamicFields" 
+                                hx-get="{% url 'timesheets:get_category_fields' %}"
+                                hx-target="#dynamicFields"
                                 hx-trigger="change">
                             <option value="">Select Category</option>
-                            {% for cat in categories %}
-                                <option value="{{ cat.id }}">{{ cat.name }}</option>
-                            {% endfor %}
+                            {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
                         </select>
                     </div>
-
-                    <div id="dynamicFieldsContainer" class="p-4 mb-3 border-start border-4 border-primary bg-light rounded shadow-sm" style="display: none;">
+                    <div id="dynamicFieldsContainer"
+                         class="p-4 mb-3 border-start border-4 border-primary bg-light rounded shadow-sm"
+                         style="display: none">
                         <h6 class="small fw-bold text-primary mb-3 text-uppercase">
                             <i class="bi bi-info-circle me-1"></i> Additional Category Details
                         </h6>
-                        <div id="dynamicFields" class="row g-3">
-                            </div>
+                        <div id="dynamicFields" class="row g-3"></div>
                     </div>
                 </div>
-
                 <div class="modal-footer bg-light border-0 px-4 py-3">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-5 shadow-sm fw-bold text-white">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit"
+                            class="btn btn-primary px-5 shadow-sm fw-bold text-white">
                         <i class="bi bi-check-lg me-2"></i>Save Log Entry
                     </button>
                 </div>

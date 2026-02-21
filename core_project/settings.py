@@ -177,6 +177,11 @@ LOGGING = {
         },
     },
     'handlers': {
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
         'file': {
             'level': 'INFO',
             'class': 'logging.FileHandler',
@@ -185,8 +190,8 @@ LOGGING = {
         },
     },
     'loggers': {
-        'core.views': {
-            'handlers': ['file'],
+        '': {
+            'handlers': ['console', 'file'],
             'level': 'INFO',
             'propagate': True,
         },

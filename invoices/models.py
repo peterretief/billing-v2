@@ -29,6 +29,23 @@ class InvoiceEmailStatusLog(TenantModel):
 
 
 class Invoice(TenantModel):
+    attach_timesheet_to_email = models.BooleanField(
+        default=False,
+        help_text="Attach timesheet report PDF to invoice email if created from timesheet."
+    )
+
+    def get_latest_delivery_status(self):
+        """
+        Returns the highest-priority delivery status for this invoice, or None if no logs exist.
+        Priority: DELIVERED > SENT > REQUEST > others by created_at.
+        """
+        priority = {'DELIVERED': 3, 'SENT': 2, 'REQUEST': 1}
+        logs = list(self.delivery_logs.all())
+        if not logs:
+            return None
+        logs.sort(key=lambda l: (priority.get(l.status.upper(), 0), l.created_at), reverse=True)
+        return logs[0].status
+
     class TaxMode(models.TextChoices):
         NONE = 'NONE', 'Exempt (No VAT)'
         FULL = 'FULL', 'VAT on Whole Invoice'
@@ -48,38 +65,29 @@ class Invoice(TenantModel):
     is_template = models.BooleanField(
         default=False, 
         db_index=True,
-        help_text="If checked, this invoice will be used " \
-        "as a base for recurring monthly billing."
+        help_text="If checked, this invoice will be used as a base for recurring monthly billing."
     )
 
     is_emailed = models.BooleanField(default=False)
     emailed_at = models.DateTimeField(null=True, blank=True)
     last_email_error = models.TextField(null=True, blank=True) # Great for debugging
 
-    client = models.ForeignKey(Client, on_delete=models.CASCADE,
-                                related_name='invoices')
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='invoices')
     number = models.CharField(max_length=50, blank=True)
     date_issued = models.DateField(default=date.today)
     due_date = models.DateField()
-    
-    billing_type = models.CharField(max_length=10, 
-                                    choices=BillingType.choices, 
-                                    default=BillingType.SERVICE)
-    status = models.CharField(max_length=10, 
-                              choices=Status.choices, default=Status.DRAFT)
-    tax_mode = models.CharField(max_length=10, 
-                                choices=TaxMode.choices, default=TaxMode.NONE)
-    
+
+    billing_type = models.CharField(max_length=10, choices=BillingType.choices, default=BillingType.SERVICE)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    tax_mode = models.CharField(max_length=10, choices=TaxMode.choices, default=TaxMode.NONE)
+
     # Financial Snapshots (Keep these - they are your "Source of Truth")
     subtotal_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
 
     # Document Storage
-    latex_content = models.TextField(blank=True, 
-                                     help_text="The raw LaTeX source used to " \
-                                     "generate the PDF.")
-
+    latex_content = models.TextField(blank=True, help_text="The raw LaTeX source used to generate the PDF.")
 
     last_generated = models.DateTimeField(null=True, blank=True)
 

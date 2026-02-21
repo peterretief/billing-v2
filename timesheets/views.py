@@ -209,6 +209,7 @@ class TimesheetListView(LoginRequiredMixin, ListView):
         total_val = totals['total_value'] or Decimal('0.00')
         target_amount = Decimal('50000.00')
 
+        invoices = Invoice.objects.filter(user=self.request.user).order_by('-date_issued')
         context.update({
             'client_stats': client_stats,
             'clients': clients,
@@ -218,6 +219,7 @@ class TimesheetListView(LoginRequiredMixin, ListView):
             'target_amount': target_amount,
             'progress_percent': float(min((total_val / target_amount) * 100, 100)) if target_amount > 0 else 0,
             'timesheet_form': TimesheetEntryForm(),
+            'invoices': invoices,
         })
         return context
 
@@ -232,12 +234,12 @@ def log_time(request):
         if form.is_valid():
             entry = form.save(commit=False)
             entry.user = request.user
-            
+
             # Capture the Category ID
             category_id = request.POST.get('category')
             if category_id:
                 entry.category_id = category_id
-            
+
             # Set default hourly rate if missing
             if not entry.hourly_rate or entry.hourly_rate == 0:
                 entry.hourly_rate = entry.client.default_hourly_rate
@@ -245,22 +247,22 @@ def log_time(request):
             # Handle Metadata
             meta_data = {k.replace('meta_', ''): v for k, v in request.POST.items() 
                          if k.startswith('meta_') and v.strip()}
-            
             entry.metadata = meta_data
+
+            # Handle attach_to_invoice boolean (store in metadata or custom logic)
+            attach_to_invoice = form.cleaned_data.get('attach_to_invoice', False)
+            entry.metadata['attach_to_invoice'] = attach_to_invoice
+
             entry.save()
-            
+
             messages.success(request, f"Logged {entry.hours}h for {entry.client.name}.")
-            
-            # SUCCESS: Return the response with the HTMX trigger
             response = redirect('timesheets:timesheet_list')
             response['HX-Trigger'] = 'timesheetAdded'
             return response
         else:
             messages.error(request, "Please correct the errors below.")
-            # If invalid, we redirect back to let the list view re-render the modal/form errors
             return redirect('timesheets:timesheet_list')
 
-    # Fallback for GET requests
     return redirect('timesheets:timesheet_list')
 
 
@@ -379,10 +381,11 @@ def generate_invoice_bulk(request):
                 status=Invoice.Status.DRAFT
             )
 
-            # 3. Aggregate Work Logs into Line Items (Desc + Rate)
+            # 3. Aggregate Work Logs into Line Items (Category + Rate)
             line_items = defaultdict(Decimal) 
             for entry in client_entries:
-                key = (entry.description, entry.hourly_rate)
+                category_name = entry.category.name if entry.category else "General Work"
+                key = (category_name, entry.hourly_rate)
                 line_items[key] += entry.hours
                 
                 # Link the original entry to the invoice for the detailed LaTeX report

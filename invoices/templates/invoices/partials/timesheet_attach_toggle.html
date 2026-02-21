@@ -1,0 +1,29 @@
+{% if invoice.attach_timesheet_to_email %}
+    <button type="submit"
+            class="btn btn-sm btn-warning active"
+            title="Toggle timesheet PDF attachment"
+            hx-indicator="#toggle-spinner-{{ invoice.id }}">
+        <i class="bi bi-paperclip-fill"></i>
+        <span class="d-none d-md-inline">Attached</span>
+        <span id="toggle-spinner-{{ invoice.id }}"
+              class="htmx-indicator"
+              style="display:none;
+                     margin-left:5px">
+            <span class="spinner-border spinner-border-sm text-light" role="status"></span>
+        </span>
+    </button>
+{% else %}
+    <button type="submit"
+            class="btn btn-sm btn-outline-warning"
+            title="Toggle timesheet PDF attachment"
+            hx-indicator="#toggle-spinner-{{ invoice.id }}">
+        <i class="bi bi-paperclip"></i>
+        <span class="d-none d-md-inline">Not Attached</span>
+        <span id="toggle-spinner-{{ invoice.id }}"
+              class="htmx-indicator"
+              style="display:none;
+                     margin-left:5px">
+            <span class="spinner-border spinner-border-sm text-warning" role="status"></span>
+        </span>
+    </button>
+{% endif %}
