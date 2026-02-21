@@ -1,10 +1,10 @@
 from django.urls import path
-
 from . import views
 
 app_name = 'invoices'
 
 urlpatterns = [
+    path('audit/mark-sorted/<int:pk>/', views.mark_anomaly_sorted, name='mark_anomaly_sorted'),
         path('<int:pk>/toggle-attach-timesheet/', views.toggle_attach_timesheet, name='toggle_attach_timesheet'),
     # Dashboard & Lists
     path('<int:pk>/pdf/', views.generate_invoice_pdf_view, name='generate_invoice_pdf_view'),

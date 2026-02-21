@@ -56,7 +56,15 @@
                                     <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
                                 </td>
                                 <td>{{ invoice.client.name }}</td>
-                                <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
+                                <td class="fw-bold text-primary">
+                                    {{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}
+                                    {% if invoice.billed_timesheets.count > 0 %}
+                                        <br>
+                                        <a href="{% url 'timesheets:invoice_time_report' invoice.pk %}"
+                                           target="_blank"
+                                           class="badge bg-info text-dark mt-1">Timesheet PDF</a>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if invoice.is_overdue %}
                                         <span class="badge rounded-pill bg-danger">

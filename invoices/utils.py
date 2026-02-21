@@ -219,6 +219,11 @@ def render_invoice_tex(invoice, template_name='invoice_template.tex'):
 def email_invoice_to_client(invoice):
     """Standard method for sending out new invoices."""
     from .models import Invoice, InvoiceEmailStatusLog
+    # Block sending if flagged anomaly
+    from core.models import BillingAuditLog
+    if BillingAuditLog.objects.filter(invoice=invoice, is_anomaly=True).exists():
+        print(f"Blocked: Invoice {invoice.pk} is flagged as anomaly.")
+        return False
     try:
         latex_source = render_invoice_tex(invoice)
         profile = invoice.user.profile
@@ -258,7 +263,6 @@ def email_invoice_to_client(invoice):
         else:
             sent_messages = email.send()
 
-
         # Now anymail_status will actually be populated
         anymail_status = getattr(email, 'anymail_status', None)
         message_id = anymail_status.message_id if anymail_status else None
@@ -266,7 +270,6 @@ def email_invoice_to_client(invoice):
         print(f"DEBUG: Anymail Status Object: {anymail_status}")
         print(f"DEBUG: Captured Message ID: {message_id}")
 
-        
         # Create the tracking record (One record only)
         InvoiceEmailStatusLog.objects.create(
             user=invoice.user,
@@ -276,7 +279,8 @@ def email_invoice_to_client(invoice):
         )
 
         invoice.last_generated = now()
-        invoice.status = Invoice.Status.PENDING
+        if invoice.status != Invoice.Status.PENDING:
+            invoice.status = Invoice.Status.PENDING
         invoice.save(update_fields=['last_generated', 'status'])
         return True
     except Exception as e:

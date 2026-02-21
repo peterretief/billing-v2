@@ -1,3 +1,24 @@
+
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from core.models import BillingAuditLog
+
+@login_required
+@require_POST
+def mark_anomaly_sorted(request, pk):
+    log = get_object_or_404(BillingAuditLog, pk=pk, user=request.user)
+    log.is_anomaly = False
+    log.save()
+    invoice = log.invoice
+    from .utils import email_invoice_to_client
+    from django.contrib import messages
+    if invoice:
+        sent = email_invoice_to_client(invoice)
+        if sent:
+            messages.success(request, f"Invoice #{invoice.number} resent successfully.")
+        else:
+            messages.error(request, f"Invoice #{invoice.number} could not be resent.")
+    return redirect('invoices:billing_audit_report')
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from datetime import date, timedelta
@@ -276,6 +297,19 @@ def bulk_post(request):
         invoices = Invoice.objects.filter(id__in=invoice_ids, user=request.user, status='DRAFT')
         count = 0
         for inv in invoices:
+            is_anomaly, comment = get_anomaly_status(request.user, inv)
+            if is_anomaly:
+                BillingAuditLog.objects.create(
+                    user=request.user,
+                    invoice=inv,
+                    is_anomaly=True,
+                    ai_comment=comment,
+                    details={
+                        "total": float(inv.total_amount),
+                        "source": "bulk_post"
+                    }
+                )
+                continue  # Skip posting/emailing flagged invoices
             with transaction.atomic():
                 inv.status = 'PENDING'
                 inv.save()
@@ -288,11 +322,10 @@ def bulk_post(request):
                     description__in=item_desc
                 ).update(last_billed_date=timezone.now().date())
 
-                is_anomaly, comment = get_anomaly_status(request.user, inv)
                 BillingAuditLog.objects.create(
                     user=request.user,
                     invoice=inv,
-                    is_anomaly=is_anomaly,
+                    is_anomaly=False,
                     ai_comment=comment,
                     details={
                         "total": float(inv.total_amount),
