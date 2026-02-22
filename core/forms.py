@@ -34,19 +34,20 @@ class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
         fields = [
-            'company_name', 
+            'company_name',
+            'contact_name',
             'business_email',
-            'monthly_target',  # <-- IMPORTANT: Added this back in
+            'monthly_target',
             'currency',
             'invoice_footer',
             'is_vat_registered',
-            'vat_rate', 
-            'phone', 
-            'logo', 
-            'vat_number', 
+            'vat_rate',
+            'phone',
+            'logo',
+            'vat_number',
             'tax_number',
             'vendor_number',
-            'address', 
+            'address',
             'bank_name',
             'account_holder',
             'account_number',

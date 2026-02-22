@@ -226,26 +226,14 @@ class Invoice(TenantModel):
 
     def sync_totals(self):
         """Call this before saving to update the snapshot fields."""
-        self.subtotal_amount = self.calculated_subtotal
-        self.tax_amount = self.calculated_vat
-        self.total_amount = self.calculated_total
+        Invoice.objects.update_totals(self)
 
-# invoices/models.py (Invoice)
-
-def save(self, *args, **kwargs):
-    # Ensure we have default decimals to avoid NoneType errors
-    self.subtotal_amount = self.subtotal_amount or Decimal('0.00')
-    self.total_amount = self.total_amount or Decimal('0.00')
-    
-    super().save(*args, **kwargs)
-    
-    # If we have items but totals are zero, sync them
-    # We do this after super().save() so self.pk exists
-    if hasattr(self, 'billed_items') and self.billed_items.exists():
-        self.sync_totals()
-        # Save again to commit the new totals
-        super().save(update_fields=['subtotal_amount', 'tax_amount', 'total_amount'])
-
+    def save(self, *args, **kwargs):
+        """
+        Directly save the invoice model. Total calculations are handled
+        by the manager or signals to prevent recursion.
+        """
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.number or 'DRAFT'} - {self.client.name}"

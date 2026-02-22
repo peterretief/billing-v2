@@ -1,8 +1,11 @@
 from decimal import Decimal
+
 from django.urls import reverse
 from django.utils import timezone
+
 from core.tests import BaseBillingTest
 from timesheets.models import TimesheetEntry
+
 
 class TimesheetDashboardHoursTest(BaseBillingTest):
     def test_monthly_hours_sum_on_dashboard(self):

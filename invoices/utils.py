@@ -218,9 +218,10 @@ def render_invoice_tex(invoice, template_name='invoice_template.tex'):
 
 def email_invoice_to_client(invoice):
     """Standard method for sending out new invoices."""
-    from .models import Invoice, InvoiceEmailStatusLog
     # Block sending if flagged anomaly
     from core.models import BillingAuditLog
+
+    from .models import Invoice, InvoiceEmailStatusLog
     if BillingAuditLog.objects.filter(invoice=invoice, is_anomaly=True).exists():
         print(f"Blocked: Invoice {invoice.pk} is flagged as anomaly.")
         return False
@@ -329,11 +330,11 @@ def generate_timesheet_pdf(invoice):
     Generates a PDF report of all timesheets billed to the invoice.
     Returns PDF bytes or None if no timesheets.
     """
-    from timesheets.models import TimesheetEntry
-    from django.template.loader import render_to_string
-    from django.template import TemplateDoesNotExist
-    from tempfile import TemporaryDirectory
     import os
+    from tempfile import TemporaryDirectory
+
+    from django.template import TemplateDoesNotExist
+    from django.template.loader import render_to_string
     timesheets = invoice.billed_timesheets.all()
     if not timesheets:
         return None

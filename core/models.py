@@ -116,6 +116,7 @@ class UserProfile(models.Model):
 
     # Business Details
     company_name = models.CharField(max_length=255, blank=True)
+    contact_name = models.CharField(max_length=255, blank=True, help_text="Contact person for email preferences.")
     business_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)

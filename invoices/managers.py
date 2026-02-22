@@ -61,9 +61,18 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
         # Tax Calculation
         tax_amount = Decimal('0.00')
-        if is_registered and invoice.tax_mode != 'NONE':
-            rate = custom_vat_rate / Decimal('100.00')
-            tax_amount = subtotal * rate
+        if is_registered:
+            if invoice.tax_mode == 'FULL':
+                rate = custom_vat_rate / Decimal('100.00')
+                tax_amount = subtotal * rate
+            elif invoice.tax_mode == 'MIXED':
+                # Sum up totals only from taxable items
+                taxable_items_total = sum(
+                    (item.quantity * item.unit_price for item in items if item.is_taxable),
+                    Decimal('0.00')
+                )
+                rate = custom_vat_rate / Decimal('100.00')
+                tax_amount = taxable_items_total * rate
 
         invoice.subtotal_amount = subtotal
         invoice.tax_amount = tax_amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)

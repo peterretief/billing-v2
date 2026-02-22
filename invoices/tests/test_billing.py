@@ -59,3 +59,68 @@ class BillingLogicTest(TestCase):
         print(f"Standard Billing Success: \
               {invoice.number} total is {invoice.total_amount}")
 
+    def test_vat_calculation(self):
+        """Verify that VAT is calculated correctly when enabled."""
+        # Enable VAT for the user
+        self.profile.is_vat_registered = True
+        self.profile.vat_rate = Decimal('15.00')
+        self.profile.save()
+
+        today = timezone.now().date()
+        invoice = Invoice.objects.create(
+            user=self.user,
+            client=self.client,
+            status='DRAFT',
+            date_issued=today,
+            due_date=today + timedelta(days=14),
+            tax_mode=Invoice.TaxMode.FULL
+        )
+        
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
+            invoice=invoice,
+            description="Consulting",
+            quantity=Decimal('10.00'),
+            unit_price=Decimal('200.00'),
+            is_taxable=True
+        )
+        
+        invoice.save() 
+        invoice.refresh_from_db()
+
+        expected_subtotal = Decimal('2000.00')
+        expected_vat = expected_subtotal * (Decimal('15.00') / 100)
+        expected_total = expected_subtotal + expected_vat
+
+        self.assertEqual(invoice.calculated_subtotal, expected_subtotal)
+        self.assertEqual(invoice.calculated_vat, expected_vat)
+        self.assertEqual(invoice.calculated_total, expected_total)
+
+        self.assertEqual(invoice.subtotal_amount, expected_subtotal)
+        self.assertEqual(invoice.tax_amount, expected_vat)
+        self.assertEqual(invoice.total_amount, expected_total)
+        print(f"VAT Billing Success: {invoice.number} total is {invoice.total_amount}")
+
+    def test_resend_invoice_no_recursion(self):
+        """
+        Verify that resending an invoice does not cause a recursion error.
+        """
+        # Create an invoice that is already sent
+        invoice = Invoice.objects.create(
+            user=self.user,
+            client=self.client,
+            status=Invoice.Status.PENDING,
+            date_issued=timezone.now().date(),
+            due_date=timezone.now().date() + timedelta(days=14),
+            total_amount=Decimal('100.00') # Set a dummy amount
+        )
+        
+        # Attempt to save it again, simulating a "resend" action
+        try:
+            invoice.save()
+            # If we get here, there was no recursion error
+            self.assertTrue(True)
+        except RecursionError:
+            self.fail("Resending the invoice caused a RecursionError.")
+

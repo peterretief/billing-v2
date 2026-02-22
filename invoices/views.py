@@ -1,7 +1,9 @@
 
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+
 from core.models import BillingAuditLog
+
 
 @login_required
 @require_POST
@@ -10,8 +12,9 @@ def mark_anomaly_sorted(request, pk):
     log.is_anomaly = False
     log.save()
     invoice = log.invoice
-    from .utils import email_invoice_to_client
     from django.contrib import messages
+
+    from .utils import email_invoice_to_client
     if invoice:
         sent = email_invoice_to_client(invoice)
         if sent:
@@ -19,9 +22,11 @@ def mark_anomaly_sorted(request, pk):
         else:
             messages.error(request, f"Invoice #{invoice.number} could not be resent.")
     return redirect('invoices:billing_audit_report')
+from datetime import date, timedelta
+
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from datetime import date, timedelta
+
 
 @login_required
 @require_POST
@@ -65,7 +70,7 @@ from google import genai
 
 from clients.models import Client
 from core.decorators import setup_required
-from core.models import BillingAuditLog, UserProfile
+from core.models import UserProfile
 from core.utils import get_anomaly_status
 from invoices.models import Invoice, InvoiceEmailStatusLog
 from items.models import Item

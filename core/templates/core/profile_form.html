@@ -1,48 +1,77 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% load crispy_forms_tags %}
-
 {% block title %}User Profile{% endblock %}
-
 {% block content %}
-<div class="container py-4">
-    <h2 class="fw-bold mb-4">Business Profile</h2>
-    <div class="row">
-        <div class="col-md-8">
-            <form method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button type="submit" class="btn btn-primary">Save Profile</button>
-            </form>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card bg-dark text-white shadow-sm">
-                <div class="card-body text-center">
-                    <h6 class="text-uppercase small text-warning">Annual Revenue Forecast</h6>
-                    <h2 class="fw-bold mb-0">{{ profile.currency }} {{ profile.annual_revenue_forecast|intcomma }}</h2>
-                    <hr class="border-secondary">
-                    <p class="small text-muted mb-0">Based on your {{ profile.monthly_target|intcomma }} monthly goal.</p>
+    <div class="container py-4">
+        <h2 class="fw-bold mb-4">Business Profile</h2>
+        <div class="row">
+            <div class="col-md-8">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">{{ form.company_name|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.contact_name|as_crispy_field }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">{{ form.business_email|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.phone|as_crispy_field }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">{{ form.monthly_target|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.currency|as_crispy_field }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">{{ form.is_vat_registered|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.vat_rate|as_crispy_field }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">{{ form.vat_number|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.tax_number|as_crispy_field }}</div>
+                    </div>
+                    {{ form.vendor_number|as_crispy_field }}
+                    {{ form.address|as_crispy_field }}
+                    {{ form.invoice_footer|as_crispy_field }}
+                    {{ form.logo|as_crispy_field }}
+                    <hr class="my-4">
+                    <h4 class="mb-3">Bank Details</h4>
+                    <div class="row">
+                        <div class="col-md-6">{{ form.bank_name|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.account_holder|as_crispy_field }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">{{ form.account_number|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.branch_code|as_crispy_field }}</div>
+                    </div>
+                    {{ form.swift_bic|as_crispy_field }}
+                    <button type="submit" class="btn btn-primary mt-4">Save Profile</button>
+                </form>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-dark text-white shadow-sm">
+                    <div class="card-body text-center">
+                        <h6 class="text-uppercase small text-warning">Annual Revenue Forecast</h6>
+                        <h2 class="fw-bold mb-0">{{ profile.currency }} {{ profile.annual_revenue_forecast|intcomma }}</h2>
+                        <hr class="border-secondary">
+                        <p class="small text-muted mb-0">Based on your {{ profile.monthly_target|intcomma }} monthly goal.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Detect the timezone from the browser
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // 1. Detect the timezone from the browser
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        
-        // 2. Find the timezone input field in your Django form
-        // (Assuming your field ID is id_timezone)
-        const tzField = document.querySelector('#id_timezone');
-        
-        if (tzField && !tzField.value) {
-            tzField.value = userTimezone;
-            console.log("Detected Timezone: " + userTimezone);
-        }
-    });
-</script>
+            // 2. Find the timezone input field in your Django form
+            // (Assuming your field ID is id_timezone)
+            const tzField = document.querySelector('#id_timezone');
 
+            if (tzField && !tzField.value) {
+                tzField.value = userTimezone;
+                console.log("Detected Timezone: " + userTimezone);
+            }
+        });
+    </script>
 {% endblock %}
