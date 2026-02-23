@@ -42,7 +42,7 @@ def get_anomaly_status(user, invoice):
         status__in=['PENDING', 'PAID']
     ).values_list('total_amount', flat=True)[:50]  # Last 50 invoices
     
-    if len(recent_invoices) >= 3:  # Need at least 3 data points for std dev
+    if len(recent_invoices) >= 2:  # Need at least 2 data points for std dev
         amounts = [float(a) for a in recent_invoices]
         mean = sum(amounts) / len(amounts)
         
