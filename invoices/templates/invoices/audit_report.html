@@ -29,7 +29,7 @@
                 <div class="card shadow-sm border-0 bg-success text-white">
                     <div class="card-body">
                         <h6 class="small text-uppercase">Potential Errors Saved</h6>
-                        <h3>{{ GLOBAL_CURRENCY }}{{ potential_errors_value|intcomma }}</h3>
+                        <h3>{{ currency }}{{ potential_errors_value|floatformat:2 }}</h3>
                     </div>
                 </div>
             </div>
@@ -101,7 +101,7 @@
                                 <td>
                                     <small class="text-muted">{{ log.ai_comment|default:"Regular cycle run" }}</small>
                                 </td>
-                                <td class="text-end fw-bold">{{ GLOBAL_CURRENCY }}{{ log.details.total|default:"0"|intcomma }}</td>
+                                <td class="text-end fw-bold">{{ currency }}{{ log.details.total|default:"0"|floatformat:2 }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>

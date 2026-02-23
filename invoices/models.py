@@ -278,8 +278,9 @@ class Payment(TenantModel):
                 f"balance due ({currency} {self.invoice.balance_due})"
             )
 
-        if self.amount <= 0:
-            raise ValidationError("Payment amount must be greater than zero")
+        # Allow amount=0 for credit-only payments
+        if self.amount < 0:
+            raise ValidationError("Payment amount cannot be negative")
 
 
 # invoices/models.py (Payment)

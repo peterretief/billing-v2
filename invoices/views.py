@@ -144,9 +144,13 @@ def get_payment_modal(request, pk):
         total=Coalesce(Sum('balance'), Decimal('0.00'))
     )['total']
     
+    # Get user's currency
+    currency = request.user.profile.currency if hasattr(request.user, 'profile') else 'R'
+    
     context = {
         'invoice': invoice,
         'available_credit': available_credit,
+        'currency': currency,
     }
     return render(request, 'invoices/partials/payment_modal_content.html', context)
 
@@ -553,9 +557,11 @@ def record_payment(request, pk):
                         
                         credits_used += amount_to_use
                         remaining_to_apply -= amount_to_use
-                
                 # Record the payment (after credits subtracted)
                 final_payment_amount = amount - credits_used
+                
+                # Get user's currency for messages
+                currency = request.user.profile.currency if hasattr(request.user, 'profile') else 'R'
                 
                 # Allow payments with amount > 0, or credit-only payments
                 if final_payment_amount > 0 or credits_used > 0:
@@ -569,12 +575,12 @@ def record_payment(request, pk):
                     if credits_used > 0 and final_payment_amount > 0:
                         messages.success(
                             request, 
-                            f"Payment recorded: R{final_payment_amount:.2f} cash + R{credits_used:.2f} credit applied."
+                            f"Payment recorded: {currency}{final_payment_amount:.2f} cash + {currency}{credits_used:.2f} credit applied."
                         )
                     elif credits_used > 0:
-                        messages.success(request, f"Payment recorded with R{credits_used:.2f} credit applied.")
+                        messages.success(request, f"Payment recorded with {currency}{credits_used:.2f} credit applied.")
                     else:
-                        messages.success(request, f"Payment of R{final_payment_amount:.2f} recorded.")
+                        messages.success(request, f"Payment of {currency}{final_payment_amount:.2f} recorded.")
 
             if request.headers.get('HX-Request'):
                 response = HttpResponse(status=204)
@@ -709,6 +715,9 @@ def billing_audit_report(request):
     potential_errors_value = sum([Decimal(str(d.get('total', 0))) for d in anomaly_details])
 
     success_count = logs.filter(invoice__status__in=['PENDING', 'PAID']).count()
+    
+    # Get user's currency
+    currency = request.user.profile.currency if hasattr(request.user, 'profile') else 'R'
 
     context = {
         'total_logs': total_logs,
@@ -720,5 +729,6 @@ def billing_audit_report(request):
         'manual_count': logs.filter(details__source='manual_create').count(),
         'bulk_count': logs.filter(details__source='bulk_post').count(),
         'scheduler_count': logs.filter(details__source='recurring_scheduler').count(),
+        'currency': currency,
     }
     return render(request, 'invoices/audit_report.html', context)

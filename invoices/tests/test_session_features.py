@@ -37,10 +37,11 @@ class AuditSystemTest(TestCase):
 
     def _create_invoice_with_item(self, amount):
         """Helper to create invoice with item at specific amount."""
+        import random
         invoice = Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
-            number=f"INV-{int(timezone.now().timestamp())}",
+            number=f"INV-{int(timezone.now().timestamp())}-{random.randint(1000, 9999)}",
             status='DRAFT',
             date_issued=self.today,
             due_date=self.today + timedelta(days=14)
@@ -62,23 +63,45 @@ class AuditSystemTest(TestCase):
         return invoice
 
     def test_audit_flags_very_low_amount(self):
-        """Test that invoices under £10 are flagged."""
+        """Test that suspiciously low amounts (0.1% of average) are flagged."""
         from core.utils import get_anomaly_status
         
-        invoice = self._create_invoice_with_item(Decimal('5.00'))
-        is_anomaly, comment = get_anomaly_status(self.user, invoice)
+        # First create normal invoices with PENDING status to establish a baseline
+        invoice1 = self._create_invoice_with_item(Decimal('1000.00'))
+        invoice1.status = 'PENDING'
+        invoice1.save()
+        
+        invoice2 = self._create_invoice_with_item(Decimal('900.00'))
+        invoice2.status = 'PENDING'
+        invoice2.save()
+        
+        # Now test a very low amount (5% of average is ~R95, which is more than 5%)
+        # So we need something much lower; let's use 1% of average which is ~R19
+        invoice3 = self._create_invoice_with_item(Decimal('5.00'))
+        is_anomaly, comment = get_anomaly_status(self.user, invoice3)
         
         self.assertTrue(is_anomaly)
-        self.assertIn('10', comment.lower())
+        self.assertIn('unusually low', comment.lower())
 
     def test_audit_flags_high_threshold(self):
-        """Test that invoices over £5000 are flagged."""
+        """Test that invoices much higher than average (3x+) are flagged."""
         from core.utils import get_anomaly_status
         
-        invoice = self._create_invoice_with_item(Decimal('5500.00'))
+        # Create normal baseline invoices with PENDING status
+        baseline1 = self._create_invoice_with_item(Decimal('1000.00'))
+        baseline1.status = 'PENDING'
+        baseline1.save()
+        
+        baseline2 = self._create_invoice_with_item(Decimal('900.00'))
+        baseline2.status = 'PENDING'
+        baseline2.save()
+        
+        # Now test an invoice that is 3.5x the average - should be flagged
+        invoice = self._create_invoice_with_item(Decimal('3500.00'))
         is_anomaly, comment = get_anomaly_status(self.user, invoice)
         
         self.assertTrue(is_anomaly)
+        self.assertIn('above your average', comment.lower())
 
     def test_audit_clears_normal_amounts(self):
         """Test that normal amounts pass audit."""
