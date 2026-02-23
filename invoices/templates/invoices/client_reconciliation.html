@@ -9,7 +9,13 @@
                 <h1>Reconciliation Statement</h1>
                 <h4 class="text-muted">{{ client.name }}</h4>
             </div>
-            <div class="btn-group">
+            <div class="btn-group" role="group">
+                {% if user.is_staff or user.is_superuser %}
+                    <a href="{% url 'invoices:create_credit_note_for_client' client.id %}"
+                       class="btn btn-sm btn-success">
+                        <i class="bi bi-plus-circle me-1"></i> Create Credit Note
+                    </a>
+                {% endif %}
                 <a href="{% url 'invoices:client_reconciliation_csv' client.id %}?start_date={{ start_date }}&end_date={{ end_date }}"
                    class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-download"></i> CSV

@@ -46,4 +46,8 @@ urlpatterns = [
     path('reconciliation/client/<int:client_id>/', recon_views.client_reconciliation_statement, name='client_reconciliation'),
     path('reconciliation/client/<int:client_id>/pdf/', recon_views.client_reconciliation_pdf, name='client_reconciliation_pdf'),
     path('reconciliation/client/<int:client_id>/csv/', recon_views.client_reconciliation_csv, name='client_reconciliation_csv'),
+    
+    # Credit Notes
+    path('credit-note/create/', recon_views.create_credit_note, name='create_credit_note'),
+    path('credit-note/create/<int:client_id>/', recon_views.create_credit_note, name='create_credit_note_for_client'),
 ]

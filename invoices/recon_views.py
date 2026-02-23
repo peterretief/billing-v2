@@ -7,16 +7,18 @@ import csv
 import io
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import HttpResponse, FileResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
+from django.contrib import messages
 
 from clients.models import Client
 from invoices.models import Invoice, CreditNote
 from invoices.reconciliation import ClientReconciliation, AllClientsReconciliation
+from invoices.forms import CreditNoteForm
 
 # For PDF generation
 try:
@@ -328,3 +330,63 @@ def client_reconciliation_csv(request, client_id):
         ])
     
     return response
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def create_credit_note(request, client_id=None):
+    """
+    User-friendly form to create a credit note.
+    Optionally pre-select client by client_id in URL.
+    """
+    selected_client = None
+    if client_id:
+        selected_client = get_object_or_404(Client, id=client_id, user=request.user)
+    
+    if request.method == 'POST':
+        form = CreditNoteForm(request.POST, user=request.user)
+        if form.is_valid():
+            credit_note = form.save(commit=False)
+            credit_note.user = request.user
+            
+            # Auto-generate reference if not provided
+            if not credit_note.reference:
+                # Get last credit note reference for this year
+                year = timezone.now().year
+                last_cn = CreditNote.objects.filter(
+                    user=request.user,
+                    reference__startswith=f'CN{year}'
+                ).order_by('-reference').first()
+                
+                if last_cn:
+                    # Extract sequence number and increment
+                    try:
+                        seq = int(last_cn.reference.split('-')[-1]) + 1
+                    except (ValueError, IndexError):
+                        seq = 1
+                else:
+                    seq = 1
+                
+                credit_note.reference = f'CN{year}-{seq:04d}'
+            
+            credit_note.save()
+            messages.success(request, f'Credit note {credit_note.reference} created successfully for {credit_note.client.name}')
+            
+            # Redirect to client reconciliation if available
+            if selected_client:
+                return redirect('invoices:client_reconciliation_statement', client_id=selected_client.id)
+            else:
+                return redirect('invoices:all_clients_reconciliation')
+    else:
+        initial_data = {}
+        if selected_client:
+            initial_data['client'] = selected_client
+        form = CreditNoteForm(user=request.user, initial=initial_data)
+    
+    context = {
+        'form': form,
+        'selected_client': selected_client,
+        'page_title': f'Create Credit Note - {selected_client.name}' if selected_client else 'Create Credit Note',
+    }
+    
+    return render(request, 'invoices/create_credit_note.html', context)
