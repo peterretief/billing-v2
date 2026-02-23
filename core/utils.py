@@ -1,4 +1,6 @@
-from django.db.models import Avg
+from django.db.models import Avg, StdDev
+from statistics import stdev
+from decimal import Decimal
 
 from invoices.models import Invoice
 
@@ -7,9 +9,14 @@ from .models import UserGroup
 
 def get_anomaly_status(user, invoice):
     """
-    Detects anomalies relative to the user's own billing history
-    rather than fixed currency amounts.
-    Uses the user's billing pattern as the baseline.
+    Detects anomalies relative to the user's own billing history.
+    Uses mean and standard deviation to adapt to currency variance.
+    
+    For weaker currencies (ZAR, INR, etc), higher variance is expected.
+    For stronger currencies (EUR, GBP, etc), lower variance is expected.
+    
+    Flags invoices that are statistical outliers (>2 std devs from mean).
+    Adapts thresholds based on coefficient of variation.
     """
     comments = []
     is_anomaly = False
@@ -29,26 +36,60 @@ def get_anomaly_status(user, invoice):
         is_anomaly = True
         comments.append("Invoice total is zero")
 
-    # 2. Statistical anomaly — flag if > 3x the user's average invoice (less aggressive than 2x)
-    avg = Invoice.objects.filter(
+    # 2. Statistical anomaly using standard deviation (accounts for currency variance)
+    recent_invoices = Invoice.objects.filter(
         user=user,
         status__in=['PENDING', 'PAID']
-    ).aggregate(avg=Avg('total_amount'))['avg']
+    ).values_list('total_amount', flat=True)[:50]  # Last 50 invoices
+    
+    if len(recent_invoices) >= 3:  # Need at least 3 data points for std dev
+        amounts = [float(a) for a in recent_invoices]
+        mean = sum(amounts) / len(amounts)
+        
+        if mean > 0:
+            # Calculate standard deviation (adapts to currency)
+            variance = sum((x - mean) ** 2 for x in amounts) / len(amounts)
+            std_dev = variance ** 0.5
+            
+            # Coefficient of variation (CV) measures relative variance
+            # CV > 0.8 means high variance (weaker currencies often have this)
+            # CV < 0.2 means low variance (stable invoice patterns)
+            cv = std_dev / mean if mean > 0 else 0
+            
+            current_amount = float(invoice.total_amount)
+            
+            # Minimum threshold to prevent false positives
+            # Even with low variance, allow up to 15% variance as natural
+            min_threshold = mean * 0.15
+            adjusted_std_dev = max(std_dev, min_threshold)
+            
+            # Adaptive threshold: more lenient for high-variance currencies
+            if cv > 0.8:
+                # High variance: use 2.5 sigma (catches ~1.2% outliers)
+                threshold_upper = mean + (2.5 * adjusted_std_dev)
+                threshold_lower = mean - (2 * adjusted_std_dev)
+            elif cv > 0.5:
+                # Medium variance: use 2 sigma (catches ~2.3% outliers)
+                threshold_upper = mean + (2 * adjusted_std_dev)
+                threshold_lower = mean - (1.5 * adjusted_std_dev)
+            else:
+                # Low variance (stable): use 1.5 sigma (catches ~6.7% outliers)
+                threshold_upper = mean + (1.5 * adjusted_std_dev)
+                threshold_lower = mean - (1.5 * adjusted_std_dev)
+            
+            # Flag high outliers
+            if current_amount > threshold_upper:
+                ratio = current_amount / mean
+                is_anomaly = True
+                comments.append(f"Invoice is {ratio:.1f}x above your average (high outlier)")
+            
+            # Flag low outliers (but only if significantly low)
+            if 0 < current_amount < threshold_lower and current_amount < mean * 0.1:
+                ratio = current_amount / mean if mean > 0 else 0
+                is_anomaly = True
+                comments.append(f"Invoice is unusually low — {ratio*100:.1f}% of average")
 
-    if avg and avg > 0:
-        ratio = float(invoice.total_amount) / float(avg)
-        if ratio > 3:  # More permissive: 3x instead of 2x
-            is_anomaly = True
-            comments.append(f"Invoice is {ratio:.1f}x above your average ({currency}{avg:.2f})")
-
-    # 3. Unusually low — flag if less than 5% of average (less aggressive, was 10%)
-    if avg and avg > 0:
-        ratio = float(invoice.total_amount) / float(avg)
-        if 0 < ratio < 0.05:
-            is_anomaly = True
-            comments.append(f"Invoice is unusually low — only {ratio*100:.1f}% of your average")
-
-    # 4. No client email — will fail to send
+    # 3. No client email — will fail to send
     if not invoice.client.email:
         is_anomaly = True
         comments.append("Client has no email address")
