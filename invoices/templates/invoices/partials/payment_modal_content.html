@@ -62,9 +62,11 @@
                            name="amount"
                            step="0.01"
                            class="form-control"
-                           value="{{ invoice.balance_due|unlocalize }}"
+                           value="0"
                            min="0"
-                           max="{{ invoice.balance_due|unlocalize }}">
+                           max="{{ invoice.balance_due|unlocalize }}"
+                           data-balance-due="{{ invoice.balance_due|unlocalize }}"
+                           data-available-credit="{{ available_credit|unlocalize }}">
                 </div>
                 <small class="form-text text-muted d-block mt-1">
                     Enter the cash/EFT amount. Leave at <strong>0</strong> if paying entirely with credit.
@@ -83,7 +85,7 @@
                                name="credit_to_apply"
                                step="0.01"
                                class="form-control"
-                               value="0"
+                               value="{% if available_credit >= invoice.balance_due %}{{ invoice.balance_due|unlocalize }}{% else %}{{ available_credit|unlocalize }}{% endif %}"
                                min="0"
                                max="{{ available_credit|unlocalize }}"
                                data-max-credit="{{ available_credit|unlocalize }}">
@@ -170,9 +172,35 @@
         const totalSpan = document.getElementById('totalToPay');
         const submitBtn = document.getElementById('submitBtn');
         const creditMaxBtn = document.getElementById('creditMaxBtn');
-        const invoiceBalance = parseFloat(cashInput.value) || 0;
 
-        // Get max credit from data attribute instead of parsing max attribute
+        // Get values from data attributes
+        const balanceDue = parseFloat(cashInput.dataset.balanceDue) || 0;
+        const availableCredit = parseFloat(cashInput.dataset.availableCredit) || 0;
+
+        // Initialize smart defaults on page load
+        function initializeDefaults() {
+            if (availableCredit > 0 && creditInput) {
+                // If we have credit, calculate optimal distribution
+                if (availableCredit >= balanceDue) {
+                    // Credit covers everything
+                    cashInput.value = '0';
+                    creditInput.value = balanceDue.toFixed(2);
+                    creditInput.max = availableCredit;
+                } else {
+                    // Credit is partial, calculate remaining cash needed
+                    const cashNeeded = balanceDue - availableCredit;
+                    cashInput.value = cashNeeded.toFixed(2);
+                    creditInput.value = availableCredit.toFixed(2);
+                    creditInput.max = availableCredit;
+                }
+            } else {
+                // No credit available, require full cash payment
+                cashInput.value = balanceDue.toFixed(2);
+            }
+            updateTotal();
+        }
+
+        // Get max credit from data attribute
         function getMaxCredit() {
             if (!creditInput) return 0;
             const dataMaxCredit = creditInput.dataset.maxCredit;
@@ -191,9 +219,9 @@
             const discountValue = parseFloat(selectedOption.dataset.discountValue);
 
             if (discountType === 'PERCENTAGE') {
-                return (invoiceBalance * discountValue) / 100;
+                return (balanceDue * discountValue) / 100;
             } else {
-                return Math.min(discountValue, invoiceBalance);
+                return Math.min(discountValue, balanceDue);
             }
         }
 
@@ -239,6 +267,9 @@
                 }
 
                 creditInput.value = maxCredit.toFixed(2);
+                // Update cash to cover the remaining balance
+                const remainingCash = Math.max(0, balanceDue - maxCredit);
+                cashInput.value = remainingCash.toFixed(2);
                 updateTotal();
                 creditInput.focus();
             });
@@ -258,7 +289,7 @@
             couponSelect.addEventListener('change', updateTotal);
         }
 
-        // Initial check
-        updateTotal();
+        // Initialize with smart defaults
+        initializeDefaults();
     });
 </script>
