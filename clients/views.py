@@ -54,7 +54,8 @@ class ClientListView(LoginRequiredMixin, ListView):
                 Q(client_code__icontains=q) |
                 Q(email__icontains=q)
             )
-        return qs
+        # Ensure consistent ordering for pagination
+        return qs.order_by('name')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
