@@ -102,6 +102,37 @@
                 <input type="hidden" name="credit_to_apply" value="0">
             {% endif %}
             <hr class="my-3">
+            <!-- Coupon Application -->
+            {% if available_coupons %}
+                <div class="mb-4">
+                    <label class="form-label fw-bold small text-uppercase text-muted">
+                        <i class="bi bi-ticket me-1"></i> Apply Coupon (Optional)
+                    </label>
+                    <div class="input-group">
+                        <select id="couponSelect" name="coupon_code" class="form-select">
+                            <option value="">-- No Coupon --</option>
+                            {% for coupon in available_coupons %}
+                                <option value="{{ coupon.code }}"
+                                        data-discount-type="{{ coupon.discount_type }}"
+                                        data-discount-value="{{ coupon.discount_value }}">
+                                    {{ coupon.code }}
+                                    {% if coupon.discount_type == 'PERCENTAGE' %}
+                                        ({{ coupon.discount_value }}% off)
+                                    {% else %}
+                                        ({{ currency }}{{ coupon.discount_value }} off)
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <small class="form-text text-muted d-block mt-2">
+                        <strong>Discount preview:</strong> <span id="couponDiscount">{{ currency }}0.00</span>
+                    </small>
+                </div>
+            {% else %}
+                <input type="hidden" name="coupon_code" value="">
+            {% endif %}
+            <hr class="my-3">
             <!-- Reference -->
             <div class="mb-2">
                 <label class="form-label fw-bold small text-uppercase text-muted">Reference / Method</label>
@@ -132,14 +163,40 @@
     document.addEventListener('DOMContentLoaded', function() {
         const cashInput = document.getElementById('paymentAmount');
         const creditInput = document.getElementById('creditToApply');
+        const couponSelect = document.getElementById('couponSelect');
+        const couponDiscount = document.getElementById('couponDiscount');
         const totalSpan = document.getElementById('totalToPay');
         const submitBtn = document.getElementById('submitBtn');
         const creditMaxBtn = document.getElementById('creditMaxBtn');
         const maxCreditValue = creditInput ? parseFloat(creditInput.max) : 0;
+        const invoiceBalance = parseFloat(cashInput.value) || 0;
+
+        function calculateCouponDiscount() {
+            if (!couponSelect || !couponSelect.value) {
+                return 0;
+            }
+            const selectedOption = couponSelect.options[couponSelect.selectedIndex];
+            const discountType = selectedOption.dataset.discountType;
+            const discountValue = parseFloat(selectedOption.dataset.discountValue);
+
+            if (discountType === 'PERCENTAGE') {
+                return (invoiceBalance * discountValue) / 100;
+            } else {
+                return Math.min(discountValue, invoiceBalance);
+            }
+        }
 
         function updateTotal() {
             const cash = parseFloat(cashInput.value) || 0;
             const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
+            const couponDisc = calculateCouponDiscount();
+
+            // Update coupon display
+            if (couponDiscount) {
+                const currency = document.querySelector('[data-currency]')?.dataset.currency || 'R';
+                couponDiscount.textContent = couponDisc.toFixed(2);
+            }
+
             const total = cash + credit;
 
             if (totalSpan) {
@@ -175,6 +232,10 @@
         if (creditInput) {
             creditInput.addEventListener('change', updateTotal);
             creditInput.addEventListener('keyup', updateTotal);
+        }
+
+        if (couponSelect) {
+            couponSelect.addEventListener('change', updateTotal);
         }
 
         // Initial check

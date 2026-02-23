@@ -1,6 +1,7 @@
 
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
+from django.db import models
 
 from core.models import BillingAuditLog
 
@@ -133,7 +134,7 @@ def get_payment_modal(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     
     # Get available credit balance for the client
-    from invoices.models import CreditNote
+    from invoices.models import CreditNote, Coupon
     from django.db.models import Sum
     from django.db.models.functions import Coalesce
     
@@ -144,12 +145,26 @@ def get_payment_modal(request, pk):
         total=Coalesce(Sum('balance'), Decimal('0.00'))
     )['total']
     
+    # Get valid coupons for this user
+    from django.utils import timezone
+    today = timezone.now().date()
+    available_coupons = Coupon.objects.filter(
+        user=request.user,
+        is_active=True,
+        valid_from__lte=today
+    ).exclude(
+        valid_until__lt=today
+    ).exclude(
+        max_uses=models.F('current_uses')
+    ).values('id', 'code', 'discount_type', 'discount_value')
+    
     # Get user's currency
     currency = request.user.profile.currency if hasattr(request.user, 'profile') else 'R'
     
     context = {
         'invoice': invoice,
         'available_credit': available_credit,
+        'available_coupons': available_coupons,
         'currency': currency,
     }
     return render(request, 'invoices/partials/payment_modal_content.html', context)
@@ -530,6 +545,23 @@ def record_payment(request, pk):
                 return redirect(next_url)
 
             with transaction.atomic():
+                # Apply coupon if requested
+                coupon_discount = Decimal('0.00')
+                coupon_code = request.POST.get('coupon_code', '').strip()
+                if coupon_code:
+                    from invoices.models import Coupon
+                    from django.utils import timezone
+                    
+                    try:
+                        coupon = Coupon.objects.get(user=request.user, code=coupon_code)
+                        if coupon.is_valid():
+                            coupon_discount = coupon.apply_discount(invoice.balance_due)
+                            coupon.use()
+                        else:
+                            messages.warning(request, f"Coupon '{coupon_code}' is no longer valid.")
+                    except Coupon.DoesNotExist:
+                        messages.warning(request, f"Coupon '{coupon_code}' not found.")
+                
                 # Apply credit notes if requested
                 credits_used = Decimal('0.00')
                 if credit_to_apply > 0:
@@ -557,14 +589,15 @@ def record_payment(request, pk):
                         
                         credits_used += amount_to_use
                         remaining_to_apply -= amount_to_use
-                # Record the payment (after credits subtracted)
-                final_payment_amount = amount - credits_used
+                
+                # Record the payment (after credits subtracted and coupon applied)
+                final_payment_amount = amount - credits_used - coupon_discount
                 
                 # Get user's currency for messages
                 currency = request.user.profile.currency if hasattr(request.user, 'profile') else 'R'
                 
                 # Allow payments with amount > 0, or credit-only payments
-                if final_payment_amount > 0 or credits_used > 0:
+                if final_payment_amount > 0 or credits_used > 0 or coupon_discount > 0:
                     Payment.objects.create(
                         user=request.user,
                         invoice=invoice,
@@ -572,15 +605,21 @@ def record_payment(request, pk):
                         reference=request.POST.get('reference', 'Manual Payment')
                     )
                     
-                    if credits_used > 0 and final_payment_amount > 0:
-                        messages.success(
-                            request, 
-                            f"Payment recorded: {currency}{final_payment_amount:.2f} cash + {currency}{credits_used:.2f} credit applied."
-                        )
-                    elif credits_used > 0:
-                        messages.success(request, f"Payment recorded with {currency}{credits_used:.2f} credit applied.")
+                    # Build success message with all payment components
+                    message_parts = []
+                    if final_payment_amount > 0:
+                        message_parts.append(f"{currency}{final_payment_amount:.2f} cash")
+                    if credits_used > 0:
+                        message_parts.append(f"{currency}{credits_used:.2f} credit")
+                    if coupon_discount > 0:
+                        message_parts.append(f"{currency}{coupon_discount:.2f} coupon")
+                    
+                    if len(message_parts) == 1:
+                        payment_desc = f"Payment recorded: {message_parts[0]}."
                     else:
-                        messages.success(request, f"Payment of {currency}{final_payment_amount:.2f} recorded.")
+                        payment_desc = f"Payment recorded: {' + '.join(message_parts)}."
+                    
+                    messages.success(request, payment_desc)
 
             if request.headers.get('HX-Request'):
                 response = HttpResponse(status=204)

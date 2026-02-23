@@ -2,7 +2,7 @@
 # /opt/billing_v2/invoices/admin.py
 from django.contrib import admin
 
-from .models import Invoice, InvoiceEmailStatusLog, CreditNote
+from .models import Invoice, InvoiceEmailStatusLog, CreditNote, Coupon
 from core.models import BillingAuditLog
 
 
@@ -35,6 +35,30 @@ class CreditNoteAdmin(admin.ModelAdmin):
         }),
         ('Documentation', {
             'fields': ('reference', 'description')
+        }),
+        ('Audit Trail', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display = ('code', 'discount_type', 'discount_value', 'current_uses', 'max_uses', 'valid_until', 'is_active')
+    list_filter = ('is_active', 'discount_type', 'valid_from', 'valid_until')
+    search_fields = ('code', 'description')
+    readonly_fields = ('current_uses', 'created_at', 'updated_at')
+    
+    fieldsets = (
+        ('Coupon Code & Discount', {
+            'fields': ('code', 'discount_type', 'discount_value', 'description')
+        }),
+        ('Usage Limits', {
+            'fields': ('max_uses', 'current_uses')
+        }),
+        ('Validity', {
+            'fields': ('is_active', 'valid_from', 'valid_until')
         }),
         ('Audit Trail', {
             'fields': ('created_at', 'updated_at'),

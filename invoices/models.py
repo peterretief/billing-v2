@@ -348,6 +348,71 @@ class CreditNote(TenantModel):
         return f"CN - {self.client.name} - {self.user.profile.currency} {self.amount} ({self.issued_date})"
 
 
+class Coupon(TenantModel):
+    """
+    Promotional coupons that provide discounts on invoices.
+    Can be fixed amount or percentage-based.
+    Can be applied multiple times until expiry or usage limit reached.
+    """
+    
+    class DiscountType(models.TextChoices):
+        FIXED = 'FIXED', 'Fixed Amount'
+        PERCENTAGE = 'PERCENTAGE', 'Percentage Discount'
+    
+    code = models.CharField(max_length=50, help_text="e.g., SUMMER2026, LOYAL10")
+    discount_type = models.CharField(max_length=20, choices=DiscountType.choices, default=DiscountType.FIXED)
+    discount_value = models.DecimalField(max_digits=12, decimal_places=2,
+                                         help_text="Fixed amount or percentage (e.g., 10.00 for 10% or R500)")
+    
+    description = models.TextField(blank=True, help_text="Coupon description for internal use")
+    
+    # Usage tracking
+    max_uses = models.IntegerField(null=True, blank=True, help_text="Unlimited if blank")
+    current_uses = models.IntegerField(default=0, help_text="Number of times coupon has been used")
+    
+    # Validity
+    valid_from = models.DateField(default=timezone.now)
+    valid_until = models.DateField(null=True, blank=True, help_text="Null = no expiry")
+    is_active = models.BooleanField(default=True)
+    
+    # Audit trail
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ('user', 'code')
+    
+    def is_valid(self):
+        """Check if coupon is currently valid."""
+        today = timezone.now().date()
+        if not self.is_active:
+            return False
+        if today < self.valid_from:
+            return False
+        if self.valid_until and today > self.valid_until:
+            return False
+        if self.max_uses and self.current_uses >= self.max_uses:
+            return False
+        return True
+    
+    def apply_discount(self, invoice_amount):
+        """Calculate discount amount based on type."""
+        if self.discount_type == self.DiscountType.FIXED:
+            return min(self.discount_value, invoice_amount)
+        else:  # PERCENTAGE
+            return (invoice_amount * self.discount_value) / Decimal('100')
+    
+    def use(self):
+        """Mark coupon as used."""
+        self.current_uses += 1
+        self.save()
+    
+    def __str__(self):
+        discount_str = f"{self.discount_value}%" if self.discount_type == self.DiscountType.PERCENTAGE else f"{self.user.profile.currency}{self.discount_value}"
+        return f"{self.code} - {discount_str}"
+
+
 class VATReport(TenantModel):
     month = models.IntegerField()
     year = models.IntegerField()
