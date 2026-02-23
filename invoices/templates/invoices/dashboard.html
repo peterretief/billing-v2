@@ -125,12 +125,10 @@
                                class="btn btn-white border text-start">
                                 <i class="bi bi-shield-check me-2 text-warning"></i> AI Audit Report
                             </a>
-                            {% if user.is_staff or user.is_superuser %}
-                                <a href="{% url 'invoices:create_credit_note' %}"
-                                   class="btn btn-white border text-start">
-                                    <i class="bi bi-credit-card me-2"></i> Create Credit Note
-                                </a>
-                            {% endif %}
+                            <a href="{% url 'invoices:create_credit_note' %}"
+                               class="btn btn-white border text-start">
+                                <i class="bi bi-credit-card me-2"></i> Create Credit Note
+                            </a>
                             <a href="{% url 'invoices:invoice_list' %}"
                                class="btn btn-white border text-start">
                                 <i class="bi bi-files me-2"></i> All Invoices
