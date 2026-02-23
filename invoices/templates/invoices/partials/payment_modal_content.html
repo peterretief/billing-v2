@@ -66,8 +66,7 @@
                            min="0"
                            max="{{ invoice.balance_due|unlocalize }}"
                            data-balance-due="{{ invoice.balance_due|unlocalize }}"
-                           data-available-credit="{{ available_credit|unlocalize }}"
-                           required>
+                           data-available-credit="{{ available_credit|unlocalize }}">
                 </div>
                 <small class="form-text text-muted d-block mt-1">
                     The form will auto-calculate this based on your credit balance.
@@ -89,8 +88,7 @@
                                placeholder="0.00"
                                min="0"
                                max="{{ available_credit|unlocalize }}"
-                               data-max-credit="{{ available_credit|unlocalize }}"
-                               required>
+                               data-max-credit="{{ available_credit|unlocalize }}">
                         <button type="button"
                                 class="btn btn-outline-secondary"
                                 id="creditMaxBtn"
