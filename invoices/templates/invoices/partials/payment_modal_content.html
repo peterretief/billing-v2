@@ -85,10 +85,12 @@
                                class="form-control"
                                value="0"
                                min="0"
-                               max="{{ available_credit|unlocalize }}">
+                               max="{{ available_credit|unlocalize }}"
+                               data-max-credit="{{ available_credit|unlocalize }}">
                         <button type="button"
                                 class="btn btn-outline-secondary"
                                 id="creditMaxBtn"
+                                data-available-credit="{{ available_credit|unlocalize }}"
                                 title="Use full available credit">Max</button>
                     </div>
                     <small class="form-text text-muted d-block mt-2">
@@ -168,8 +170,17 @@
         const totalSpan = document.getElementById('totalToPay');
         const submitBtn = document.getElementById('submitBtn');
         const creditMaxBtn = document.getElementById('creditMaxBtn');
-        const maxCreditValue = creditInput ? parseFloat(creditInput.max) : 0;
         const invoiceBalance = parseFloat(cashInput.value) || 0;
+
+        // Get max credit from data attribute instead of parsing max attribute
+        function getMaxCredit() {
+            if (!creditInput) return 0;
+            const dataMaxCredit = creditInput.dataset.maxCredit;
+            if (dataMaxCredit) {
+                return parseFloat(dataMaxCredit) || 0;
+            }
+            return parseFloat(creditInput.max) || 0;
+        }
 
         function calculateCouponDiscount() {
             if (!couponSelect || !couponSelect.value) {
@@ -214,11 +225,20 @@
             }
         }
 
-        // Max button handler
-        if (creditMaxBtn && creditInput) {
+        // Max button handler - read credit from button's data attribute
+        if (creditMaxBtn) {
             creditMaxBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                creditInput.value = maxCreditValue.toFixed(2);
+                if (!creditInput) return;
+
+                // Get max credit from button's data attribute for reliability
+                let maxCredit = parseFloat(creditMaxBtn.dataset.availableCredit);
+                if (isNaN(maxCredit)) {
+                    // Fallback to input's data attribute
+                    maxCredit = getMaxCredit();
+                }
+
+                creditInput.value = maxCredit.toFixed(2);
                 updateTotal();
                 creditInput.focus();
             });
