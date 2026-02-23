@@ -122,6 +122,34 @@
                                     </li>
                                 </ul>
                             </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle {% if 'reconciliation' in request.path or 'audit-report' in request.path %}active{% endif %}"
+                                   href="#"
+                                   data-bs-toggle="dropdown"><i class="bi bi-file-earmark-text me-1"></i>Reports</a>
+                                <ul class="dropdown-menu shadow">
+                                    <li>
+                                        <a class="dropdown-item {% if 'reconciliation' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'invoices:all_clients_reconciliation' %}">
+                                            <i class="bi bi-graph-up me-2"></i>Reconciliation
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'audit-report' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'invoices:billing_audit_report' %}">
+                                            <i class="bi bi-shield-check me-2"></i>Audit Report
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item"
+                                           href="{% url 'admin:invoices_creditnote_changelist' %}">
+                                            <i class="bi bi-credit-card me-2"></i>Credit Notes
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
                         </ul>
                         <ul class="navbar-nav ms-auto align-items-center">
                             <li class="nav-item dropdown">
