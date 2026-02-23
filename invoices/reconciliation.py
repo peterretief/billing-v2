@@ -168,34 +168,55 @@ class ClientReconciliation:
         """Get summary statistics for the period."""
         transactions = self.get_transactions()
         
+        # Build filters conditionally based on start_date
+        invoice_filter = {
+            'user': self.user,
+            'client': self.client,
+            'date_issued__lte': self.end_date,
+            'status__in': ['PENDING', 'PAID', 'OVERDUE']
+        }
+        if self.start_date:
+            invoice_filter['date_issued__gte'] = self.start_date
+        
         invoices_sent = Invoice.objects.filter(
-            user=self.user,
-            client=self.client,
-            date_issued__gte=self.start_date,
-            date_issued__lte=self.end_date,
-            status__in=['PENDING', 'PAID', 'OVERDUE']
+            **invoice_filter
         ).aggregate(total=Coalesce(Sum('total_amount'), Decimal('0.00')))['total']
+        
+        cancelled_filter = {
+            'user': self.user,
+            'client': self.client,
+            'date_issued__lte': self.end_date,
+            'status': 'CANCELLED'
+        }
+        if self.start_date:
+            cancelled_filter['date_issued__gte'] = self.start_date
         
         invoices_cancelled = Invoice.objects.filter(
-            user=self.user,
-            client=self.client,
-            date_issued__gte=self.start_date,
-            date_issued__lte=self.end_date,
-            status='CANCELLED'
+            **cancelled_filter
         ).aggregate(total=Coalesce(Sum('total_amount'), Decimal('0.00')))['total']
         
+        payment_filter = {
+            'user': self.user,
+            'invoice__client': self.client,
+            'date_paid__lte': self.end_date
+        }
+        if self.start_date:
+            payment_filter['date_paid__gte'] = self.start_date
+        
         payments_received = Payment.objects.filter(
-            user=self.user,
-            invoice__client=self.client,
-            date_paid__gte=self.start_date,
-            date_paid__lte=self.end_date
+            **payment_filter
         ).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
         
+        credit_filter = {
+            'user': self.user,
+            'client': self.client,
+            'issued_date__lte': self.end_date
+        }
+        if self.start_date:
+            credit_filter['issued_date__gte'] = self.start_date
+        
         credit_notes_issued = CreditNote.objects.filter(
-            user=self.user,
-            client=self.client,
-            issued_date__gte=self.start_date,
-            issued_date__lte=self.end_date
+            **credit_filter
         ).aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
         
         opening_balance = self.get_opening_balance()
