@@ -50,4 +50,5 @@ urlpatterns = [
     # Credit Notes
     path('credit-note/create/', recon_views.create_credit_note, name='create_credit_note'),
     path('credit-note/create/<int:client_id>/', recon_views.create_credit_note, name='create_credit_note_for_client'),
+    path('credit-notes/', recon_views.list_credit_notes, name='list_credit_notes'),
 ]

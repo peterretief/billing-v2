@@ -123,7 +123,7 @@
                                 </ul>
                             </li>
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle {% if 'reconciliation' in request.path or 'audit-report' in request.path %}active{% endif %}"
+                                <a class="nav-link dropdown-toggle {% if 'reconciliation' in request.path or 'audit-report' in request.path or 'credit-note' in request.path %}active{% endif %}"
                                    href="#"
                                    data-bs-toggle="dropdown"><i class="bi bi-file-earmark-text me-1"></i>Reports</a>
                                 <ul class="dropdown-menu shadow">
@@ -139,17 +139,21 @@
                                             <i class="bi bi-shield-check me-2"></i>Audit Report
                                         </a>
                                     </li>
-                                    {% if user.is_staff or user.is_superuser %}
-                                        <li>
-                                            <hr class="dropdown-divider">
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item"
-                                               href="{% url 'admin:invoices_creditnote_changelist' %}">
-                                                <i class="bi bi-credit-card me-2"></i>Credit Notes
-                                            </a>
-                                        </li>
-                                    {% endif %}
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'credit-note/create' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'invoices:create_credit_note' %}">
+                                            <i class="bi bi-plus-circle me-2"></i>Create Credit Note
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'credit-notes' in request.path and 'create' not in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'invoices:list_credit_notes' %}">
+                                            <i class="bi bi-list-check me-2"></i>View Credit Notes
+                                        </a>
+                                    </li>
                                 </ul>
                             </li>
                         </ul>

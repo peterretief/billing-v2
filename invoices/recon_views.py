@@ -390,3 +390,33 @@ def create_credit_note(request, client_id=None):
     }
     
     return render(request, 'invoices/create_credit_note.html', context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def list_credit_notes(request):
+    """
+    List all credit notes for the current user.
+    Shows issued date, client, amount, balance, and status.
+    """
+    credit_notes = CreditNote.objects.filter(
+        user=request.user
+    ).select_related('client').order_by('-issued_date')
+    
+    # Calculate summary stats
+    total_issued = credit_notes.aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
+    total_available = credit_notes.aggregate(total=Coalesce(Sum('balance'), Decimal('0.00')))['total']
+    total_used = total_issued - total_available
+    
+    context = {
+        'credit_notes': credit_notes,
+        'currency': request.user.profile.currency,
+        'stats': {
+            'total_issued': total_issued,
+            'total_used': total_used,
+            'total_available': total_available,
+            'count': credit_notes.count(),
+        }
+    }
+    
+    return render(request, 'invoices/list_credit_notes.html', context)
