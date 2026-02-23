@@ -9,6 +9,7 @@ from core.models import BillingAuditLog
 @login_required
 @require_POST
 def mark_anomaly_sorted(request, pk):
+    """Clear an anomaly flag and send the invoice to client."""
     log = get_object_or_404(BillingAuditLog, pk=pk, user=request.user)
     log.is_anomaly = False
     log.save()
@@ -17,11 +18,14 @@ def mark_anomaly_sorted(request, pk):
 
     from .utils import email_invoice_to_client
     if invoice:
-        sent = email_invoice_to_client(invoice)
+        # Pass force_send=True to bypass anomaly check since we just cleared it
+        sent = email_invoice_to_client(invoice, force_send=True)
         if sent:
-            messages.success(request, f"Invoice #{invoice.number} resent successfully.")
+            messages.success(request, f"✓ Invoice #{invoice.number} cleared and sent to {invoice.client.email} successfully.")
         else:
-            messages.error(request, f"Invoice #{invoice.number} could not be resent.")
+            messages.error(request, f"✗ Anomaly cleared, but invoice #{invoice.number} could not be sent. Check email address or try manual resend.")
+    else:
+        messages.error(request, "Invoice not found.")
     return redirect('invoices:billing_audit_report')
 
 

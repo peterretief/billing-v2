@@ -216,18 +216,26 @@ def render_invoice_tex(invoice, template_name='invoice_template.tex'):
 
 # --- Email Functions ---
 
-def email_invoice_to_client(invoice):
-    """Standard method for sending out new invoices."""
+def email_invoice_to_client(invoice, force_send=False):
+    """Standard method for sending out new invoices.
+    
+    Args:
+        invoice: Invoice object to email
+        force_send: If True, bypass anomaly flag check (used when explicitly cleared from audit)
+    """
     # Block sending only if CURRENTLY flagged (check latest audit log)
+    # UNLESS force_send is True (e.g., user explicitly cleared from audit report)
     from core.models import BillingAuditLog
 
     from .models import Invoice, InvoiceEmailStatusLog
     
-    # Check only the LATEST audit log, not all historical ones
-    latest_log = BillingAuditLog.objects.filter(invoice=invoice).order_by('-created_at').first()
-    if latest_log and latest_log.is_anomaly:
-        print(f"Blocked: Invoice {invoice.pk} is flagged as anomaly.")
-        return False
+    if not force_send:
+        # Check only the LATEST audit log, not all historical ones
+        latest_log = BillingAuditLog.objects.filter(invoice=invoice).order_by('-created_at').first()
+        if latest_log and latest_log.is_anomaly:
+            print(f"Blocked: Invoice {invoice.pk} is flagged as anomaly.")
+            return False
+    
     try:
         latex_source = render_invoice_tex(invoice)
         profile = invoice.user.profile
