@@ -68,12 +68,18 @@ class ClientReconciliation:
         transactions = []
         running_balance = self.get_opening_balance()
         
+        # Build invoice filter
+        invoice_filter = {
+            'user': self.user,
+            'client': self.client,
+            'date_issued__lte': self.end_date
+        }
+        if self.start_date:
+            invoice_filter['date_issued__gte'] = self.start_date
+        
         # Get all invoices in period
         invoices = Invoice.objects.filter(
-            user=self.user,
-            client=self.client,
-            date_issued__gte=self.start_date,
-            date_issued__lte=self.end_date
+            **invoice_filter
         ).exclude(status='DRAFT').order_by('date_issued')
         
         for invoice in invoices:
@@ -104,11 +110,16 @@ class ClientReconciliation:
                     })
         
         # Get all payments in period
+        payment_filter = {
+            'user': self.user,
+            'invoice__client': self.client,
+            'date_paid__lte': self.end_date
+        }
+        if self.start_date:
+            payment_filter['date_paid__gte'] = self.start_date
+        
         payments = Payment.objects.filter(
-            user=self.user,
-            invoice__client=self.client,
-            date_paid__gte=self.start_date,
-            date_paid__lte=self.end_date
+            **payment_filter
         ).order_by('date_paid').select_related('invoice')
         
         for payment in payments:
@@ -124,14 +135,19 @@ class ClientReconciliation:
             })
         
         # Get all credit notes in period
-        credit_notes = CreditNote.objects.filter(
-            user=self.user,
-            client=self.client,
-            issued_date__gte=self.start_date,
-            issued_date__lte=self.end_date
+        credit_filter = {
+            'user': self.user,
+            'client': self.client,
+            'issued_date__lte': self.end_date
+        }
+        if self.start_date:
+            credit_filter['issued_date__gte'] = self.start_date
+        
+        credits = CreditNote.objects.filter(
+            **credit_filter
         ).order_by('issued_date')
         
-        for credit in credit_notes:
+        for credit in credits:
             running_balance -= credit.amount
             transactions.append({
                 'type': 'CREDIT_NOTE',
