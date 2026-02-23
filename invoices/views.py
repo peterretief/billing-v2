@@ -403,13 +403,14 @@ def bulk_post(request):
         invoice_ids = request.POST.getlist('invoice_ids')
         invoices = Invoice.objects.filter(id__in=invoice_ids, user=request.user, status='DRAFT')
         count = 0
+        flagged_count = 0
         for inv in invoices:
             try:
                 is_anomaly, comment = get_anomaly_status(request.user, inv)
                 BillingAuditLog.objects.create(
                     user=request.user,
                     invoice=inv,
-                    is_anomaly=True,
+                    is_anomaly=is_anomaly,
                     ai_comment=comment,
                     details={
                         "total": float(inv.total_amount),
@@ -417,12 +418,15 @@ def bulk_post(request):
                     }
                 )
                 if is_anomaly:
+                    flagged_count += 1
                     continue  # Skip posting/emailing flagged invoices
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to audit invoice {inv.id} in bulk_post: {e}")
                 # Continue anyway even if audit fails
+                
+            # Only send if NOT flagged
             with transaction.atomic():
                 inv.status = 'PENDING'
                 inv.save()
@@ -435,24 +439,25 @@ def bulk_post(request):
                     description__in=item_desc
                 ).update(last_billed_date=timezone.now().date())
 
-                BillingAuditLog.objects.create(
-                    user=request.user,
-                    invoice=inv,
-                    is_anomaly=False,
-                    ai_comment=comment,
-                    details={
-                        "total": float(inv.total_amount),
-                        "source": "bulk_post"
-                    }
-                )
-
                 try:
                     if email_invoice_to_client(inv):
                         count += 1
-                except Exception:
-                    pass
+                    else:
+                        # If email failed, revert status to DRAFT
+                        inv.status = 'DRAFT'
+                        inv.save()
+                except Exception as e:
+                    # If email failed, revert status to DRAFT
+                    inv.status = 'DRAFT'
+                    inv.save()
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to email invoice {inv.id}: {e}")
 
-        messages.success(request, f"Processed {count} invoices.")
+        message = f"Sent {count} invoice(s)"
+        if flagged_count > 0:
+            message += f" ({flagged_count} flagged - review in audit)"
+        messages.success(request, message)
     return redirect('invoices:invoice_list')
 
 

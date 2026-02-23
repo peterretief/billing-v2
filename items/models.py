@@ -72,3 +72,8 @@ class Item(TenantModel):
     def total(self):
         # Ensure we return a decimal even if values are missing
         return (self.quantity or 0) * (self.unit_price or 0)
+    
+    @property
+    def row_subtotal(self):
+        # Alias for total for backward compatibility with templates
+        return self.total

@@ -178,9 +178,7 @@
                                     <td class="ps-4">{{ item.description }}</td>
                                     <td class="text-end">{{ item.quantity }}</td>
                                     <td class="text-end">{{ request.user.profile.currency }} {{ item.unit_price|floatformat:2|intcomma }}</td>
-                                    <td class="text-end pe-4 fw-bold">
-                                        {{ request.user.profile.currency }} {{ item.row_subtotal|floatformat:2|intcomma }}
-                                    </td>
+                                    <td class="text-end pe-4 fw-bold">{{ request.user.profile.currency }} {{ item.total|floatformat:2|intcomma }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>

@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Client Reconciliation - {{ client.name }}{% endblock %}
+{% block content %}
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>Reconciliation Statement</h1>
+                <h4 class="text-muted">{{ client.name }}</h4>
+            </div>
+            <div class="btn-group">
+                <a href="{% url 'invoices:client_reconciliation_csv' client.id %}?start_date={{ start_date }}&end_date={{ end_date }}"
+                   class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-download"></i> CSV
+                </a>
+                {% if REPORTLAB_AVAILABLE %}
+                    <a href="{% url 'invoices:client_reconciliation_pdf' client.id %}?start_date={{ start_date }}&end_date={{ end_date }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-file-pdf"></i> PDF
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+        <!-- Period Selector -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date"
+                               class="form-control"
+                               id="start_date"
+                               name="start_date"
+                               value="{% if start_date %}{{ start_date }}{% endif %}">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date"
+                               class="form-control"
+                               id="end_date"
+                               name="end_date"
+                               value="{{ end_date }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">Filter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- Summary Section -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tbody>
+                                <tr>
+                                    <td class="fw-bold">Period:</td>
+                                    <td>
+                                        {% if report.period_start %}
+                                            {{ report.period_start }} to {{ report.period_end }}
+                                        {% else %}
+                                            From beginning to {{ report.period_end }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Opening Balance:</td>
+                                    <td>{{ currency }} {{ report.summary.opening_balance|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Invoices Sent:</td>
+                                    <td class="text-success">+ {{ currency }} {{ report.summary.invoices_sent|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Invoices Cancelled:</td>
+                                    <td class="text-warning">- {{ currency }} {{ report.summary.invoices_cancelled|floatformat:2 }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-sm table-borderless">
+                            <tbody>
+                                <tr>
+                                    <td class="fw-bold">Payments Received:</td>
+                                    <td class="text-success">- {{ currency }} {{ report.summary.payments_received|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Credit Notes:</td>
+                                    <td class="text-success">- {{ currency }} {{ report.summary.credit_notes_issued|floatformat:2 }}</td>
+                                </tr>
+                                <tr class="border-top-2">
+                                    <td class="fw-bold">Closing Balance:</td>
+                                    <td class="h5 {% if report.summary.closing_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                                        {{ currency }} {{ report.summary.closing_balance|floatformat:2 }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Cancelled Invoices Section -->
+        {% if report.cancelled_sent %}
+            <div class="card mb-4 border-warning">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h5 class="mb-0 text-warning">Cancelled Invoices (Previously Sent)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr class="table-light">
+                                    <th>Invoice #</th>
+                                    <th>Date Issued</th>
+                                    <th>Amount</th>
+                                    <th>Cancellation Reason</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for invoice in report.cancelled_sent %}
+                                    <tr class="text-muted">
+                                        <td>{{ invoice.number }}</td>
+                                        <td>{{ invoice.date_issued }}</td>
+                                        <td>{{ currency }} {{ invoice.total_amount|floatformat:2 }}</td>
+                                        <td>
+                                            <small>{{ invoice.cancellation_reason|default:"No reason provided" }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ invoice.get_status_display }}</span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        <!-- Outstanding Credit Section -->
+        {% if report.outstanding_credit > 0 %}
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success bg-opacity-10">
+                    <h5 class="mb-0 text-success">Outstanding Credit</h5>
+                </div>
+                <div class="card-body">
+                    <p class="lead mb-0">
+                        {{ client.name }} has <strong>{{ currency }} {{ report.outstanding_credit|floatformat:2 }}</strong> available credit that can be applied to future invoices.
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+        <!-- Transaction Details -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Transaction Details ({{ report.summary.transaction_count }} transactions)</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if report.transactions %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Amount</th>
+                                    <th class="text-end">Running Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for transaction in report.transactions %}
+                                    <tr>
+                                        <td>{{ transaction.date }}</td>
+                                        <td>
+                                            {% if transaction.type == 'INVOICE' %}
+                                                <span class="badge bg-primary">Invoice</span>
+                                            {% elif transaction.type == 'INVOICE_CANCELLED' %}
+                                                <span class="badge bg-danger">Cancelled</span>
+                                            {% elif transaction.type == 'PAYMENT' %}
+                                                <span class="badge bg-success">Payment</span>
+                                            {% elif transaction.type == 'CREDIT_NOTE' %}
+                                                <span class="badge bg-info">Credit</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div>{{ transaction.description }}</div>
+                                            <small class="text-muted">{{ transaction.detail }}</small>
+                                        </td>
+                                        <td class="text-end fw-semibold">
+                                            {% if transaction.amount < 0 %}
+                                                <span class="text-success">{{ currency }} {{ transaction.amount|floatformat:2 }}</span>
+                                            {% else %}
+                                                <span class="text-danger">{{ currency }} {{ transaction.amount|floatformat:2 }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">{{ currency }} {{ transaction.running_balance|floatformat:2 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted p-3 mb-0">No transactions in this period.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

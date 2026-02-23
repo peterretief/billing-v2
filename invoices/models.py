@@ -301,6 +301,52 @@ class Payment(TenantModel):
         return f"{self.user.profile.currency} {self.amount} for {self.invoice.number}"  
     
 
+class CreditNote(TenantModel):
+    """
+    Tracks credit notes issued to clients for:
+    - Overpayments (when payment exceeded invoice due)
+    - Manual adjustments/discounts
+    - Corrections to cancelled invoices
+    
+    Can be applied against future invoices as a credit.
+    """
+    
+    class NoteType(models.TextChoices):
+        OVERPAYMENT = 'OVERPAYMENT', 'Overpayment'
+        ADJUSTMENT = 'ADJUSTMENT', 'Manual Adjustment'
+        CANCELLATION = 'CANCELLATION', 'Cancelled Invoice'
+        OTHER = 'OTHER', 'Other'
+    
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='credit_notes')
+    invoice = models.ForeignKey(Invoice, on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='credit_notes',
+                                help_text="Original invoice if related to overpayment/cancellation")
+    
+    note_type = models.CharField(max_length=20, choices=NoteType.choices, default=NoteType.ADJUSTMENT)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.TextField(blank=True, help_text="Reason for credit note")
+    reference = models.CharField(max_length=100, blank=True, help_text="e.g., CN2026-001")
+    
+    issued_date = models.DateField(default=timezone.now)
+    balance = models.DecimalField(max_digits=12, decimal_places=2, 
+                                  help_text="Remaining credit available to use")
+    
+    # Audit trail
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-issued_date', '-created_at']
+    
+    def save(self, *args, **kwargs):
+        if not self.balance:
+            self.balance = self.amount
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        return f"CN - {self.client.name} - {self.user.profile.currency} {self.amount} ({self.issued_date})"
+
+
 class VATReport(TenantModel):
     month = models.IntegerField()
     year = models.IntegerField()

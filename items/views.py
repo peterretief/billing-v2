@@ -26,20 +26,19 @@ class ItemListView(LoginRequiredMixin, ListView):
     context_object_name = 'one_off_items'
 
     def get_queryset(self):
-        # TOP TABLE: Linear cycle items (One-offs)
+        # TOP TABLE: Show only UNBILLED one-off items (not sent to invoice)
+        # Items with is_billed=False OR invoice=NULL will show
         return Item.objects.filter(
             user=self.request.user, 
-            invoice__isnull=True, 
-            is_recurring=False
+            is_billed=False,        # Check is_billed status
+            is_recurring=False      # Only one-offs, not recurring templates
         ).order_by('-date')
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         
-        # --- THE FIX ---
-        # Passing 'today' allows the template to compare months for the green tick
+        # Pass 'today' allows the template to compare months for the green tick
         ctx['today'] = timezone.now() 
-        # ----------------
         
         # BOTTOM TABLE: Persistent cycle items (Templates)
         ctx['queued_items'] = Item.objects.filter(
@@ -179,15 +178,6 @@ def generate_invoice_from_items(request):
     return redirect('invoices:invoice_list')
 
 
-
-@login_required
-def item_list(request):
-    """Clean list view for all billable items."""
-    items = Item.objects.filter(user=request.user)
-    return render(request, 'items/item_list.html', {
-        'recurring_items': items.filter(is_recurring=True),
-        'one_off_items': items.filter(is_recurring=False, is_billed=False),
-    })
 
 @login_required
 def trigger_billing(request):

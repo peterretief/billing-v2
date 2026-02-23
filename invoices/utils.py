@@ -218,11 +218,14 @@ def render_invoice_tex(invoice, template_name='invoice_template.tex'):
 
 def email_invoice_to_client(invoice):
     """Standard method for sending out new invoices."""
-    # Block sending if flagged anomaly
+    # Block sending only if CURRENTLY flagged (check latest audit log)
     from core.models import BillingAuditLog
 
     from .models import Invoice, InvoiceEmailStatusLog
-    if BillingAuditLog.objects.filter(invoice=invoice, is_anomaly=True).exists():
+    
+    # Check only the LATEST audit log, not all historical ones
+    latest_log = BillingAuditLog.objects.filter(invoice=invoice).order_by('-created_at').first()
+    if latest_log and latest_log.is_anomaly:
         print(f"Blocked: Invoice {invoice.pk} is flagged as anomaly.")
         return False
     try:
