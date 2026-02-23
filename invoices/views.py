@@ -131,7 +131,24 @@ InvoiceItemFormSet = inlineformset_factory(
 @setup_required
 def get_payment_modal(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
-    return render(request, 'invoices/partials/payment_modal_content.html', {'invoice': invoice})
+    
+    # Get available credit balance for the client
+    from invoices.models import CreditNote
+    from django.db.models import Sum
+    from django.db.models.functions import Coalesce
+    
+    available_credit = CreditNote.objects.filter(
+        user=request.user,
+        client=invoice.client
+    ).aggregate(
+        total=Coalesce(Sum('balance'), Decimal('0.00'))
+    )['total']
+    
+    context = {
+        'invoice': invoice,
+        'available_credit': available_credit,
+    }
+    return render(request, 'invoices/partials/payment_modal_content.html', context)
 
 
 @login_required
@@ -496,16 +513,58 @@ def record_payment(request, pk):
         try:
             amount_str = request.POST.get('amount', '0').replace(',', '').strip()
             amount = Decimal(amount_str)
+            credit_to_apply_str = request.POST.get('credit_to_apply', '0').replace(',', '').strip()
+            credit_to_apply = Decimal(credit_to_apply_str)
 
             with transaction.atomic():
-                Payment.objects.create(
-                    user=request.user,
-                    invoice=invoice,
-                    amount=amount,
-                    reference=request.POST.get('reference', 'Manual Payment')
-                )
-
-            messages.success(request, f"Payment of {amount} recorded.")
+                # Apply credit notes if requested
+                credits_used = Decimal('0.00')
+                if credit_to_apply > 0:
+                    from invoices.models import CreditNote
+                    
+                    # Get available credit notes for this client, ordered by date
+                    available_credits = CreditNote.objects.filter(
+                        user=request.user,
+                        client=invoice.client,
+                        balance__gt=0
+                    ).order_by('issued_date')
+                    
+                    remaining_to_apply = credit_to_apply
+                    
+                    for credit_note in available_credits:
+                        if remaining_to_apply <= 0:
+                            break
+                        
+                        # Calculate how much of this credit to use
+                        amount_to_use = min(remaining_to_apply, credit_note.balance)
+                        
+                        # Deduct from credit note balance
+                        credit_note.balance -= amount_to_use
+                        credit_note.save()
+                        
+                        credits_used += amount_to_use
+                        remaining_to_apply -= amount_to_use
+                
+                # Record the payment (after credits subtracted)
+                final_payment_amount = amount - credits_used
+                
+                if final_payment_amount > 0 or credits_used > 0:
+                    Payment.objects.create(
+                        user=request.user,
+                        invoice=invoice,
+                        amount=final_payment_amount,
+                        reference=request.POST.get('reference', 'Manual Payment')
+                    )
+                    
+                    if credits_used > 0:
+                        messages.success(
+                            request, 
+                            f"Payment recorded: {final_payment_amount:.2f} cash + {credits_used:.2f} credit applied."
+                        )
+                    else:
+                        messages.success(request, f"Payment of {final_payment_amount} recorded.")
+                else:
+                    messages.info(request, f"Credit of {credits_used} applied to invoice.")
 
             if request.headers.get('HX-Request'):
                 response = HttpResponse(status=204)
