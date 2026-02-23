@@ -164,161 +164,173 @@
     </form>
 </div>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-                const cashInput = document.getElementById('paymentAmount');
-                const creditInput = document.getElementById('creditToApply');
-                const couponSelect = document.getElementById('couponSelect');
-                const couponDiscount = document.getElementById('couponDiscount');
-                const totalSpan = document.getElementById('totalToPay');
-                const submitBtn = document.getElementById('submitBtn');
-                const creditMaxBtn = document.getElementById('creditMaxBtn');
-                const paymentForm = document.getElementById('payment-form');
+    // Initialize payment form immediately (IIFE - not wrapped in DOMContentLoaded)
+    // because this template may be loaded dynamically via HTMX after page load
+    (function() {
+        'use strict';
+        const cashInput = document.getElementById('paymentAmount');
+        const creditInput = document.getElementById('creditToApply');
+        const couponSelect = document.getElementById('couponSelect');
+        const couponDiscount = document.getElementById('couponDiscount');
+        const totalSpan = document.getElementById('totalToPay');
+        const submitBtn = document.getElementById('submitBtn');
+        const creditMaxBtn = document.getElementById('creditMaxBtn');
+        const paymentForm = document.getElementById('payment-form');
 
-                // Get values from data attributes
-                const balanceDue = parseFloat(cashInput.dataset.balanceDue) || 0;
-                const availableCredit = parseFloat(cashInput.dataset.availableCredit) || 0;
+        // Get values from data attributes
+        const balanceDue = parseFloat(cashInput.dataset.balanceDue) || 0;
+        const availableCredit = parseFloat(cashInput.dataset.availableCredit) || 0;
 
-                // Initialize smart defaults on page load
-                function initializeDefaults() {
-                    if (availableCredit > 0 && creditInput) {
-                        // If we have credit, calculate optimal distribution
-                        if (availableCredit >= balanceDue) {
-                            // Credit covers everything
-                            cashInput.value = '0';
-                            creditInput.value = balanceDue.toFixed(2);
-                            creditInput.max = availableCredit;
-                        } else {
-                            // Credit is partial, calculate remaining cash needed
-                            const cashNeeded = balanceDue - availableCredit;
-                            cashInput.value = cashNeeded.toFixed(2);
-                            creditInput.value = availableCredit.toFixed(2);
-                            creditInput.max = availableCredit;
-                        }
-                    } else {
-                        // No credit available, require full cash payment
-                        cashInput.value = balanceDue.toFixed(2);
-                    }
-                    updateTotal();
+        // Initialize smart defaults on page load
+        function initializeDefaults() {
+            if (availableCredit > 0 && creditInput) {
+                // If we have credit, calculate optimal distribution
+                if (availableCredit >= balanceDue) {
+                    // Credit covers everything
+                    cashInput.value = '0';
+                    creditInput.value = balanceDue.toFixed(2);
+                    creditInput.max = availableCredit;
+                } else {
+                    // Credit is partial, calculate remaining cash needed
+                    const cashNeeded = balanceDue - availableCredit;
+                    cashInput.value = cashNeeded.toFixed(2);
+                    creditInput.value = availableCredit.toFixed(2);
+                    creditInput.max = availableCredit;
+                }
+            } else {
+                // No credit available, require full cash payment
+                cashInput.value = balanceDue.toFixed(2);
+            }
+            updateTotal();
+        }
+
+        // Get max credit from data attribute
+        function getMaxCredit() {
+            if (!creditInput) return 0;
+            const dataMaxCredit = creditInput.dataset.maxCredit;
+            if (dataMaxCredit) {
+                return parseFloat(dataMaxCredit) || 0;
+            }
+            return parseFloat(creditInput.max) || 0;
+        }
+
+        function calculateCouponDiscount() {
+            if (!couponSelect || !couponSelect.value) {
+                return 0;
+            }
+            const selectedOption = couponSelect.options[couponSelect.selectedIndex];
+            const discountType = selectedOption.dataset.discountType;
+            const discountValue = parseFloat(selectedOption.dataset.discountValue);
+
+            if (discountType === 'PERCENTAGE') {
+                return (balanceDue * discountValue) / 100;
+            } else {
+                return Math.min(discountValue, balanceDue);
+            }
+        }
+
+        function updateTotal() {
+            const cash = parseFloat(cashInput.value) || 0;
+            const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
+            const couponDisc = calculateCouponDiscount();
+
+            // Update coupon display
+            if (couponDiscount) {
+                const currency = document.querySelector('[data-currency]')?.dataset.currency || 'R';
+                couponDiscount.textContent = couponDisc.toFixed(2);
+            }
+
+            const total = cash + credit;
+
+            if (totalSpan) {
+                totalSpan.textContent = total.toFixed(2);
+            }
+
+            // Enable submit button only if total coverage > 0
+            if (submitBtn) {
+                const isValid = total > 0;
+                submitBtn.disabled = !isValid;
+
+                if (total <= 0) {
+                    submitBtn.classList.add('disabled');
+                    submitBtn.innerHTML = '<span class="button-text"><i class="bi bi-exclamation-circle me-1"></i> Enter Payment Amount</span>';
+                } else {
+                    submitBtn.classList.remove('disabled');
+                    submitBtn.innerHTML = '<span class="htmx-indicator spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="button-text"><i class="bi bi-check-circle me-1"></i> Save Payment</span>';
+                }
+            }
+        }
+
+        // Form submission validation
+        if (paymentForm) {
+            paymentForm.addEventListener('submit', function(e) {
+                const cash = parseFloat(cashInput.value) || 0;
+                const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
+
+                if (cash <= 0 && credit <= 0) {
+                    e.preventDefault();
+                    alert('Please enter a payment amount or apply credit. A payment of R0 is not allowed.');
+                    cashInput.focus();
+                    return false;
                 }
 
-                // Get max credit from data attribute
-                function getMaxCredit() {
-                    if (!creditInput) return 0;
-                    const dataMaxCredit = creditInput.dataset.maxCredit;
+                // Also check total matches balance
+                if ((cash + credit) <= 0) {
+                    e.preventDefault();
+                    alert('Payment total must be greater than zero.');
+                    cashInput.focus();
+                    return false;
+                }
+            });
+        }
+
+        // Max button handler - read credit from button's data attribute
+        if (creditMaxBtn) {
+            creditMaxBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                // Re-query creditInput to ensure it's found
+                const creditInputField = document.getElementById('creditToApply');
+                if (!creditInputField) return;
+
+                // Get max credit from button's data attribute for reliability
+                let maxCredit = parseFloat(creditMaxBtn.dataset.availableCredit);
+                if (isNaN(maxCredit)) {
+                    // Fallback to input's data attribute
+                    const dataMaxCredit = creditInputField.dataset.maxCredit;
                     if (dataMaxCredit) {
-                        return parseFloat(dataMaxCredit) || 0;
-                    }
-                    return parseFloat(creditInput.max) || 0;
-                }
-
-                function calculateCouponDiscount() {
-                    if (!couponSelect || !couponSelect.value) {
-                        return 0;
-                    }
-                    const selectedOption = couponSelect.options[couponSelect.selectedIndex];
-                    const discountType = selectedOption.dataset.discountType;
-                    const discountValue = parseFloat(selectedOption.dataset.discountValue);
-
-                    if (discountType === 'PERCENTAGE') {
-                        return (balanceDue * discountValue) / 100;
+                        maxCredit = parseFloat(dataMaxCredit) || 0;
                     } else {
-                        return Math.min(discountValue, balanceDue);
+                        maxCredit = parseFloat(creditInputField.max) || 0;
                     }
                 }
 
-                function updateTotal() {
-                    const cash = parseFloat(cashInput.value) || 0;
-                    const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
-                    const couponDisc = calculateCouponDiscount();
+                creditInputField.value = maxCredit.toFixed(2);
+                // Update cash to cover the remaining balance
+                const remainingCash = Math.max(0, balanceDue - maxCredit);
+                cashInput.value = remainingCash.toFixed(2);
+                updateTotal();
+                creditInputField.focus();
+            });
+        }
 
-                    // Update coupon display
-                    if (couponDiscount) {
-                        const currency = document.querySelector('[data-currency]')?.dataset.currency || 'R';
-                        couponDiscount.textContent = couponDisc.toFixed(2);
-                    }
+        if (cashInput) {
+            cashInput.addEventListener('change', updateTotal);
+            cashInput.addEventListener('keyup', updateTotal);
+            cashInput.addEventListener('input', updateTotal);
+        }
 
-                    const total = cash + credit;
+        if (creditInput) {
+            creditInput.addEventListener('change', updateTotal);
+            creditInput.addEventListener('keyup', updateTotal);
+            creditInput.addEventListener('input', updateTotal);
+        }
 
-                    if (totalSpan) {
-                        totalSpan.textContent = total.toFixed(2);
-                    }
+        if (couponSelect) {
+            couponSelect.addEventListener('change', updateTotal);
+        }
 
-                    // Enable submit button only if total coverage > 0
-                    if (submitBtn) {
-                        const isValid = total > 0;
-                        submitBtn.disabled = !isValid;
-
-                        if (total <= 0) {
-                            submitBtn.classList.add('disabled');
-                            submitBtn.innerHTML = '<span class="button-text"><i class="bi bi-exclamation-circle me-1"></i> Enter Payment Amount</span>';
-                        } else {
-                            submitBtn.classList.remove('disabled');
-                            submitBtn.innerHTML = '<span class="htmx-indicator spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="button-text"><i class="bi bi-check-circle me-1"></i> Save Payment</span>';
-                        }
-                    }
-                }
-
-                // Form submission validation
-                if (paymentForm) {
-                    paymentForm.addEventListener('submit', function(e) {
-                        const cash = parseFloat(cashInput.value) || 0;
-                        const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
-
-                        if (cash <= 0 && credit <= 0) {
-                            e.preventDefault();
-                            alert('Please enter a payment amount or apply credit. A payment of R0 is not allowed.');
-                            cashInput.focus();
-                            return false;
-                        }
-
-                        // Also check total matches balance
-                        if ((cash + credit) <= 0) {
-                            e.preventDefault();
-                            alert('Payment total must be greater than zero.');
-                            cashInput.focus();
-                            return false;
-                        }
-                    });
-                }
-
-                // Max button handler - read credit from button's data attribute
-                if (creditMaxBtn) {
-                    creditMaxBtn.addEventListener('click', function(e) {
-                        e.preventDefault();
-
-                        // Re-query creditInput to ensure it's found
-                        const creditInputField = document.getElementById('creditToApply');
-                        if (!creditInputField) return;
-
-                        // Get max credit from button's data attribute for reliability
-                        let maxCredit = parseFloat(creditMaxBtn.dataset.availableCredit);
-                        if (isNaN(maxCredit)) {
-                            // Fallback to input's data attribute
-                            const dataMaxCredit = creditInputField.dataset.maxCredit;
-                            if (dataMaxCredit) {
-                                maxCredit = parseFloat(dataMaxCredit) || 0;
-                            } else {
-                                maxCredit = parseFloat(creditInputField.max) || 0;
-                            }
-                        }
-
-                        creditInputField.value = maxCredit.toFixed(2);
-                        // Update cash to cover the remaining balance
-                        const remainingCash = Math.max(0, balanceDue - maxCredit);
-                        cashInput.value = remainingCash.toFixed(2);
-                        updateTotal();
-                        creditInputField.focus();
-                    });
-                }
-
-                if (cashInput) {
-                    cashInput.addEventListener('change', updateTotal);
-                    cashInput.addEventListener('keyup', updateTotal);
-                    cashInput.addEventListener('input', updateTotal);
-                }
-
-                if (creditInput) {
-                    creditInput.addEventListener('change', updateTotal);
-                    creditInput.addEventListener('keyup', updateTotal);
-                    creditInput.addEventListener('input', updateTotal);
+        // Initialize with smart defaults
+        initializeDefaults();
+    })();
 </script>
