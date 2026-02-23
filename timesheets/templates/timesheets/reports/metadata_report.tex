@@ -20,21 +20,19 @@
 \vspace{10mm}
 
 {% for category, entries in grouped_data.items %}
-    % This creates the category header
-    \section*{ {{ category|escape }} }
-    \nopagebreak
-    \begin{longtable}{p{2.5cm} p{10cm} r}
+    \section*{ {{ category }} }
+    \begin{longtable}{lp{8cm}r}
         \toprule
-        \textbf{Date} & \textbf{Work Description \& Metadata} & \textbf{Hours} \\
+        \textbf{Date} & \textbf{Details} & \textbf{Hours} \\
         \midrule
         {% for entry in entries %}
-            {{ entry.date|date:"d M Y" }} & \textbf{ {{ entry.description|escape }} } \\
-            & \small 
-            {% for key, val in entry.metadata.items %}
-                \textit{ {{ key|escape }}: {{ val|escape }} } \quad
-            {% endfor %}
+            {{ entry.date|date:"d M Y" }} & 
+            {% if entry.metadata %}
+                {{ entry.formatted_metadata }}
+            {% else %}
+                Standard work
+            {% endif %}
             & {{ entry.hours }}h \\
-            \addlinespace[2mm]
         {% endfor %}
         \bottomrule
     \end{longtable}

@@ -1,175 +1,214 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Billing v2{% endblock %}</title>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>
+            {% block title %}Billing v2{% endblock %}
+        </title>
+        <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+        <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
+        <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+        <script src="{% static 'js/htmx.min.js' %}"></script>
+        <link rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <style>
+            /* 2. Better HTMX Indicator Logic */
+            .htmx-indicator {
+                display: none;
+                opacity: 0;
+                transition: opacity 200ms ease-in;
+            }
 
-    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/bootstrap-icons.css' %}">
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
-    <script src="{% static 'js/htmx.min.js' %}"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-        
-    <style>
-        /* 2. Better HTMX Indicator Logic */
-        .htmx-indicator {
-            display: none;
-            opacity: 0;
-            transition: opacity 200ms ease-in;
-        }
-        .htmx-request .htmx-indicator {
-            display: inline-block;
-            opacity: 1;
-        }
-        .htmx-request.htmx-indicator {
-            display: inline-block;
-            opacity: 1;
-        }
+            .htmx-request .htmx-indicator {
+                display: inline-block;
+                opacity: 1;
+            }
 
-        /* 3. Give the Sync button a visible presence even if icon fails */
-        .btn-sync-status {
-            min-width: 38px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
+            .htmx-request.htmx-indicator {
+                display: inline-block;
+                opacity: 1;
+            }
 
-        /* User Avatar styling */
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            background: #0d6efd;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-        }
-    </style>
+            /* 3. Give the Sync button a visible presence even if icon fails */
+            .btn-sync-status {
+                min-width: 38px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
 
-</head>
-
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-
-
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="{% if user.is_authenticated %}{% url 'invoices:dashboard' %}{% else %}{% url 'core:landing_page' %}{% endif %}">
-                <i class="bi bi-receipt-cutoff me-2 text-primary"></i> 
-                <span>Billing <span class="text-primary">v2</span></span>
-            </a>
-            
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="mainNav">
-                {% if user.is_authenticated %}
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link {% if 'invoices' in request.path %}active{% endif %}" href="{% url 'invoices:invoice_list' %}">Invoices</a></li>
-                    <li class="nav-item"><a class="nav-link {% if 'clients' in request.path %}active{% endif %}" href="{% url 'clients:client_list' %}">Clients</a></li>
-                    
-                    {# Updated: Changed is_ops to is_staff/superuser for visibility #}
-                    {% if user.is_staff or user.is_superuser %}
-                    <li class="nav-item ms-lg-3">
-                        <a class="nav-link fw-bold text-primary" href="{% url 'core:portfolio_summary' %}">
-                            <i class="bi bi-briefcase-fill me-1"></i> Portfolio
-                        </a>
-                    </li>
-                    {% endif %}
-
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">Tools</a>
-                        <ul class="dropdown-menu shadow">
-                            <li><a class="dropdown-item" href="{% url 'items:item_list' %}">Items</a></li>
-                            <li><a class="dropdown-item" href="{% url 'timesheets:timesheet_list' %}">Timesheets</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'billing_schedule:policy_list' %}">Billing Schedule</a></li>
-                            <li><a class="dropdown-item" href="{% url 'timesheets:manage_categories' %}">Work Categories</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'core:email_status' %}">Email Status</a></li>
-                        </ul>
-                    </li>
-                </ul>
-
-
-                
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" data-bs-toggle="dropdown">
-                            <div class="user-avatar rounded-circle d-inline-block text-white me-2">
-                                {{ user.email|slice:":1"|upper }}
-                            </div>
-                            <span class="d-none d-sm-inline">{{ user.email }}</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2">
-                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Account</li>
-                            <li><a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-person-gear me-2 text-muted"></i> Profile</a></li>
-
-                            {# Added: Portfolio and Admin links inside the dropdown for staff convenience #}
+            /* User Avatar styling */
+            .user-avatar {
+                width: 32px;
+                height: 32px;
+                background: #0d6efd;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+            <div class="container">
+                <a class="navbar-brand fw-bold"
+                   href="{% if user.is_authenticated %}{% url 'invoices:dashboard' %}{% else %}{% url 'core:landing_page' %}{% endif %}">
+                    <i class="bi bi-receipt-cutoff me-2 text-primary"></i>
+                    <span>Billing <span class="text-primary">v2</span></span>
+                </a>
+                <button class="navbar-toggler"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    {% if user.is_authenticated %}
+                        <ul class="navbar-nav me-auto">
+                            <li class="nav-item ms-lg-2">
+                                <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active fw-bold{% endif %}"
+                                   href="{% url 'invoices:dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'invoices' in request.path and request.resolver_match.url_name != 'dashboard' %}active{% endif %}"
+                                   href="{% url 'invoices:invoice_list' %}">Invoices</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'clients' in request.path %}active{% endif %}"
+                                   href="{% url 'clients:client_list' %}">Clients</a>
+                            </li>
+                            {# Updated: Changed is_ops to is_staff/superuser for visibility #}
                             {% if user.is_staff or user.is_superuser %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Staff Admin</li>
-                            <li><a class="dropdown-item" href="{% url 'core:portfolio_summary' %}"><i class="bi bi-briefcase-fill me-2 text-primary"></i> Portfolio Dashboard</a></li>
+                                <li class="nav-item ms-lg-3">
+                                    <a class="nav-link fw-bold {% if request.resolver_match.url_name == 'portfolio_summary' %}active{% endif %}"
+                                       href="{% url 'core:portfolio_summary' %}">
+                                        <i class="bi bi-briefcase-fill me-1"></i> Portfolio
+                                    </a>
+                                </li>
                             {% endif %}
-
-                            <li><hr class="dropdown-divider"></li>
-                            <li class="px-3 py-2">
-                                <form action="{% url 'logout' %}" method="post">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">Logout</button>
-                                </form>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle {% if 'items' in request.path or 'timesheets' in request.path or 'billing_schedule' in request.path or 'categories' in request.path or 'email_status' in request.path %}active{% endif %}"
+                                   href="#"
+                                   data-bs-toggle="dropdown">Tools</a>
+                                <ul class="dropdown-menu shadow">
+                                    <li>
+                                        <a class="dropdown-item {% if 'items' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'items:item_list' %}">Items</a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'timesheets' in request.path and 'categories' not in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'timesheets:timesheet_list' %}">Timesheets</a>
+                                    </li>
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'billing_schedule' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'billing_schedule:policy_list' %}">Billing Schedule</a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'categories' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'timesheets:manage_categories' %}">Work Categories</a>
+                                    </li>
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'email_status' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'core:email_status' %}">Email Status</a>
+                                    </li>
+                                </ul>
                             </li>
                         </ul>
-                    </li>
-                </ul>
-                {% else %}
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Login</a></li>
-                </ul>
-                {% endif %}
+                        <ul class="navbar-nav ms-auto align-items-center">
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle d-flex align-items-center"
+                                   href="#"
+                                   id="userDropdown"
+                                   data-bs-toggle="dropdown">
+                                    <div class="user-avatar rounded-circle d-inline-block text-white me-2">{{ user.email|slice:":1"|upper }}</div>
+                                    <span class="d-none d-sm-inline">{{ user.email }}</span>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2">
+                                    <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Account</li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-person-gear me-2 text-muted"></i> Profile</a>
+                                    </li>
+                                    {# Added: Portfolio and Admin links inside the dropdown for staff convenience #}
+                                    {% if user.is_staff or user.is_superuser %}
+                                        <li>
+                                            <hr class="dropdown-divider">
+                                        </li>
+                                        <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Staff Admin</li>
+                                        <li>
+                                            <a class="dropdown-item" href="{% url 'core:portfolio_summary' %}"><i class="bi bi-briefcase-fill me-2 text-primary"></i> Portfolio Dashboard</a>
+                                        </li>
+                                    {% endif %}
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li class="px-3 py-2">
+                                        <form action="{% url 'logout' %}" method="post">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-danger btn-sm w-100">Logout</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    {% else %}
+                        <ul class="navbar-nav ms-auto">
+                            <li class="nav-item">
+                                <a class="nav-link" href="{% url 'login' %}">Login</a>
+                            </li>
+                        </ul>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-    </nav>
-
-    {% if show_onboarding_bar and not read_only %}
-    <div id="onboarding-wrapper">
-        <div class="bg-white border-bottom shadow-sm mb-4" id="onboarding-bar">
-            <div class="container py-2 d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-rocket-takeoff text-primary me-2"></i>
-                    <span class="text-muted small fw-bold text-uppercase me-3 d-none d-md-inline">Quick Setup:</span>
-                    <div class="d-flex gap-2">
-                        {% for task in onboarding_tasks %}
-                        <span class="badge bg-primary px-3 py-2 shadow-sm">{{ task.message }}</span>
-                        {% endfor %}
+        </nav>
+        {% if show_onboarding_bar and not read_only %}
+            <div id="onboarding-wrapper">
+                <div class="bg-white border-bottom shadow-sm mb-4" id="onboarding-bar">
+                    <div class="container py-2 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-rocket-takeoff text-primary me-2"></i>
+                            <span class="text-muted small fw-bold text-uppercase me-3 d-none d-md-inline">Quick Setup:</span>
+                            <div class="d-flex gap-2">
+                                {% for task in onboarding_tasks %}
+                                    <span class="badge bg-primary px-3 py-2 shadow-sm">{{ task.message }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <button type="button"
+                                class="btn-close ms-3"
+                                data-bs-toggle="modal"
+                                data-bs-target="#dismissModal"></button>
                     </div>
                 </div>
-                <button type="button" class="btn-close ms-3" data-bs-toggle="modal" data-bs-target="#dismissModal"></button>
             </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <div class="container mt-3">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
         {% endif %}
-        
-        <main class="pb-5">
-            {% block content %}{% endblock %}
-        </main>
-    </div>
-
-    {% include 'includes/modals.html' %} 
-
-    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
-    {% block extra_js %}{% endblock %}
-</body>
+        <div class="container mt-3">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show shadow-sm">
+                        {% if 'safe' in message.tags %}
+                            {{ message|safe }}
+                        {% else %}
+                            {{ message }}
+                        {% endif %}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            <main class="pb-5">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+        {% include 'includes/modals.html' %}
+        <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+        {% block extra_js %}{% endblock %}
+    </body>
 </html>

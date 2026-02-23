@@ -16,7 +16,9 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.views.generic import ListView
 
 import items
@@ -38,45 +40,75 @@ def get_client_rate(request):
 
 @login_required
 def export_metadata_pdf(request, invoice_id):
-    invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
-    # Fetch entries linked to this invoice
-    entries = TimesheetEntry.objects.filter(invoice=invoice).select_related('category').order_by('date')
-    
-    # Group by Category Name
-    grouped_entries = defaultdict(list)
-    for entry in entries:
-        cat_name = entry.category.name if entry.category else "General"
-        grouped_entries[cat_name].append(entry)
+    try:
+        invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
+        # Fetch entries linked to this invoice
+        entries = TimesheetEntry.objects.filter(invoice=invoice).select_related('category').order_by('date')
+        
+        if not entries.exists():
+            messages.error(request, "No timesheet entries found for this invoice.")
+            return redirect('invoices:invoice_detail', pk=invoice_id)
+        
+        # Group by Category Name
+        grouped_entries = defaultdict(list)
+        for entry in entries:
+            cat_name = entry.category.name if entry.category else "General"
+            # Escape LaTeX special characters in category name
+            cat_name = cat_name.replace('&', r'\&').replace('$', r'\$').replace('%', r'\%').replace('_', r'\_').replace('^', r'\textasciicircum{}').replace('~', r'\textasciitilde{}')
+            grouped_entries[cat_name].append(entry)
 
-    context = {
-        'invoice_number': invoice.number,
-        'client_name': invoice.client.name,
-        'date_generated': timezone.now().strftime('%d %b %Y'),
-        'grouped_data': dict(grouped_entries), # Pass the dictionary
-        'total_hours': sum(e.hours for e in entries),
-    }
+        context = {
+            'invoice_number': invoice.number,
+            'client_name': invoice.client.name,
+            'date_generated': timezone.now().strftime('%d %b %Y'),
+            'grouped_data': dict(grouped_entries), # Pass the dictionary
+            'total_hours': sum(e.hours for e in entries),
+        }
 
+        # 1. Render the LaTeX string
+        tex_content = render_to_string('timesheets/reports/metadata_report.tex', context)
+        
+        # 2. Save to temporary file and compile
+        temp_dir = os.path.join(settings.BASE_DIR, 'tmp')
+        if not os.path.exists(temp_dir): 
+            os.makedirs(temp_dir)
+        
+        tex_file_path = os.path.join(temp_dir, f'report_{invoice.id}.tex')
+        with open(tex_file_path, 'w') as f:
+            f.write(tex_content)
 
-    # 1. Render the LaTeX string
-    tex_content = render_to_string('timesheets/reports/metadata_report.tex', context)
-    
-    # 2. Save to temporary file and compile
-    temp_dir = os.path.join(settings.BASE_DIR, 'tmp')
-    if not os.path.exists(temp_dir): os.makedirs(temp_dir)
-    
-    tex_file_path = os.path.join(temp_dir, f'report_{invoice.id}.tex')
-    with open(tex_file_path, 'w') as f:
-        f.write(tex_content)
+        # Run pdflatex (ensure pdflatex is installed on your server)
+        result = subprocess.run(
+            ['pdflatex', '-interaction=nonstopmode', '-output-directory', temp_dir, tex_file_path],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode != 0:
+            # Log the actual error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"pdflatex error for invoice {invoice_id}:")
+            logger.error(f"STDOUT: {result.stdout}")
+            logger.error(f"STDERR: {result.stderr}")
+            messages.error(request, "Failed to generate timesheet PDF. Check server logs for LaTeX error.")
+            return redirect('invoices:invoice_detail', pk=invoice_id)
 
-    # Run pdflatex (ensure pdflatex is installed on your server)
-    subprocess.run(['pdflatex', '-output-directory', temp_dir, tex_file_path])
-
-    # 3. Return the PDF
-    pdf_path = tex_file_path.replace('.tex', '.pdf')
-    with open(pdf_path, 'rb') as f:
-        response = HttpResponse(f.read(), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Work_Log_{invoice.number}.pdf"'
-        return response
+        # 3. Return the PDF
+        pdf_path = tex_file_path.replace('.tex', '.pdf')
+        if not os.path.exists(pdf_path):
+            messages.error(request, "PDF file was not generated successfully.")
+            return redirect('invoices:invoice_detail', pk=invoice_id)
+            
+        with open(pdf_path, 'rb') as f:
+            response = HttpResponse(f.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Work_Log_{invoice.number}.pdf"'
+            return response
+            
+    except Exception as e:
+        messages.error(request, f"Error generating timesheet report: {str(e)}")
+        return redirect('invoices:invoice_detail', pk=invoice_id)
 
 @login_required
 def manage_categories(request):
@@ -367,6 +399,7 @@ def generate_invoice_bulk(request):
         for entry in entries:
             client_map[entry.client].append(entry)
 
+        flagged_count = 0
         for client, client_entries in client_map.items():
             # Determine Tax Mode based on Business Profile
             # We use FULL if registered, otherwise NONE
@@ -409,7 +442,31 @@ def generate_invoice_bulk(request):
             # We must do this AFTER items are created so the math is not zero
             invoice.sync_totals()
             invoice.save()
+            
+            # 6. Add audit logging
+            try:
+                from core.utils import get_anomaly_status
+                from core.models import BillingAuditLog
+                is_anomaly, comment = get_anomaly_status(request.user, invoice)
+                BillingAuditLog.objects.create(
+                    user=request.user,
+                    invoice=invoice,
+                    is_anomaly=is_anomaly,
+                    ai_comment=comment,
+                    details={
+                        "total": float(invoice.total_amount),
+                        "source": "timesheet_ui_billing"
+                    }
+                )
+                if is_anomaly:
+                    flagged_count += 1
+                    messages.warning(request, mark_safe(f"⚠️ Invoice #{invoice.number} flagged: {comment} <a href='{reverse('invoices:billing_audit_report')}' class='alert-link'>Review in Audit</a>"), extra_tags='safe')
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to audit timesheet invoice {invoice.id}: {e}")
+                # Don't fail the creation just because audit failed
 
-        messages.success(request, f"Generated {len(client_map)} invoice(s) as drafts.")
+        messages.success(request, f"Generated {len(client_map)} invoice(s) as drafts." + (f" {flagged_count} flagged by audit." if flagged_count > 0 else ""))
 
     return redirect('invoices:invoice_list')

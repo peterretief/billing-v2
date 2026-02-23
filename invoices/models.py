@@ -80,6 +80,7 @@ class Invoice(TenantModel):
     billing_type = models.CharField(max_length=10, choices=BillingType.choices, default=BillingType.SERVICE)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
     tax_mode = models.CharField(max_length=10, choices=TaxMode.choices, default=TaxMode.NONE)
+    cancellation_reason = models.TextField(blank=True, null=True, help_text="Reason for cancellation")
 
     # Financial Snapshots (Keep these - they are your "Source of Truth")
     subtotal_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)

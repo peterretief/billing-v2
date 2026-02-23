@@ -10,6 +10,11 @@
                    placeholder="Search invoices..."
                    value="{{ search_query|default:'' }}">
             <button class="btn btn-outline-secondary" type="submit">Search</button>
+            {% if search_query %}
+                <a href="?" class="btn btn-outline-danger">
+                    <i class="bi bi-x-circle me-1"></i>Clear
+                </a>
+            {% endif %}
         </div>
     </form>
     <form action="{% url 'invoices:bulk_post' %}" method="POST">
@@ -17,7 +22,13 @@
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Invoices</h5>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="card-title mb-0">Invoices</h5>
+                        <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}overdue={% if overdue_filter %}false{% else %}true{% endif %}"
+                           class="btn btn-sm {% if overdue_filter %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Overdue
+                        </a>
+                    </div>
                     <div>
                         <span id="selectedCount" class="text-muted me-2"></span>
                         <button id="postBtn" class="btn btn-primary" type="submit" disabled>Post Selected</button>
@@ -31,12 +42,52 @@
                             <th style="width:1%">
                                 <input type="checkbox" id="selectAll">
                             </th>
-                            <th scope="col">Number</th>
-                            <th scope="col">Client</th>
-                            <th scope="col">Total</th>
-                            <th scope="col">Status</th>
+                            <th scope="col">
+                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'number' %}-number{% else %}number{% endif %}"
+                                   class="text-decoration-none text-dark">
+                                    Number
+                                    {% if current_sort == 'number' %}
+                                        <i class="bi bi-arrow-up ms-1"></i>
+                                    {% elif current_sort == '-number' %}
+                                        <i class="bi bi-arrow-down ms-1"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th scope="col">
+                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'client__name' %}-client__name{% else %}client__name{% endif %}"
+                                   class="text-decoration-none text-dark">
+                                    Client
+                                    {% if current_sort == 'client__name' %}
+                                        <i class="bi bi-arrow-up ms-1"></i>
+                                    {% elif current_sort == '-client__name' %}
+                                        <i class="bi bi-arrow-down ms-1"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th scope="col">
+                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'total_amount' %}-total_amount{% else %}total_amount{% endif %}"
+                                   class="text-decoration-none text-dark">
+                                    Total
+                                    {% if current_sort == 'total_amount' %}
+                                        <i class="bi bi-arrow-up ms-1"></i>
+                                    {% elif current_sort == '-total_amount' %}
+                                        <i class="bi bi-arrow-down ms-1"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th scope="col">Type</th>
+                            <th scope="col">
+                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'status' %}-status{% else %}status{% endif %}"
+                                   class="text-decoration-none text-dark">
+                                    Status
+                                    {% if current_sort == 'status' %}
+                                        <i class="bi bi-arrow-up ms-1"></i>
+                                    {% elif current_sort == '-status' %}
+                                        <i class="bi bi-arrow-down ms-1"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
                             <th scope="col">Delivery</th>
-                            <th scope="col" class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -52,17 +103,20 @@
                                 </td>
                                 <td>
                                     <a href="{% url 'invoices:invoice_detail' invoice.pk %}"
-                                       class="text-decoration-none fw-bold text-dark">{{ invoice.number|default:"[DRAFT]" }}</a>
+                                       class="text-decoration-none fw-bold link-primary"
+                                       style="font-size: 1.05em;
+                                              transition: all 0.2s ease">
+                                        <i class="bi bi-file-earmark-text me-2"></i>{{ invoice.number|default:"[DRAFT]" }}
+                                    </a>
                                     <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
                                 </td>
                                 <td>{{ invoice.client.name }}</td>
-                                <td class="fw-bold text-primary">
-                                    {{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}
+                                <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
+                                <td>
                                     {% if invoice.billed_timesheets.count > 0 %}
-                                        <br>
-                                        <a href="{% url 'timesheets:invoice_time_report' invoice.pk %}"
-                                           target="_blank"
-                                           class="badge bg-info text-dark mt-1">Timesheet PDF</a>
+                                        <span class="badge bg-info text-dark"><i class="bi bi-clock-history me-1"></i>Timesheet</span>
+                                    {% else %}
+                                        <span class="badge bg-success"><i class="bi bi-list-check me-1"></i>Items</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -92,56 +146,6 @@
                                         </span>
                                     {% else %}
                                         <span class="text-muted small">—</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-end pe-4">
-                                    <div class="btn-group btn-group-sm shadow-sm">
-                                        {% if invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
-                                            <button type="button"
-                                                    class="btn btn-outline-primary btn-sm"
-                                                    title="Resend Invoice Email"
-                                                    hx-get="{% url 'invoices:get_resend_modal' invoice.pk %}"
-                                                    hx-target="#paymentModalContent"
-                                                    hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show()">
-                                                <i class="bi bi-envelope-arrow-up"></i>
-                                                <span class="d-none d-md-inline">Resend</span>
-                                            </button>
-                                        {% endif %}
-                                        <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.pk %}"
-                                           class="btn btn-outline-dark"
-                                           target="_blank"
-                                           title="View PDF">
-                                            <i class="bi bi-file-pdf"></i> Pdf
-                                        </a>
-                                        {% if invoice.status == 'PAID' or invoice.status == 'CANCELLED' or invoice.status == 'DRAFT' %}
-                                            <button class="btn btn-sm btn-outline-secondary"
-                                                    disabled
-                                                    title="{% if invoice.status == 'PAID' %}Already paid{% elif invoice.status == 'CANCELLED' %}Invoice cancelled{% elif invoice.status == 'DRAFT' %}Not yet sent{% endif %}">
-                                                <i class="bi bi-{% if invoice.status == 'PAID' %}check-circle{% elif invoice.status == 'CANCELLED' %}x-circle{% else %}lock{% endif %}"></i>
-                                                <span class="d-none d-md-inline">
-                                                    {% if invoice.status == 'PAID' %}
-                                                        Paid
-                                                    {% elif invoice.status == 'CANCELLED' %}
-                                                        Cancelled
-                                                    {% else %}
-                                                        Draft
-                                                    {% endif %}
-                                                </span>
-                                            </button>
-                                        {% else %}
-                                            <button class="btn btn-sm btn-success"
-                                                    hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
-                                                    hx-target="#paymentModalContent"
-                                                    hx-trigger="click"
-                                                    hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
-                                                    title="Record Payment">
-                                                <i class="bi bi-cash-stack"></i>
-                                                <span class="d-none d-md-inline">Pay</span>
-                                            </button>
-                                        {% endif %}
-                                    </div>
-                                    {% if invoice.billed_timesheets.count > 0 %}
-                                        {% include "invoices/partials/timesheet_attach_toggle_form.html" with invoice=invoice %}
                                     {% endif %}
                                 </td>
                             </tr>

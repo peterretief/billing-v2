@@ -94,17 +94,25 @@ def import_recurring_to_invoices(user):
             Invoice.objects.update_totals(invoice)
             invoice.refresh_from_db()
 
-            # Audit logging
-            is_huge = float(invoice.total_amount) > 10000
-            BillingAuditLog.objects.create(
-                user=user, 
-                invoice=invoice, 
-                is_anomaly=is_huge,
-                ai_comment="High value" if is_huge else "",
-                details={"total": float(invoice.total_amount)}
-            )
-            
-            if not is_huge:
+            # Audit logging using the new comprehensive audit function
+            try:
+                from core.utils import get_anomaly_status
+                is_anomaly, comment = get_anomaly_status(user, invoice)
+                BillingAuditLog.objects.create(
+                    user=user, 
+                    invoice=invoice, 
+                    is_anomaly=is_anomaly,
+                    ai_comment=comment,
+                    details={"total": float(invoice.total_amount), "source": "items_billing"}
+                )
+                
+                if not is_anomaly:
+                    new_invoices.append(invoice)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to audit invoice {invoice.id}: {e}")
+                # Still add to new_invoices even if audit fails
                 new_invoices.append(invoice)
 
     # --- STEP 4: THE DISPATCH ---

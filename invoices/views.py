@@ -22,6 +22,42 @@ def mark_anomaly_sorted(request, pk):
         else:
             messages.error(request, f"Invoice #{invoice.number} could not be resent.")
     return redirect('invoices:billing_audit_report')
+
+
+@login_required
+@require_POST
+def cancel_invoice_from_audit(request, pk):
+    """Cancel an invoice from the audit report."""
+    log = get_object_or_404(BillingAuditLog, pk=pk, user=request.user)
+    invoice = log.invoice
+    from django.contrib import messages
+    
+    if not invoice:
+        messages.error(request, "Invoice not found.")
+        return redirect('invoices:billing_audit_report')
+    
+    # Prevent cancelling paid invoices
+    if invoice.status == 'PAID':
+        messages.error(request, f"Cannot cancel invoice #{invoice.number} - it has already been paid. Contact support if needed.")
+        return redirect('invoices:billing_audit_report')
+    
+    # Get cancellation reason from POST
+    reason = request.POST.get('cancellation_reason', '').strip()
+    if not reason:
+        messages.error(request, "Please provide a reason for cancellation.")
+        return redirect('invoices:billing_audit_report')
+    
+    # Cancel the invoice
+    invoice.status = 'CANCELLED'
+    invoice.cancellation_reason = reason
+    invoice.save()
+    
+    log.is_anomaly = False
+    log.ai_comment = f"Cancelled by user. Reason: {reason}"
+    log.save()
+    
+    messages.success(request, f"Invoice #{invoice.number} cancelled. Reason: {reason}")
+    return redirect('invoices:billing_audit_report')
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
@@ -64,6 +100,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 
 # AI Integration
 from google import genai
@@ -135,7 +172,7 @@ def dashboard(request):
             is_anomaly=True
         ).exclude(invoice__status='PAID').count()
 
-    stats = invoices.aggregate(
+    stats = invoices.exclude(status__in=['DRAFT', 'CANCELLED']).aggregate(
         billed=Sum('total_amount'),
         paid=Sum('payments__amount')
     )
@@ -175,11 +212,15 @@ def invoice_list(request):
             default=False,
             output_field=BooleanField()
         )
-    ).order_by('-date_issued', '-id')
+    )
 
     status_filter = request.GET.get('status')
     if status_filter == 'UNPAID':
         invoice_queryset = invoice_queryset.exclude(status='PAID')
+
+    overdue_filter = request.GET.get('overdue') == 'true'
+    if overdue_filter:
+        invoice_queryset = invoice_queryset.filter(is_overdue=True)
 
     search_query = request.GET.get('q', '').strip()
     if search_query:
@@ -189,16 +230,48 @@ def invoice_list(request):
             Q(client__email__icontains=search_query)
         )
 
-    paginator = Paginator(invoice_queryset, 10)
+    # Handle sorting
+    sort_param = request.GET.get('sort', '-date_issued')
+    allowed_sorts = {
+        'number': 'number',
+        '-number': '-number',
+        'client__name': 'client__name',
+        '-client__name': '-client__name',
+        'total_amount': 'total_amount',
+        '-total_amount': '-total_amount',
+        'date_issued': 'date_issued',
+        '-date_issued': '-date_issued',
+        'status': 'status',
+        '-status': '-status',
+    }
+    if sort_param not in allowed_sorts:
+        sort_param = '-date_issued'
+    
+    invoice_queryset = invoice_queryset.order_by(sort_param, '-id')
+
+    paginator = Paginator(invoice_queryset, 5)
     page_obj = paginator.get_page(request.GET.get('page'))
     # Attach latest delivery status to each invoice for display
     for invoice in page_obj:
         invoice.latest_delivery_status = invoice.get_latest_delivery_status()
 
+    # Build sort URLs
+    def toggle_sort(field):
+        """Toggle sort direction for a field"""
+        if sort_param == field:
+            return '-' + field
+        elif sort_param == '-' + field:
+            return field
+        else:
+            return '-' + field
+
     return render(request, 'invoices/invoice_list.html', {
         'invoices': page_obj,
         'search_query': search_query,
         'status_filter': status_filter,
+        'overdue_filter': overdue_filter,
+        'current_sort': sort_param,
+        'toggle_sort': toggle_sort,
     })
 
 
@@ -230,17 +303,25 @@ def invoice_create(request):
                 Invoice.objects.update_totals(invoice)
                 invoice.refresh_from_db()
 
-                is_anomaly, comment = get_anomaly_status(request.user, invoice)
-                BillingAuditLog.objects.create(
-                    user=request.user,
-                    invoice=invoice,
-                    is_anomaly=is_anomaly,
-                    ai_comment=comment,
-                    details={
-                        "total": float(invoice.total_amount),
-                        "source": "manual_create"
-                    }
-                )
+                try:
+                    is_anomaly, comment = get_anomaly_status(request.user, invoice)
+                    BillingAuditLog.objects.create(
+                        user=request.user,
+                        invoice=invoice,
+                        is_anomaly=is_anomaly,
+                        ai_comment=comment,
+                        details={
+                            "total": float(invoice.total_amount),
+                            "source": "manual_create"
+                        }
+                    )
+                    if is_anomaly:
+                        messages.warning(request, mark_safe(f"⚠️ Invoice flagged by audit system: {comment} <a href='{reverse('invoices:billing_audit_report')}' class='alert-link'>Review in Audit Report</a>"), extra_tags='safe')
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to audit new invoice {invoice.id}: {e}")
+                    # Still save the invoice even if audit fails
 
             messages.success(request, "Invoice created.")
             return redirect('invoices:invoice_detail', pk=invoice.pk)
@@ -266,6 +347,27 @@ def invoice_edit(request, pk):
                 form.save()
                 formset.save()
                 Invoice.objects.update_totals(invoice)
+                invoice.refresh_from_db()
+                
+                # Re-audit the invoice after edits
+                try:
+                    is_anomaly, comment = get_anomaly_status(request.user, invoice)
+                    BillingAuditLog.objects.filter(invoice=invoice).delete()
+                    BillingAuditLog.objects.create(
+                        user=request.user,
+                        invoice=invoice,
+                        is_anomaly=is_anomaly,
+                        ai_comment=comment,
+                        details={
+                            "total": float(invoice.total_amount),
+                            "source": "manual_edit"
+                        }
+                    )
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to audit edited invoice {invoice.id}: {e}")
+                    # Still save the invoice even if audit fails
             return redirect('invoices:invoice_detail', pk=invoice.pk)
     else:
         form = InvoiceForm(instance=invoice)
@@ -302,8 +404,8 @@ def bulk_post(request):
         invoices = Invoice.objects.filter(id__in=invoice_ids, user=request.user, status='DRAFT')
         count = 0
         for inv in invoices:
-            is_anomaly, comment = get_anomaly_status(request.user, inv)
-            if is_anomaly:
+            try:
+                is_anomaly, comment = get_anomaly_status(request.user, inv)
                 BillingAuditLog.objects.create(
                     user=request.user,
                     invoice=inv,
@@ -314,7 +416,13 @@ def bulk_post(request):
                         "source": "bulk_post"
                     }
                 )
-                continue  # Skip posting/emailing flagged invoices
+                if is_anomaly:
+                    continue  # Skip posting/emailing flagged invoices
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to audit invoice {inv.id} in bulk_post: {e}")
+                # Continue anyway even if audit fails
             with transaction.atomic():
                 inv.status = 'PENDING'
                 inv.save()

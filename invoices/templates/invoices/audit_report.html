@@ -71,12 +71,29 @@
                                 <td>
                                     {% if log.is_anomaly %}
                                         <span class="badge bg-danger">FLAGGED</span>
-                                        <form method="post"
-                                              action="{% url 'invoices:mark_anomaly_sorted' log.pk %}"
-                                              style="display:inline">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-outline-success ms-2">Mark Sorted & Resend</button>
-                                        </form>
+                                        <div class="mt-2 d-flex gap-2">
+                                            <form method="post"
+                                                  action="{% url 'invoices:mark_anomaly_sorted' log.pk %}"
+                                                  style="display:inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-success">Accept & Send</button>
+                                            </form>
+                                            <form method="post"
+                                                  action="{% url 'invoices:cancel_invoice_from_audit' log.pk %}"
+                                                  style="display:inline"
+                                                  onsubmit="return confirm('Provide a reason for cancellation in the prompt.\n\nReasons: Wrong email, Incorrect data, Sent to wrong client, Other')">
+                                                {% csrf_token %}
+                                                <input type="hidden"
+                                                       name="cancellation_reason"
+                                                       id="reason_{{ log.pk }}"
+                                                       required>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-warning"
+                                                        onclick="getCancellationReason({{ log.pk }})">
+                                                    Cancel Invoice
+                                                </button>
+                                            </form>
+                                        </div>
                                     {% else %}
                                         <span class="badge bg-success">CLEARED</span>
                                     {% endif %}
@@ -92,4 +109,14 @@
             </div>
         </div>
     </div>
+    <script>
+        function getCancellationReason(logId) {
+            const reason = prompt('Why are you cancelling this invoice?\n\nExamples:\n- Wrong email address\n- Incorrect invoice data\n- Sent to wrong client\n- Other error');
+
+            if (reason && reason.trim()) {
+                document.getElementById('reason_' + logId).value = reason;
+                document.getElementById('reason_' + logId).closest('form').submit();
+            }
+        }
+    </script>
 {% endblock %}

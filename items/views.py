@@ -8,8 +8,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
 from invoices.models import Invoice
@@ -126,6 +127,7 @@ def generate_invoice_from_items(request):
         for item in items:
             client_map[item.client].append(item)
 
+        flagged_count = 0
         for client, client_items in client_map.items():
             initial_tax_mode = Invoice.TaxMode.FULL if profile.is_vat_registered else Invoice.TaxMode.NONE
 
@@ -147,8 +149,32 @@ def generate_invoice_from_items(request):
             # Usually invoice.sync_totals() or Invoice.objects.update_totals(invoice)
             invoice.sync_totals()
             invoice.save()
+            
+            # Add audit logging
+            try:
+                from core.utils import get_anomaly_status
+                from core.models import BillingAuditLog
+                is_anomaly, comment = get_anomaly_status(request.user, invoice)
+                BillingAuditLog.objects.create(
+                    user=request.user,
+                    invoice=invoice,
+                    is_anomaly=is_anomaly,
+                    ai_comment=comment,
+                    details={
+                        "total": float(invoice.total_amount),
+                        "source": "items_bulk_billing"
+                    }
+                )
+                if is_anomaly:
+                    flagged_count += 1
+                    messages.warning(request, mark_safe(f"⚠️ Invoice #{invoice.number} flagged: {comment} <a href='{reverse('invoices:billing_audit_report')}' class='alert-link'>Review in Audit</a>"), extra_tags='safe')
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to create audit log for invoice {invoice.id}: {e}")
+                # Don't fail the invoice creation just because audit failed
 
-        messages.success(request, f"Generated {len(client_map)} invoice(s) as drafts.")
+        messages.success(request, f"Generated {len(client_map)} invoice(s) as drafts." + (f" {flagged_count} flagged by audit." if flagged_count > 0 else ""))
 
     return redirect('invoices:invoice_list')
 

@@ -2,191 +2,252 @@
 {% load humanize %}
 {% load l10n %}
 {% block title %}Invoice #{{ invoice.number|default:invoice.id }}{% endblock %}
-
 {% block content %}
-<div class="container mt-4 mb-5">
-    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-        <div>
-            <h2 class="mb-0">Invoice #{{ invoice.number|default:invoice.id }}</h2>
-            <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'OVERDUE' %}bg-danger{% else %}bg-warning text-dark{% endif %} px-3 py-2 mt-2">
-                {{ invoice.get_status_display }}
-            </span>
-        </div>
-
-
-
-<div class="btn-group">
-
-{% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
-<button class="btn btn-sm btn-success"
-        hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
-        hx-target="#paymentModalContent"
-        hx-trigger="click"
-        hx-on::after-request="
-          var myModal = new bootstrap.Modal(document.getElementById('paymentModal'));
-          myModal.show();
-        "
-        title="Record Payment">
-    <i class="bi bi-cash-stack"></i>
-    <span class="d-none d-md-inline">Pay</span>
-</button>
-{% elif invoice.status == 'DRAFT' %}
-<button class="btn btn-sm btn-outline-secondary" disabled title="Locked in Draft">
-    <i class="bi bi-lock"></i>
-    <span class="d-none d-md-inline">Draft</span>
-</button>
-{% endif %}
-            
-            <div class="btn-group">
-                <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-download"></i> Documents
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="{% url 'invoices:invoice_pdf' invoice.pk %}" target="_blank">Download Tax Invoice (PDF)</a></li>
-                    <li><a class="dropdown-item" href="{% url 'timesheets:export_metadata_pdf' invoice.id %}">Download Work Log</a></li>
-                </ul>
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+            <div>
+                <h2 class="mb-0">Invoice #{{ invoice.number|default:invoice.id }}</h2>
+                <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'OVERDUE' %}bg-danger{% else %}bg-warning text-dark{% endif %} px-3 py-2 mt-2">
+                    {{ invoice.get_status_display }}
+                </span>
             </div>
-            {% if invoice.status == 'DRAFT' %}
-            <a href="{% url 'invoices:delete_invoice' invoice.pk %}" class="btn btn-outline-danger" title="Delete Draft Invoice">
-                <i class="bi bi-trash"></i> Delete
-            </a>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body border-start border-primary border-4 rounded">
-                    <h6 class="text-muted text-uppercase small fw-bold">Total Invoiced</h6>
-                    <h3 class="mb-0">{{ request.user.profile.currency }} {{ invoice.total_amount|floatformat:2|intcomma }}</h3>
+            <div class="d-flex gap-2 flex-wrap">
+                <!-- Back to List -->
+                <a href="{% url 'invoices:invoice_list' %}"
+                   class="btn btn-outline-secondary btn-sm"
+                   title="Back to list">
+                    <i class="bi bi-arrow-left"></i>
+                    <span class="d-none d-md-inline">Back</span>
+                </a>
+                <!-- Record Payment (if applicable) -->
+                {% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
+                    <button class="btn btn-success btn-sm"
+                            hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
+                            hx-target="#paymentModalContent"
+                            hx-trigger="click"
+                            hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show()"
+                            title="Record Payment">
+                        <i class="bi bi-cash-stack"></i>
+                        <span class="d-none d-md-inline">Record Payment</span>
+                    </button>
+                {% endif %}
+                <!-- Resend Invoice (if not draft/cancelled) -->
+                {% if invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
+                    <button class="btn btn-outline-primary btn-sm"
+                            hx-get="{% url 'invoices:get_resend_modal' invoice.pk %}"
+                            hx-target="#paymentModalContent"
+                            hx-trigger="click"
+                            hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show()"
+                            title="Resend Invoice Email">
+                        <i class="bi bi-envelope-arrow-up"></i>
+                        <span class="d-none d-md-inline">Resend Email</span>
+                    </button>
+                {% endif %}
+                <!-- Documents Dropdown -->
+                <div class="btn-group btn-sm">
+                    <button type="button"
+                            class="btn btn-outline-dark dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            title="Download documents">
+                        <i class="bi bi-download"></i>
+                        <span class="d-none d-md-inline">Download</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a class="dropdown-item"
+                               href="{% url 'invoices:invoice_pdf' invoice.pk %}"
+                               target="_blank">
+                                <i class="bi bi-file-pdf me-2"></i>Invoice PDF
+                            </a>
+                        </li>
+                        {% if invoice.billed_timesheets.count > 0 %}
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'timesheets:export_metadata_pdf' invoice.id %}"
+                                   target="_blank">
+                                    <i class="bi bi-file-text me-2"></i>Timesheet Report
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <!-- More Actions Dropdown -->
+                <div class="btn-group btn-sm">
+                    <button type="button"
+                            class="btn btn-outline-secondary dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            title="More options">
+                        <i class="bi bi-three-dots-vertical"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        {% if invoice.status == 'DRAFT' %}
+                            <li>
+                                <a class="dropdown-item"
+                                   href="{% url 'invoices:invoice_edit' invoice.pk %}">
+                                    <i class="bi bi-pencil me-2"></i>Edit Invoice
+                                </a>
+                            </li>
+                        {% endif %}
+                        {% if invoice.billed_timesheets.count > 0 %}
+                            <li>{% include "invoices/partials/timesheet_attach_toggle_form.html" with invoice=invoice %}</li>
+                        {% endif %}
+                        {% if invoice.status == 'DRAFT' %}
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <a class="dropdown-item text-danger"
+                                   href="{% url 'invoices:delete_invoice' invoice.pk %}">
+                                    <i class="bi bi-trash me-2"></i>Delete Draft
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body border-start border-success border-4 rounded">
-                    <h6 class="text-muted text-uppercase small fw-bold">Total Paid</h6>
-                    <h3 class="mb-0 text-success">{{ request.user.profile.currency }} {{ invoice.total_paid|floatformat:2|intcomma }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body border-start border-danger border-4 rounded">
-                    <h6 class="text-muted text-uppercase small fw-bold">Balance Outstanding</h6>
-                    <h3 class="mb-0 {% if invoice.balance_due > 0 %}text-danger{% endif %}">{{ request.user.profile.currency }} {{ invoice.balance_due|floatformat:2|intcomma }}</h3>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card shadow-sm mb-4 border-0">
-                <div class="card-header bg-white fw-bold border-bottom-0 pt-3">Billed To</div>
-                <div class="card-body">
-                    <h5 class="card-title text-primary">{{ invoice.client.name }}</h5>
-                    <p class="card-text text-muted">{{ invoice.client.address|linebreaks }}</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card shadow-sm mb-4 border-0">
-                <div class="card-header bg-white fw-bold border-bottom-0 pt-3">Invoice Details</div>
-                <div class="card-body">
-                    <div class="d-flex justify-content-between mb-2">
-                        <span class="text-muted">Date Issued:</span>
-                        <span class="fw-bold">{{ invoice.date_issued|date:"d M Y" }}</span>
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body border-start border-primary border-4 rounded">
+                        <h6 class="text-muted text-uppercase small fw-bold">Total Invoiced</h6>
+                        <h3 class="mb-0">{{ request.user.profile.currency }} {{ invoice.total_amount|floatformat:2|intcomma }}</h3>
                     </div>
-                    <div class="d-flex justify-content-between mb-0">
-                        <span class="text-muted">Due Date:</span>
-                        <span class="fw-bold text-danger">{{ invoice.due_date|date:"d M Y" }}</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body border-start border-success border-4 rounded">
+                        <h6 class="text-muted text-uppercase small fw-bold">Total Paid</h6>
+                        <h3 class="mb-0 text-success">{{ request.user.profile.currency }} {{ invoice.total_paid|floatformat:2|intcomma }}</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body border-start border-danger border-4 rounded">
+                        <h6 class="text-muted text-uppercase small fw-bold">Balance Outstanding</h6>
+                        <h3 class="mb-0 {% if invoice.balance_due > 0 %}text-danger{% endif %}">
+                            {{ request.user.profile.currency }} {{ invoice.balance_due|floatformat:2|intcomma }}
+                        </h3>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table mb-0">
-                    <thead class="table-light">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card shadow-sm mb-4 border-0">
+                    <div class="card-header bg-white fw-bold border-bottom-0 pt-3">Billed To</div>
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">{{ invoice.client.name }}</h5>
+                        <p class="card-text text-muted">{{ invoice.client.address|linebreaks }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm mb-4 border-0">
+                    <div class="card-header bg-white fw-bold border-bottom-0 pt-3">Invoice Details</div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Date Issued:</span>
+                            <span class="fw-bold">{{ invoice.date_issued|date:"d M Y" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-0">
+                            <span class="text-muted">Due Date:</span>
+                            <span class="fw-bold text-danger">{{ invoice.due_date|date:"d M Y" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4 py-3">Description</th>
+                                <th class="text-end py-3">Qty / Hours</th>
+                                <th class="text-end py-3">Unit Price</th>
+                                <th class="text-end pe-4 py-3">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in invoice.billed_items.all %}
+                                <tr class="align-middle">
+                                    <td class="ps-4">{{ item.description }}</td>
+                                    <td class="text-end">{{ item.quantity }}</td>
+                                    <td class="text-end">{{ request.user.profile.currency }} {{ item.unit_price|floatformat:2|intcomma }}</td>
+                                    <td class="text-end pe-4 fw-bold">
+                                        {{ request.user.profile.currency }} {{ item.row_subtotal|floatformat:2|intcomma }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-group-divider">
+                            <tr>
+                                <th colspan="3" class="text-end pt-3 fw-normal text-muted">Subtotal</th>
+                                <td class="text-end pe-4 pt-3">
+                                    {{ request.user.profile.currency }} {{ invoice.subtotal_amount|floatformat:2|intcomma }}
+                                </td>
+                            </tr>
+                            {% if invoice.tax_amount > 0 %}
+                                <tr>
+                                    <th colspan="3" class="text-end fw-normal text-muted">VAT ({{ invoice.user.profile.vat_rate }}%)</th>
+                                    <td class="text-end pe-4 text-muted">
+                                        {{ request.user.profile.currency }} {{ invoice.tax_amount|floatformat:2|intcomma }}
+                                    </td>
+                                </tr>
+                            {% endif %}
+                            <tr>
+                                <th colspan="3" class="text-end fw-bold">Total Amount</th>
+                                <td class="text-end pe-4 fw-bold">
+                                    {{ request.user.profile.currency }} {{ invoice.total_amount|floatformat:2|intcomma }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th colspan="3" class="text-end text-success fw-normal small">Less Payments Received</th>
+                                <td class="text-end pe-4 text-success small">
+                                    - {{ request.user.profile.currency }} {{ invoice.total_paid|floatformat:2|intcomma }}
+                                </td>
+                            </tr>
+                            <tr class="table-light">
+                                <th colspan="3" class="text-end fs-5 text-primary pe-3">Balance Due</th>
+                                <td class="text-end pe-4 fs-5 text-primary">
+                                    <strong>{{ request.user.profile.currency }} {{ invoice.balance_due|floatformat:2|intcomma }}</strong>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="card shadow-sm border-0 d-print-none">
+            <div class="card-header bg-white fw-bold pt-3 border-bottom-0">Payment History</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="small text-muted">
                         <tr>
-                            <th class="ps-4 py-3">Description</th>
-                            <th class="text-end py-3">Qty / Hours</th>
-                            <th class="text-end py-3">Unit Price</th>
-                            <th class="text-end pe-4 py-3">Total</th>
+                            <th class="ps-4">Date</th>
+                            <th>Reference</th>
+                            <th class="text-end pe-4">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in invoice.billed_items.all %}
-                        <tr class="align-middle">
-                            <td class="ps-4">{{ item.description }}</td>
-                            <td class="text-end">{{ item.quantity }}</td>
-                            <td class="text-end">{{ request.user.profile.currency }} {{ item.unit_price|floatformat:2|intcomma }}</td>
-                            <td class="text-end pe-4 fw-bold">{{ request.user.profile.currency }} {{ item.row_subtotal|floatformat:2|intcomma }}</td>
-                        </tr>
+                        {% for payment in invoice.payments.all %}
+                            <tr class="small">
+                                <td class="ps-4 text-muted">{{ payment.date_paid|date:"d M Y" }}</td>
+                                <td>{{ payment.reference }}</td>
+                                <td class="text-end pe-4 fw-bold">{{ request.user.profile.currency }} {{ payment.amount|floatformat:2|intcomma }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center py-3 text-muted small">No payments recorded yet.</td>
+                            </tr>
                         {% endfor %}
                     </tbody>
-                    <tfoot class="table-group-divider">
-                        <tr>
-                            <th colspan="3" class="text-end pt-3 fw-normal text-muted">Subtotal</th>
-                            <td class="text-end pe-4 pt-3">{{ request.user.profile.currency }} {{ invoice.subtotal_amount|floatformat:2|intcomma }}</td>
-                        </tr>
-                        {% if invoice.tax_amount > 0 %}
-                        <tr>
-                            <th colspan="3" class="text-end fw-normal text-muted">VAT ({{ invoice.user.profile.vat_rate }}%)</th>
-                            <td class="text-end pe-4 text-muted">{{ request.user.profile.currency }} {{ invoice.tax_amount|floatformat:2|intcomma }}</td>
-                        </tr>
-                        {% endif %}
-                        <tr>
-                            <th colspan="3" class="text-end fw-bold">Total Amount</th>
-                            <td class="text-end pe-4 fw-bold">{{ request.user.profile.currency }} {{ invoice.total_amount|floatformat:2|intcomma }}</td>
-                        </tr>
-                        <tr>
-                            <th colspan="3" class="text-end text-success fw-normal small">Less Payments Received</th>
-                            <td class="text-end pe-4 text-success small">- {{ request.user.profile.currency }} {{ invoice.total_paid|floatformat:2|intcomma }}</td>
-                        </tr>
-                        <tr class="table-light">
-                            <th colspan="3" class="text-end fs-5 text-primary pe-3">Balance Due</th>
-                            <td class="text-end pe-4 fs-5 text-primary"><strong>{{ request.user.profile.currency }} {{ invoice.balance_due|floatformat:2|intcomma }}</strong></td>
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
         </div>
     </div>
-
-    <div class="card shadow-sm border-0 d-print-none">
-        <div class="card-header bg-white fw-bold pt-3 border-bottom-0">Payment History</div>
-        <div class="card-body p-0">
-            <table class="table table-sm mb-0">
-                <thead class="small text-muted">
-                    <tr>
-                        <th class="ps-4">Date</th>
-                        <th>Reference</th>
-                        <th class="text-end pe-4">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for payment in invoice.payments.all %}
-                    <tr class="small">
-                        <td class="ps-4 text-muted">{{ payment.date_paid|date:"d M Y" }}</td>
-                        <td>{{ payment.reference }}</td>
-                        <td class="text-end pe-4 fw-bold">{{ request.user.profile.currency }} {{ payment.amount|floatformat:2|intcomma }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="3" class="text-center py-3 text-muted small">No payments recorded yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
 {% endblock %}

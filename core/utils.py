@@ -25,7 +25,12 @@ def get_anomaly_status(user, invoice):
         is_anomaly = True
         comments.append("Invoice total is zero")
 
-    # 2. Statistical anomaly — flag if > 3x the user's average invoice
+    # 2. Absolute threshold - flag any invoice over £5,000
+    if float(invoice.total_amount) > 5000:
+        is_anomaly = True
+        comments.append(f"High-value invoice (£{invoice.total_amount:.2f})")
+
+    # 3. Statistical anomaly — flag if > 2x the user's average invoice
     avg = Invoice.objects.filter(
         user=user,
         status__in=['PENDING', 'PAID']
@@ -33,18 +38,23 @@ def get_anomaly_status(user, invoice):
 
     if avg and avg > 0:
         ratio = float(invoice.total_amount) / float(avg)
-        if ratio > 3:
+        if ratio > 2:
             is_anomaly = True
-            comments.append(f"Invoice is {ratio:.1f}x above your average ({avg:.2f})")
+            comments.append(f"Invoice is {ratio:.1f}x above your average (£{avg:.2f})")
 
-    # 3. Unusually low — might indicate a data entry error
+    # 4. Unusually low — might indicate a data entry error
     if avg and avg > 0:
         ratio = float(invoice.total_amount) / float(avg)
         if 0 < ratio < 0.1:
             is_anomaly = True
             comments.append(f"Invoice is unusually low — only {ratio*100:.1f}% of your average")
+    
+    # 5. Suspiciously very low absolute amount (under £10)
+    if 0 < float(invoice.total_amount) < 10:
+        is_anomaly = True
+        comments.append("Invoice amount suspiciously low (under £10)")
 
-    # 4. No client email — will fail to send
+    # 6. No client email — will fail to send
     if not invoice.client.email:
         is_anomaly = True
         comments.append("Client has no email address")
