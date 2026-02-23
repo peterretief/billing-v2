@@ -516,6 +516,15 @@ def record_payment(request, pk):
             credit_to_apply_str = request.POST.get('credit_to_apply', '0').replace(',', '').strip()
             credit_to_apply = Decimal(credit_to_apply_str)
 
+            # Validate that at least one payment method is used
+            if amount <= 0 and credit_to_apply <= 0:
+                messages.error(request, "Please enter a payment amount or apply credit.")
+                if request.headers.get('HX-Request'):
+                    response = HttpResponse(status=204)
+                    response['HX-Redirect'] = next_url
+                    return response
+                return redirect(next_url)
+
             with transaction.atomic():
                 # Apply credit notes if requested
                 credits_used = Decimal('0.00')
@@ -548,23 +557,24 @@ def record_payment(request, pk):
                 # Record the payment (after credits subtracted)
                 final_payment_amount = amount - credits_used
                 
+                # Allow payments with amount > 0, or credit-only payments
                 if final_payment_amount > 0 or credits_used > 0:
                     Payment.objects.create(
                         user=request.user,
                         invoice=invoice,
-                        amount=final_payment_amount,
+                        amount=max(final_payment_amount, Decimal('0.00')),  # Ensure amount is never negative
                         reference=request.POST.get('reference', 'Manual Payment')
                     )
                     
-                    if credits_used > 0:
+                    if credits_used > 0 and final_payment_amount > 0:
                         messages.success(
                             request, 
-                            f"Payment recorded: {final_payment_amount:.2f} cash + {credits_used:.2f} credit applied."
+                            f"Payment recorded: R{final_payment_amount:.2f} cash + R{credits_used:.2f} credit applied."
                         )
+                    elif credits_used > 0:
+                        messages.success(request, f"Payment recorded with R{credits_used:.2f} credit applied.")
                     else:
-                        messages.success(request, f"Payment of {final_payment_amount} recorded.")
-                else:
-                    messages.info(request, f"Credit of {credits_used} applied to invoice.")
+                        messages.success(request, f"Payment of R{final_payment_amount:.2f} recorded.")
 
             if request.headers.get('HX-Request'):
                 response = HttpResponse(status=204)

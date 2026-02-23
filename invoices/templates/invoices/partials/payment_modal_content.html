@@ -20,7 +20,7 @@
                         <strong>Available Credit Balance:</strong>
                         <span class="fw-bold">R{{ available_credit|floatformat:2 }}</span>
                     </div>
-                    <small class="d-block mt-2 text-muted">You can apply credits below to reduce the payment amount</small>
+                    <small class="d-block mt-2 text-muted">You can apply credits below to reduce the payment amount, or leave cash amount at 0 to pay entirely with credit</small>
                 </div>
             {% endif %}
             <!-- Invoice Balance Due -->
@@ -45,9 +45,10 @@
                            step="0.01"
                            class="form-control"
                            value="{{ invoice.balance_due|unlocalize }}"
-                           max="{{ invoice.balance_due|unlocalize }}"
-                           required>
+                           min="0"
+                           max="{{ invoice.balance_due|unlocalize }}">
                 </div>
+                <small class="form-text text-muted d-block mt-1">Enter amount to pay, or 0 to use only credit</small>
             </div>
             <!-- Credit Application -->
             {% if available_credit > 0 %}
@@ -84,7 +85,9 @@
             <button type="button"
                     class="btn btn-link text-decoration-none text-muted"
                     data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-success px-4 d-flex align-items-center">
+            <button type="submit"
+                    id="submitBtn"
+                    class="btn btn-success px-4 d-flex align-items-center">
                 <span class="htmx-indicator spinner-border spinner-border-sm me-2"
                       role="status"
                       aria-hidden="true"></span>
@@ -96,29 +99,38 @@
     </form>
 </div>
 <script>
-    // Update total when credit is applied
     document.addEventListener('DOMContentLoaded', function() {
-        {
-            %
-            if available_credit > 0 %
-        }
         const cashInput = document.getElementById('paymentAmount');
         const creditInput = document.getElementById('creditToApply');
         const totalSpan = document.getElementById('totalToPay');
+        const submitBtn = document.getElementById('submitBtn');
 
         function updateTotal() {
             const cash = parseFloat(cashInput.value) || 0;
-            const credit = parseFloat(creditInput.value) || 0;
+            const credit = parseFloat(creditInput ? creditInput.value : 0) || 0;
             const total = cash + credit;
-            totalSpan.textContent = 'R' + total.toFixed(2);
+
+            if (totalSpan) {
+                totalSpan.textContent = 'R' + total.toFixed(2);
+            }
+
+            // Enable submit button only if total coverage > 0
+            if (submitBtn) {
+                submitBtn.disabled = total <= 0;
+            }
         }
 
-        if (cashInput) cashInput.addEventListener('change', updateTotal);
-        if (cashInput) cashInput.addEventListener('keyup', updateTotal);
-        if (creditInput) creditInput.addEventListener('change', updateTotal);
-        if (creditInput) creditInput.addEventListener('keyup', updateTotal);
-        {
-            % endif %
+        if (cashInput) {
+            cashInput.addEventListener('change', updateTotal);
+            cashInput.addEventListener('keyup', updateTotal);
         }
+
+        if (creditInput) {
+            creditInput.addEventListener('change', updateTotal);
+            creditInput.addEventListener('keyup', updateTotal);
+        }
+
+        // Initial check
+        updateTotal();
     });
 </script>
