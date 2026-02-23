@@ -285,21 +285,29 @@
                 if (creditMaxBtn) {
                     creditMaxBtn.addEventListener('click', function(e) {
                         e.preventDefault();
-                        if (!creditInput) return;
+
+                        // Re-query creditInput to ensure it's found
+                        const creditInputField = document.getElementById('creditToApply');
+                        if (!creditInputField) return;
 
                         // Get max credit from button's data attribute for reliability
                         let maxCredit = parseFloat(creditMaxBtn.dataset.availableCredit);
                         if (isNaN(maxCredit)) {
                             // Fallback to input's data attribute
-                            maxCredit = getMaxCredit();
+                            const dataMaxCredit = creditInputField.dataset.maxCredit;
+                            if (dataMaxCredit) {
+                                maxCredit = parseFloat(dataMaxCredit) || 0;
+                            } else {
+                                maxCredit = parseFloat(creditInputField.max) || 0;
+                            }
                         }
 
-                        creditInput.value = maxCredit.toFixed(2);
+                        creditInputField.value = maxCredit.toFixed(2);
                         // Update cash to cover the remaining balance
                         const remainingCash = Math.max(0, balanceDue - maxCredit);
                         cashInput.value = remainingCash.toFixed(2);
                         updateTotal();
-                        creditInput.focus();
+                        creditInputField.focus();
                     });
                 }
 
