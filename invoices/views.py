@@ -509,7 +509,50 @@ def duplicate_invoice(request, pk):
 @setup_required
 def bulk_post(request):
     if request.method == "POST":
-        invoice_ids = request.POST.getlist("invoice_ids")
+        select_all_matching = request.POST.get("select_all_matching") == "true"
+        
+        if select_all_matching:
+            # Reconstruct queryset with the same filters from the list view
+            from django.db.models import Case, When, Q, BooleanField
+            today = timezone.now().date()
+            
+            invoice_queryset = (
+                Invoice.objects.filter(user=request.user)
+                .annotate(
+                    is_overdue=Case(
+                        When(Q(due_date__lt=today) & ~Q(status__in=["PAID", "DRAFT", "CANCELLED"]), then=True),
+                        default=False,
+                        output_field=BooleanField(),
+                    )
+                )
+            )
+            
+            # Apply the same filters
+            status_filter = request.POST.get("status")
+            if status_filter == "UNPAID":
+                invoice_queryset = invoice_queryset.exclude(status="PAID")
+            
+            # Exclude rejected quotes
+            invoice_queryset = invoice_queryset.exclude(quote_status="REJECTED")
+            
+            overdue_filter = request.POST.get("overdue") == "true"
+            if overdue_filter:
+                invoice_queryset = invoice_queryset.filter(is_overdue=True)
+            
+            search_query = request.POST.get("q", "").strip()
+            if search_query:
+                invoice_queryset = invoice_queryset.filter(
+                    Q(number__icontains=search_query)
+                    | Q(client__name__icontains=search_query)
+                    | Q(client__email__icontains=search_query)
+                )
+            
+            # Only include DRAFT invoices that are NOT quotes
+            invoice_queryset = invoice_queryset.filter(status="DRAFT", is_quote=False)
+            invoice_ids = list(invoice_queryset.values_list("id", flat=True))
+        else:
+            invoice_ids = request.POST.getlist("invoice_ids")
+        
         # Exclude quotes from bulk posting - only post invoices
         invoices = Invoice.objects.filter(id__in=invoice_ids, user=request.user, status="DRAFT", is_quote=False)
         count = 0

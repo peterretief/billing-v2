@@ -19,6 +19,14 @@
     </form>
     <form action="{% url 'invoices:bulk_post' %}" method="POST">
         {% csrf_token %}
+        <input type="hidden"
+               id="selectAllMode"
+               name="select_all_matching"
+               value="false">
+        <!-- Preserve filter parameters for bulk operations -->
+        {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+        {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+        {% if overdue_filter %}<input type="hidden" name="overdue" value="true">{% endif %}
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
@@ -32,217 +40,352 @@
                     <div>
                         <span id="selectedCount" class="text-muted me-2"></span>
                         <button id="postBtn" class="btn btn-primary" type="submit" disabled>Post Selected</button>
+                        {% if invoices.paginator.num_pages > 1 %}
+                            <button id="selectAllMatchingBtn"
+                                    class="btn btn-outline-secondary ms-2"
+                                    type="button"
+                                    title="Select all invoices matching current filters across all pages">
+                                Select All
+                            </button>
+                        {% endif %}
+                        <button id="postAllDraftsBtn"
+                                class="btn btn-success ms-2"
+                                type="button"
+                                title="Post all draft invoices ready for sending">
+                            <i class="bi bi-send-check me-1"></i>Post All Drafts
+                        </button>
                     </div>
                 </div>
             </div>
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th style="width:1%">
+                            <input type="checkbox" id="selectAll">
+                        </th>
+                        <th scope="col">
+                            <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'number' %}-number{% else %}number{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Number
+                                {% if current_sort == 'number' %}
+                                    <i class="bi bi-arrow-up ms-1"></i>
+                                {% elif current_sort == '-number' %}
+                                    <i class="bi bi-arrow-down ms-1"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col">
+                            <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'client__name' %}-client__name{% else %}client__name{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Client
+                                {% if current_sort == 'client__name' %}
+                                    <i class="bi bi-arrow-up ms-1"></i>
+                                {% elif current_sort == '-client__name' %}
+                                    <i class="bi bi-arrow-down ms-1"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col">
+                            <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'total_amount' %}-total_amount{% else %}total_amount{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Total
+                                {% if current_sort == 'total_amount' %}
+                                    <i class="bi bi-arrow-up ms-1"></i>
+                                {% elif current_sort == '-total_amount' %}
+                                    <i class="bi bi-arrow-down ms-1"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col">Type</th>
+                        <th scope="col">
+                            <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'status' %}-status{% else %}status{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Status
+                                {% if current_sort == 'status' %}
+                                    <i class="bi bi-arrow-up ms-1"></i>
+                                {% elif current_sort == '-status' %}
+                                    <i class="bi bi-arrow-down ms-1"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col">Emailed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in invoices %}
                         <tr>
-                            <th style="width:1%">
-                                <input type="checkbox" id="selectAll">
-                            </th>
-                            <th scope="col">
-                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'number' %}-number{% else %}number{% endif %}"
-                                   class="text-decoration-none text-dark">
-                                    Number
-                                    {% if current_sort == 'number' %}
-                                        <i class="bi bi-arrow-up ms-1"></i>
-                                    {% elif current_sort == '-number' %}
-                                        <i class="bi bi-arrow-down ms-1"></i>
-                                    {% endif %}
-                                </a>
-                            </th>
-                            <th scope="col">
-                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'client__name' %}-client__name{% else %}client__name{% endif %}"
-                                   class="text-decoration-none text-dark">
-                                    Client
-                                    {% if current_sort == 'client__name' %}
-                                        <i class="bi bi-arrow-up ms-1"></i>
-                                    {% elif current_sort == '-client__name' %}
-                                        <i class="bi bi-arrow-down ms-1"></i>
-                                    {% endif %}
-                                </a>
-                            </th>
-                            <th scope="col">
-                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'total_amount' %}-total_amount{% else %}total_amount{% endif %}"
-                                   class="text-decoration-none text-dark">
-                                    Total
-                                    {% if current_sort == 'total_amount' %}
-                                        <i class="bi bi-arrow-up ms-1"></i>
-                                    {% elif current_sort == '-total_amount' %}
-                                        <i class="bi bi-arrow-down ms-1"></i>
-                                    {% endif %}
-                                </a>
-                            </th>
-                            <th scope="col">Type</th>
-                            <th scope="col">
-                                <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'status' %}-status{% else %}status{% endif %}"
-                                   class="text-decoration-none text-dark">
-                                    Status
-                                    {% if current_sort == 'status' %}
-                                        <i class="bi bi-arrow-up ms-1"></i>
-                                    {% elif current_sort == '-status' %}
-                                        <i class="bi bi-arrow-down ms-1"></i>
-                                    {% endif %}
-                                </a>
-                            </th>
-                            <th scope="col">Emailed</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for invoice in invoices %}
-                            <tr>
-                                <td>
-                                    {% if invoice.status == 'DRAFT' %}
-                                        {% if invoice.is_quote %}
-                                            <input type="checkbox"
-                                                   class="invoice-checkbox"
-                                                   name="invoice_ids"
-                                                   value="{{ invoice.pk }}"
-                                                   disabled
-                                                   title="Quotes are sent individually, not in batch">
-                                        {% else %}
-                                            <input type="checkbox"
-                                                   class="invoice-checkbox"
-                                                   name="invoice_ids"
-                                                   value="{{ invoice.pk }}">
-                                        {% endif %}
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <a href="{% url 'invoices:invoice_detail' invoice.pk %}"
-                                       class="text-decoration-none fw-bold link-primary"
-                                       style="font-size: 1.05em;
-                                              transition: all 0.2s ease">
-                                        <i class="bi bi-file-earmark-text me-2"></i>{{ invoice.number|default:"[DRAFT]" }}
-                                    </a>
-                                    <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
-                                </td>
-                                <td>{{ invoice.client.name }}</td>
-                                <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
-                                <td>
-                                    {% if invoice.billed_timesheets.count > 0 %}
-                                        <span class="badge bg-info text-dark"><i class="bi bi-clock-history me-1"></i>Timesheet</span>
-                                    {% else %}
-                                        <span class="badge bg-success"><i class="bi bi-list-check me-1"></i>Items</span>
-                                    {% endif %}
-                                    {% if invoice.is_quote %}<span class="badge bg-secondary"><i class="bi bi-file-text me-1"></i>Quote</span>{% endif %}
-                                </td>
-                                <td>
-                                    {% if invoice.is_overdue %}
-                                        <span class="badge rounded-pill bg-danger">
-                                            <i class="bi bi-exclamation-triangle me-1"></i>OVERDUE
-                                        </span>
-                                    {% else %}
-                                        <span class="badge rounded-pill {% if invoice.status == 'PAID' %}bg-success {% elif invoice.status == 'PENDING' %}bg-info text-dark {% elif invoice.status == 'CANCELLED' %}bg-danger {% else %}bg-warning text-dark {% endif %}">
-                                            {% if invoice.status == 'PENDING' %}
-                                                Sent
-                                            {% else %}
-                                                {{ invoice.get_status_display }}
-                                            {% endif %}
-                                        </span>
-                                    {% endif %}
-                                    {% if invoice.due_date and not invoice.is_overdue and invoice.status != 'PAID' %}
-                                        <div class="small text-muted mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
-                                    {% elif invoice.is_overdue %}
-                                        <div class="small text-muted mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
-                                    {% endif %}
-                                </td>
-                                <td>
+                            <td>
+                                {% if invoice.status == 'DRAFT' %}
                                     {% if invoice.is_quote %}
-                                        {% if invoice.quote_status == "REJECTED" %}
-                                            <span class="badge bg-danger">Rejected</span>
-                                        {% elif invoice.is_emailed %}
-                                            <span class="badge bg-primary">Quoted</span>
+                                        <input type="checkbox"
+                                               class="invoice-checkbox"
+                                               name="invoice_ids"
+                                               value="{{ invoice.pk }}"
+                                               disabled
+                                               title="Quotes are sent individually, not in batch">
+                                    {% else %}
+                                        <input type="checkbox"
+                                               class="invoice-checkbox"
+                                               name="invoice_ids"
+                                               value="{{ invoice.pk }}">
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'invoices:invoice_detail' invoice.pk %}"
+                                   class="text-decoration-none fw-bold link-primary"
+                                   style="font-size: 1.05em;
+                                          transition: all 0.2s ease">
+                                    <i class="bi bi-file-earmark-text me-2"></i>{{ invoice.number|default:"[DRAFT]" }}
+                                </a>
+                                <div class="small text-muted">{{ invoice.date_issued|date:"d M Y" }}</div>
+                            </td>
+                            <td>{{ invoice.client.name }}</td>
+                            <td class="fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ invoice.total_amount|intcomma }}</td>
+                            <td>
+                                {% if invoice.billed_timesheets.count > 0 %}
+                                    <span class="badge bg-info text-dark"><i class="bi bi-clock-history me-1"></i>Timesheet</span>
+                                {% else %}
+                                    <span class="badge bg-success"><i class="bi bi-list-check me-1"></i>Items</span>
+                                {% endif %}
+                                {% if invoice.is_quote %}<span class="badge bg-secondary"><i class="bi bi-file-text me-1"></i>Quote</span>{% endif %}
+                            </td>
+                            <td>
+                                {% if invoice.is_overdue %}
+                                    <span class="badge rounded-pill bg-danger">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>OVERDUE
+                                    </span>
+                                {% else %}
+                                    <span class="badge rounded-pill {% if invoice.status == 'PAID' %}bg-success {% elif invoice.status == 'PENDING' %}bg-info text-dark {% elif invoice.status == 'CANCELLED' %}bg-danger {% else %}bg-warning text-dark {% endif %}">
+                                        {% if invoice.status == 'PENDING' %}
+                                            Sent
                                         {% else %}
-                                            <span class="text-muted small">—</span>
+                                            {{ invoice.get_status_display }}
                                         {% endif %}
-                                    {% elif invoice.was_originally_quote and not invoice.is_emailed %}
-                                        <span class="badge bg-info">Accepted</span>
+                                    </span>
+                                {% endif %}
+                                {% if invoice.due_date and not invoice.is_overdue and invoice.status != 'PAID' %}
+                                    <div class="small text-muted mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
+                                {% elif invoice.is_overdue %}
+                                    <div class="small text-muted mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if invoice.is_quote %}
+                                    {% if invoice.quote_status == "REJECTED" %}
+                                        <span class="badge bg-danger">Rejected</span>
                                     {% elif invoice.is_emailed %}
-                                        <span class="badge bg-success">Invoiced</span>
-                                    {% elif invoice.latest_delivery_status %}
-                                        <span class="badge bg-secondary">{{ invoice.latest_delivery_status }}</span>
+                                        <span class="badge bg-primary">Quoted</span>
                                     {% else %}
                                         <span class="text-muted small">—</span>
                                     {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        {% if invoices|length == 0 %}
-                            <tr>
-                                <td colspan="7" class="text-center py-5 text-muted">
-                                    <i class="bi bi-inbox fs-2 d-block mb-2"></i>
-                                    {% if search_query %}
-                                        No invoices found for <strong>"{{ search_query }}"</strong>.
-                                    {% else %}
-                                        No invoices found matching your criteria.
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
+                                {% elif invoice.was_originally_quote and not invoice.is_emailed %}
+                                    <span class="badge bg-info">Accepted</span>
+                                {% elif invoice.is_emailed %}
+                                    <span class="badge bg-success">Invoiced</span>
+                                {% elif invoice.latest_delivery_status %}
+                                    <span class="badge bg-secondary">{{ invoice.latest_delivery_status }}</span>
+                                {% else %}
+                                    <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    {% if invoices|length == 0 %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                                {% if search_query %}
+                                    No invoices found for <strong>"{{ search_query }}"</strong>.
+                                {% else %}
+                                    No invoices found matching your criteria.
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% if invoices.has_other_pages %}
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if invoices.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link shadow-sm" href="?q={{ search_query }}&page=1">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link shadow-sm"
+                           href="?q={{ search_query }}&page={{ invoices.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link shadow-sm">{{ invoices.number }}</span>
+                </li>
+                {% if invoices.has_next %}
+                    <li class="page-item">
+                        <a class="page-link shadow-sm"
+                           href="?q={{ search_query }}&page={{ invoices.next_page_number }}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link shadow-sm"
+                           href="?q={{ search_query }}&page={{ invoices.paginator.num_pages }}">Last</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</form>
+<!-- Post All Drafts Confirmation Modal -->
+<div class="modal fade"
+     id="postAllDraftsModal"
+     tabindex="-1"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light border-bottom">
+                <h5 class="modal-title fw-bold">
+                    <i class="bi bi-exclamation-circle me-2 text-warning"></i>Confirm Bulk Post
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body py-4">
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle me-2"></i>
+                    You are about to post all draft invoices ready for sending.
+                </div>
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <div class="text-muted small mb-2">Total Invoices</div>
+                                <h3 class="mb-0" id="confirmCount">—</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <div class="text-muted small mb-2">Total Amount</div>
+                                <h3 class="mb-0 text-primary" id="confirmTotal">—</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-muted small">
+                    <i class="bi bi-check-circle me-1 text-success"></i>These invoices will be sent to clients
+                </div>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmPostAllBtn">
+                    <i class="bi bi-send-check me-1"></i>Yes, Post All
+                </button>
             </div>
         </div>
-        {% if invoices.has_other_pages %}
-            <nav class="mt-4">
-                <ul class="pagination justify-content-center">
-                    {% if invoices.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link shadow-sm" href="?q={{ search_query }}&page=1">First</a>
-                        </li>
-                        <li class="page-item">
-                            <a class="page-link shadow-sm"
-                               href="?q={{ search_query }}&page={{ invoices.previous_page_number }}">Previous</a>
-                        </li>
-                    {% endif %}
-                    <li class="page-item active">
-                        <span class="page-link shadow-sm">{{ invoices.number }}</span>
-                    </li>
-                    {% if invoices.has_next %}
-                        <li class="page-item">
-                            <a class="page-link shadow-sm"
-                               href="?q={{ search_query }}&page={{ invoices.next_page_number }}">Next</a>
-                        </li>
-                        <li class="page-item">
-                            <a class="page-link shadow-sm"
-                               href="?q={{ search_query }}&page={{ invoices.paginator.num_pages }}">Last</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        {% endif %}
-    </form>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const selectAll = document.getElementById('selectAll');
-            const postBtn = document.getElementById('postBtn');
-            const countDisplay = document.getElementById('selectedCount');
-            const checkboxes = document.querySelectorAll('.invoice-checkbox');
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAll = document.getElementById('selectAll');
+        const selectAllMatchingBtn = document.getElementById('selectAllMatchingBtn');
+        const selectAllModeInput = document.getElementById('selectAllMode');
+        const postBtn = document.getElementById('postBtn');
+        const countDisplay = document.getElementById('selectedCount');
+        const checkboxes = document.querySelectorAll('.invoice-checkbox');
+        let isSelectAllMode = false;
 
-            function updateCounter() {
-                const count = Array.from(checkboxes).filter(cb => cb.checked).length;
-                postBtn.disabled = count === 0;
+        function updateCounter() {
+            const count = Array.from(checkboxes).filter(cb => cb.checked).length;
+            postBtn.disabled = count === 0 && !isSelectAllMode;
+            if (isSelectAllMode) {
+                countDisplay.textContent = "All matching invoices selected";
+            } else {
                 countDisplay.textContent = count > 0 ? `${count} invoice(s) selected` : "";
             }
+        }
 
-            selectAll.addEventListener('click', function() {
+        selectAll.addEventListener('click', function() {
+            isSelectAllMode = false;
+            selectAllModeInput.value = 'false';
+            checkboxes.forEach(cb => {
+                if (!cb.disabled) { // Skip disabled checkboxes (quotes)
+                    cb.checked = selectAll.checked;
+                }
+            });
+            updateCounter();
+        });
+
+        if (selectAllMatchingBtn) {
+            selectAllMatchingBtn.addEventListener('click', function() {
+                isSelectAllMode = true;
+                selectAllModeInput.value = 'true';
                 checkboxes.forEach(cb => {
-                    if (!cb.disabled) { // Skip disabled checkboxes (quotes)
-                        cb.checked = selectAll.checked;
+                    if (!cb.disabled) {
+                        cb.checked = true;
                     }
                 });
                 updateCounter();
             });
+        }
 
-            checkboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', updateCounter);
+        const postAllDraftsBtn = document.getElementById('postAllDraftsBtn');
+        if (postAllDraftsBtn) {
+            postAllDraftsBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Count draft invoices and calculate total
+                const draftRows = Array.from(document.querySelectorAll('tbody tr')).filter(row => {
+                    const checkbox = row.querySelector('.invoice-checkbox');
+                    return checkbox && !checkbox.disabled;
+                });
+
+                let totalAmount = 0;
+                draftRows.forEach(row => {
+                    const amountText = row.querySelector('td:nth-child(4)')?.textContent || '';
+                    const amount = parseFloat(amountText.replace(/[^\d.]/g, ''));
+                    if (!isNaN(amount)) totalAmount += amount;
+                });
+
+                // Show modal with details
+                document.getElementById('confirmCount').textContent = draftRows.length;
+                document.getElementById('confirmTotal').textContent = totalAmount.toLocaleString('en-ZA', {
+                    style: 'currency',
+                    currency: 'ZAR',
+                    minimumFractionDigits: 2
+                });
+
+                const modal = new bootstrap.Modal(document.getElementById('postAllDraftsModal'));
+                modal.show();
+
+                // Set up confirm button
+                document.getElementById('confirmPostAllBtn').onclick = function() {
+                    modal.hide();
+                    isSelectAllMode = true;
+                    selectAllModeInput.value = 'true';
+                    checkboxes.forEach(cb => cb.checked = false);
+                    postBtn.disabled = false;
+                    postBtn.click();
+                };
             });
+        }
 
-            // Initial update
-            updateCounter();
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                isSelectAllMode = false;
+                selectAllModeInput.value = 'false';
+                updateCounter();
+            });
         });
-    </script>
+
+        // Handle form submission - ensure the flag is set properly
+        postBtn.addEventListener('click', function(e) {
+            selectAllModeInput.value = isSelectAllMode ? 'true' : 'false';
+        });
+
+        // Initial update
+        updateCounter();
+    });
+</script>
 {% endblock content %}
