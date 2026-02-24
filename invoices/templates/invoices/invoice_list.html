@@ -40,14 +40,6 @@
                     <div>
                         <span id="selectedCount" class="text-muted me-2"></span>
                         <button id="postBtn" class="btn btn-primary" type="submit" disabled>Post Selected</button>
-                        {% if invoices.paginator.num_pages > 1 %}
-                            <button id="selectAllMatchingBtn"
-                                    class="btn btn-outline-secondary ms-2"
-                                    type="button"
-                                    title="Select all invoices matching current filters across all pages">
-                                Select All
-                            </button>
-                        {% endif %}
                         <button id="postAllDraftsBtn"
                                 class="btn btn-success ms-2"
                                 type="button"
@@ -290,7 +282,6 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const selectAll = document.getElementById('selectAll');
-        const selectAllMatchingBtn = document.getElementById('selectAllMatchingBtn');
         const selectAllModeInput = document.getElementById('selectAllMode');
         const postBtn = document.getElementById('postBtn');
         const countDisplay = document.getElementById('selectedCount');
@@ -317,19 +308,6 @@
             });
             updateCounter();
         });
-
-        if (selectAllMatchingBtn) {
-            selectAllMatchingBtn.addEventListener('click', function() {
-                isSelectAllMode = true;
-                selectAllModeInput.value = 'true';
-                checkboxes.forEach(cb => {
-                    if (!cb.disabled) {
-                        cb.checked = true;
-                    }
-                });
-                updateCounter();
-            });
-        }
 
         const postAllDraftsBtn = document.getElementById('postAllDraftsBtn');
         if (postAllDraftsBtn) {
