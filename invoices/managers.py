@@ -40,7 +40,7 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         if invoice.status == "CANCELLED":
             return
 
-        # profile = getattr(invoice.user, 'profile', None)
+        profile = getattr(invoice.user, 'profile', None)
         is_registered = getattr(profile, "is_vat_registered", False)
         custom_vat_rate = getattr(profile, "vat_rate", None) or Decimal("15.00")
 
