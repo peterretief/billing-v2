@@ -250,11 +250,13 @@ def email_invoice_to_client(invoice, force_send=False):
     """
     # Block sending only if CURRENTLY flagged (check latest audit log)
     # UNLESS force_send is True (e.g., user explicitly cleared from audit report)
+    # ALSO: Only check audit if auditing is enabled for the user
     from core.models import BillingAuditLog
 
     from .models import Invoice, InvoiceEmailStatusLog
 
-    if not force_send:
+    # Check if auditing is enabled for this user, and if not, bypass audit checks
+    if not force_send and invoice.user.profile.audit_enabled:
         # Check only the LATEST audit log, not all historical ones
         latest_log = BillingAuditLog.objects.filter(invoice=invoice).order_by("-created_at").first()
         if latest_log and latest_log.is_anomaly:
@@ -276,13 +278,14 @@ def email_invoice_to_client(invoice, force_send=False):
         subject = f"{doc_type} {invoice.number} from {profile.company_name}"
 
         # Personalized Greeting
+        signature_name = profile.contact_name if profile.contact_name else profile.company_name
         if invoice.is_quote:
             body = (
                 f"Hi {invoice.client.salutation},\n\n"
                 f"Please find attached quote {invoice.number}.\n\n"
                 f"Total Cost: {profile.currency} {invoice.total_amount:,.2f}\n"
                 f"Valid Until: {invoice.due_date}\n\n"
-                f"Regards,\n{profile.company_name}"
+                f"Regards,\n{signature_name}"
             )
         else:
             body = (
@@ -290,7 +293,7 @@ def email_invoice_to_client(invoice, force_send=False):
                 f"Please find attached invoice {invoice.number}.\n\n"
                 f"Total Due: {profile.currency} {invoice.total_amount:,.2f}\n"
                 f"Due Date: {invoice.due_date}\n\n"
-                f"Regards,\n{profile.company_name}"
+                f"Regards,\n{signature_name}"
             )
 
         email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])
@@ -362,11 +365,12 @@ def email_receipt_to_client(invoice, amount_paid):
         subject = f"Payment Receipt: Invoice {invoice.number}"
 
         # Personalized Greeting
+        signature_name = profile.contact_name if profile.contact_name else profile.company_name
         body = (
             f"Hi {invoice.client.salutation},\n\n"
             f"Thank you for your payment of {profile.currency} {amount_paid:,.2f}.\n\n"
             f"Balance remaining: {profile.currency} {invoice.balance_due:,.2f}.\n\n"
-            f"Regards,\n{profile.company_name}"
+            f"Regards,\n{signature_name}"
         )
 
         email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])

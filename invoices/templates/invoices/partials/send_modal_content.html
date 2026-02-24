@@ -1,0 +1,43 @@
+<div class="modal-header">
+    <h5 class="modal-title">
+        Send
+        {% if invoice.is_quote %}
+            Quote
+        {% else %}
+            Invoice
+        {% endif %}
+    </h5>
+    <button type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"></button>
+</div>
+<div class="modal-body">
+    <p>
+        Send
+        {% if invoice.is_quote %}
+            quote
+        {% else %}
+            invoice
+        {% endif %}
+        <strong>#{{ invoice.number }}</strong> to <strong>{{ invoice.client.email }}</strong>?
+    </p>
+    <p class="text-muted small">
+        {% if invoice.is_quote %}
+            The client will receive your quote with the details and pricing.
+        {% else %}
+            The client will receive your invoice with payment instructions.
+        {% endif %}
+    </p>
+</div>
+<div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <form method="post"
+          action="{% url 'invoices:send_invoice' invoice.pk %}"
+          style="display: inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send"></i> Confirm Send
+        </button>
+    </form>
+</div>

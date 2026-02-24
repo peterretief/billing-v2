@@ -10,6 +10,8 @@ urlpatterns = [
     path("<int:pk>/toggle-attach-timesheet/", views.toggle_attach_timesheet, name="toggle_attach_timesheet"),
     path("<int:pk>/toggle-quote-status/", views.toggle_quote_status, name="toggle_quote_status"),
     path("<int:pk>/convert-quote-to-invoice/", views.convert_quote_to_invoice, name="convert_quote_to_invoice"),
+    path("<int:pk>/reject-quote/", views.reject_quote, name="reject_quote"),
+    path("<int:pk>/send/", views.send_invoice, name="send_invoice"),
     # Dashboard & Lists
     path("<int:pk>/pdf/", views.generate_invoice_pdf_view, name="generate_invoice_pdf_view"),
     path("<int:pk>/pay/", views.mark_invoice_paid, name="mark_as_paid"),
@@ -27,6 +29,7 @@ urlpatterns = [
     path("<int:pk>/pdf/", views.generate_invoice_pdf_view, name="invoice_pdf"),
     path("<int:pk>/resend/", views.resend_invoice, name="resend_invoice"),
     path("<int:pk>/resend-modal/", views.get_resend_modal, name="get_resend_modal"),
+    path("<int:pk>/send-modal/", views.get_send_modal, name="get_send_modal"),
     # VAT Reporting
     path("vat/generate/", views.generate_vat_report, name="generate_vat_report"),
     path("vat/<int:pk>/download/", views.download_vat_latex, name="download_vat_latex"),

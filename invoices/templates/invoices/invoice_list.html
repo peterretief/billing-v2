@@ -87,7 +87,7 @@
                                     {% endif %}
                                 </a>
                             </th>
-                            <th scope="col">Delivery</th>
+                            <th scope="col">Emailed</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -95,10 +95,19 @@
                             <tr>
                                 <td>
                                     {% if invoice.status == 'DRAFT' %}
-                                        <input type="checkbox"
-                                               class="invoice-checkbox"
-                                               name="invoice_ids"
-                                               value="{{ invoice.pk }}">
+                                        {% if invoice.is_quote %}
+                                            <input type="checkbox"
+                                                   class="invoice-checkbox"
+                                                   name="invoice_ids"
+                                                   value="{{ invoice.pk }}"
+                                                   disabled
+                                                   title="Quotes are sent individually, not in batch">
+                                        {% else %}
+                                            <input type="checkbox"
+                                                   class="invoice-checkbox"
+                                                   name="invoice_ids"
+                                                   value="{{ invoice.pk }}">
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 <td>
@@ -137,14 +146,24 @@
                                     {% if invoice.due_date and not invoice.is_overdue and invoice.status != 'PAID' %}
                                         <div class="small text-muted mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
                                     {% elif invoice.is_overdue %}
-                                        <div class="small text-danger mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
+                                        <div class="small text-muted mt-1">Due {{ invoice.due_date|date:"d M" }}</div>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if invoice.latest_delivery_status %}
-                                        <span class="badge rounded-pill {% if invoice.latest_delivery_status|lower == 'delivered' %}bg-success {% elif invoice.latest_delivery_status|lower == 'sent' %}bg-secondary {% elif invoice.latest_delivery_status|lower == 'request' %}bg-light text-dark border {% else %}bg-light text-dark border{% endif %}">
-                                            <i class="bi bi-envelope me-1"></i>{{ invoice.latest_delivery_status|upper }}
-                                        </span>
+                                    {% if invoice.is_quote %}
+                                        {% if invoice.quote_status == "REJECTED" %}
+                                            <span class="badge bg-danger">Rejected</span>
+                                        {% elif invoice.is_emailed %}
+                                            <span class="badge bg-primary">Quoted</span>
+                                        {% else %}
+                                            <span class="text-muted small">—</span>
+                                        {% endif %}
+                                    {% elif invoice.was_originally_quote and not invoice.is_emailed %}
+                                        <span class="badge bg-info">Accepted</span>
+                                    {% elif invoice.is_emailed %}
+                                        <span class="badge bg-success">Invoiced</span>
+                                    {% elif invoice.latest_delivery_status %}
+                                        <span class="badge bg-secondary">{{ invoice.latest_delivery_status }}</span>
                                     {% else %}
                                         <span class="text-muted small">—</span>
                                     {% endif %}
@@ -211,7 +230,9 @@
 
             selectAll.addEventListener('click', function() {
                 checkboxes.forEach(cb => {
-                    cb.checked = selectAll.checked;
+                    if (!cb.disabled) { // Skip disabled checkboxes (quotes)
+                        cb.checked = selectAll.checked;
+                    }
                 });
                 updateCounter();
             });

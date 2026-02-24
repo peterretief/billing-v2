@@ -80,6 +80,14 @@
                                 <a class="nav-link {% if 'clients' in request.path %}active{% endif %}"
                                    href="{% url 'clients:client_list' %}">Clients</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'items' in request.path %}active fw-bold{% endif %}"
+                                   href="{% url 'items:item_list' %}"><i class="bi bi-box-seam me-1"></i>Items</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'timesheets' in request.path and 'categories' not in request.path %}active fw-bold{% endif %}"
+                                   href="{% url 'timesheets:timesheet_list' %}"><i class="bi bi-clock-history me-1"></i>Timesheets</a>
+                            </li>
                             {# Updated: Changed is_ops to is_staff/superuser for visibility #}
                             {% if user.is_staff or user.is_superuser %}
                                 <li class="nav-item ms-lg-3">
@@ -90,21 +98,10 @@
                                 </li>
                             {% endif %}
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle {% if 'items' in request.path or 'timesheets' in request.path or 'billing_schedule' in request.path or 'categories' in request.path or 'email_status' in request.path %}active{% endif %}"
+                                <a class="nav-link dropdown-toggle {% if 'billing_schedule' in request.path or 'categories' in request.path or 'email_status' in request.path %}active{% endif %}"
                                    href="#"
-                                   data-bs-toggle="dropdown">Tools</a>
+                                   data-bs-toggle="dropdown"><i class="bi bi-gear me-1"></i>Tools</a>
                                 <ul class="dropdown-menu shadow">
-                                    <li>
-                                        <a class="dropdown-item {% if 'items' in request.path %}active fw-bold{% endif %}"
-                                           href="{% url 'items:item_list' %}">Items</a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item {% if 'timesheets' in request.path and 'categories' not in request.path %}active fw-bold{% endif %}"
-                                           href="{% url 'timesheets:timesheet_list' %}">Timesheets</a>
-                                    </li>
-                                    <li>
-                                        <hr class="dropdown-divider">
-                                    </li>
                                     <li>
                                         <a class="dropdown-item {% if 'billing_schedule' in request.path %}active fw-bold{% endif %}"
                                            href="{% url 'billing_schedule:policy_list' %}">Billing Schedule</a>

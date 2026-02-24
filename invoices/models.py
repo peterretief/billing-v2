@@ -74,6 +74,25 @@ class Invoice(TenantModel):
         help_text="If checked, this is a quote. Once accepted, can be converted to an invoice.",
     )
 
+    quote_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("PENDING", "Pending"),
+            ("ACCEPTED", "Accepted"),
+            ("REJECTED", "Rejected"),
+        ],
+        default="PENDING",
+        null=True,
+        blank=True,
+        help_text="Tracks quote status: pending, accepted, or rejected.",
+    )
+
+    was_originally_quote = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Tracks whether this invoice was originally created as a quote before being converted.",
+    )
+
     is_emailed = models.BooleanField(default=False)
     emailed_at = models.DateTimeField(null=True, blank=True)
     last_email_error = models.TextField(null=True, blank=True)  # Great for debugging

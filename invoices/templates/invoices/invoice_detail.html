@@ -1,17 +1,47 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% load l10n %}
-{% block title %}Invoice #{{ invoice.number|default:invoice.id }}{% endblock %}
+{% block title %}
+    {% if invoice.is_quote %}
+        Quote
+    {% else %}
+        Invoice
+    {% endif %}
+    #{{ invoice.number|default:invoice.id }}
+{% endblock %}
 {% block content %}
+    {% if invoice.is_quote and invoice.status == 'PENDING' %}
+        <div class="alert alert-info alert-dismissible fade show mt-3 mb-4 fw-bold shadow-sm"
+             role="alert">
+            <i class="bi bi-lightbulb me-2"></i>
+            <strong>Quote Pending Acceptance</strong> — Once the client accepts, convert it to an invoice to add to your invoice queue.
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    aria-label="Close"></button>
+        </div>
+    {% endif %}
     <div class="container mt-4 mb-5">
         <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
             <div>
-                <h2 class="mb-0">Invoice #{{ invoice.number|default:invoice.id }}</h2>
-                <div class="mt-2 d-flex gap-2">
+                <h2 class="mb-0">
+                    {% if invoice.is_quote %}
+                        Quote
+                    {% else %}
+                        Invoice
+                    {% endif %}
+                    #{{ invoice.number|default:invoice.id }}
+                </h2>
+                <div class="mt-2 d-flex gap-2 flex-wrap">
                     <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'OVERDUE' %}bg-danger{% else %}bg-warning text-dark{% endif %} px-3 py-2">
                         {{ invoice.get_status_display }}
                     </span>
-                    {% if invoice.is_quote %}<span class="badge bg-info px-3 py-2">📋 Quote</span>{% endif %}
+                    {% if invoice.is_quote %}
+                        <span class="badge bg-primary px-3 py-2 fs-6 fw-bold"><i class="bi bi-file-text me-1"></i>QUOTE</span>
+                    {% endif %}
+                    {% if invoice.is_emailed %}
+                        <span class="badge bg-success px-3 py-2"><i class="bi bi-check-circle me-1"></i>Sent</span>
+                    {% endif %}
                 </div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
@@ -23,7 +53,7 @@
                     <span class="d-none d-md-inline">Back</span>
                 </a>
                 <!-- Record Payment (if applicable) -->
-                {% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
+                {% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' and not invoice.is_quote %}
                     <button class="btn btn-success btn-sm"
                             hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
                             hx-target="#paymentModalContent"
@@ -33,6 +63,49 @@
                         <i class="bi bi-cash-stack"></i>
                         <span class="d-none d-md-inline">Record Payment</span>
                     </button>
+                {% endif %}
+                <!-- Send Quote/Invoice (if draft) -->
+                {% if invoice.status == 'DRAFT' and invoice.status != 'CANCELLED' %}
+                    <button class="btn btn-primary btn-sm"
+                            hx-get="{% url 'invoices:get_send_modal' invoice.pk %}"
+                            hx-target="#paymentModalContent"
+                            hx-trigger="click"
+                            hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show()"
+                            title="Send to client">
+                        <i class="bi bi-send"></i>
+                        <span class="d-none d-md-inline">Send
+                            {% if invoice.is_quote %}
+                                Quote
+                            {% else %}
+                                Invoice
+                            {% endif %}
+                        </span>
+                    </button>
+                {% endif %}
+                <!-- Accept Quote & Convert to Invoice -->
+                {% if invoice.is_quote and invoice.status == 'PENDING' %}
+                    <form method="post"
+                          action="{% url 'invoices:convert_quote_to_invoice' invoice.pk %}"
+                          style="display: inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success btn-sm fw-bold shadow-sm">
+                            <i class="bi bi-check-circle me-1"></i>
+                            <span class="d-none d-md-inline">Accept & Convert</span>
+                            <span class="d-inline d-md-none">Accept</span>
+                        </button>
+                    </form>
+                    <!-- Reject Quote -->
+                    <form method="post"
+                          action="{% url 'invoices:reject_quote' invoice.pk %}"
+                          style="display: inline"
+                          onsubmit="return confirm('Are you sure you want to reject this quote?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm fw-bold shadow-sm">
+                            <i class="bi bi-x-circle me-1"></i>
+                            <span class="d-none d-md-inline">Reject Quote</span>
+                            <span class="d-inline d-md-none">Reject</span>
+                        </button>
+                    </form>
                 {% endif %}
                 <!-- Resend Invoice (if not draft/cancelled) -->
                 {% if invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
@@ -89,14 +162,6 @@
                         <i class="bi bi-three-dots-vertical"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        {% if invoice.status == 'DRAFT' %}
-                            <li>
-                                <a class="dropdown-item"
-                                   href="{% url 'invoices:invoice_edit' invoice.pk %}">
-                                    <i class="bi bi-pencil me-2"></i>Edit Invoice
-                                </a>
-                            </li>
-                        {% endif %}
                         {% if invoice.billed_timesheets.count > 0 %}
                             <li>{% include "invoices/partials/timesheet_attach_toggle_form.html" with invoice=invoice %}</li>
                         {% endif %}
@@ -116,20 +181,6 @@
                                         {% else %}
                                             Convert to Quote
                                         {% endif %}
-                                    </button>
-                                </form>
-                            </li>
-                        {% elif invoice.is_quote %}
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <form method="post"
-                                      action="{% url 'invoices:convert_quote_to_invoice' invoice.pk %}"
-                                      style="display: inline">
-                                    {% csrf_token %}
-                                    <button type="submit" class="dropdown-item">
-                                        <i class="bi bi-check-circle me-2"></i>Accept Quote & Convert
                                     </button>
                                 </form>
                             </li>

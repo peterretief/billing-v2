@@ -193,6 +193,14 @@ def get_resend_modal(request, pk):
 
 @login_required
 @setup_required
+def get_send_modal(request, pk):
+    """Get modal for sending a DRAFT invoice/quote."""
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    return render(request, "invoices/partials/send_modal_content.html", {"invoice": invoice})
+
+
+@login_required
+@setup_required
 def dashboard(request):
     """Main overview for the business owner."""
     if request.user.is_ops:
@@ -272,6 +280,9 @@ def invoice_list(request):
     status_filter = request.GET.get("status")
     if status_filter == "UNPAID":
         invoice_queryset = invoice_queryset.exclude(status="PAID")
+
+    # Exclude rejected quotes from list by default
+    invoice_queryset = invoice_queryset.exclude(quote_status="REJECTED")
 
     overdue_filter = request.GET.get("overdue") == "true"
     if overdue_filter:
@@ -499,7 +510,8 @@ def duplicate_invoice(request, pk):
 def bulk_post(request):
     if request.method == "POST":
         invoice_ids = request.POST.getlist("invoice_ids")
-        invoices = Invoice.objects.filter(id__in=invoice_ids, user=request.user, status="DRAFT")
+        # Exclude quotes from bulk posting - only post invoices
+        invoices = Invoice.objects.filter(id__in=invoice_ids, user=request.user, status="DRAFT", is_quote=False)
         count = 0
         flagged_count = 0
         for inv in invoices:
@@ -817,6 +829,9 @@ def delete_invoice(request, pk):
         messages.error(request, "Only drafts can be deleted.")
         return redirect("invoices:invoice_detail", pk=pk)
     if request.method == "POST":
+        # Reset is_billed flag on all items/timesheets linked to this invoice
+        invoice.billed_items.all().update(is_billed=False)
+        invoice.billed_timesheets.all().update(is_billed=False)
         invoice.delete()
         return redirect("invoices:invoice_list")
     return render(request, "invoices/invoice_confirm_delete.html", {"invoice": invoice})
@@ -887,7 +902,56 @@ def convert_quote_to_invoice(request, pk):
         return redirect("invoices:invoice_detail", pk=pk)
     
     invoice.is_quote = False
+    # Mark that this invoice originated as a quote
+    invoice.was_originally_quote = True
+    invoice.quote_status = "ACCEPTED"
+    # Reset email flags so the invoice can be sent again (separately from the quote)
+    invoice.is_emailed = False
+    invoice.emailed_at = None
+    # Reset status to DRAFT so it can be added to batch posting queue
+    invoice.status = Invoice.Status.DRAFT
     invoice.save()
     
-    messages.success(request, f"✓ Quote #{invoice.number} converted to Invoice")
+    messages.success(request, f"✓ Quote #{invoice.number} converted to Invoice. You can now send this invoice separately.")
+    return redirect("invoices:invoice_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def reject_quote(request, pk):
+    """Mark a quote as rejected."""
+    from django.contrib import messages
+    
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    if not invoice.is_quote:
+        messages.error(request, "This is not a quote.")
+        return redirect("invoices:invoice_detail", pk=pk)
+    
+    invoice.quote_status = "REJECTED"
+    invoice.save()
+    
+    messages.success(request, f"✓ Quote #{invoice.number} marked as rejected and removed from list.")
+    return redirect("invoices:invoice_list")
+
+
+@login_required
+@require_POST
+def send_invoice(request, pk):
+    """Send a DRAFT invoice or quote to the client."""
+    from django.contrib import messages
+    
+    invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    
+    if invoice.status != "DRAFT":
+        messages.error(request, "Only DRAFT invoices/quotes can be sent.")
+        return redirect("invoices:invoice_detail", pk=pk)
+    
+    # Send the invoice
+    if email_invoice_to_client(invoice):
+        doc_type = "Quote" if invoice.is_quote else "Invoice"
+        messages.success(request, f"✓ {doc_type} #{invoice.number} sent to {invoice.client.email}")
+    else:
+        messages.error(request, f"Failed to send invoice. Check email settings.")
+    
     return redirect("invoices:invoice_detail", pk=pk)

@@ -214,7 +214,7 @@ class AuditHistory(models.Model):
     # Stats from comparison set
     comparison_mean = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
     comparison_stddev = models.DecimalField(max_digits=12, decimal_places=2, default=0, null=True, blank=True)
-    comparison_cv = models.DecimalField(max_digits=5, decimal_places=3, default=0, help_text="Coefficient of Variation")
+    comparison_cv = models.DecimalField(max_digits=5, decimal_places=3, default=0, null=True, blank=True, help_text="Coefficient of Variation")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

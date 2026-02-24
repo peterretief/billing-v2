@@ -45,10 +45,13 @@ def email_item_invoice_to_client(invoice):
         reply_address = profile.business_email if profile.business_email else invoice.user.email
 
         subject = f"Invoice {invoice.number} from {profile.company_name}"
+        
+        # Personalized Greeting
+        signature_name = profile.contact_name if profile.contact_name else profile.company_name
         body = (
             f"Hi {invoice.client.name},\n\n"
             f"Please find attached invoice {invoice.number}.\n\n"
-            f"Regards,\n{profile.company_name}"
+            f"Regards,\n{signature_name}"
         )
 
         email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])
