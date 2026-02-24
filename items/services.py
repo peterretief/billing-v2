@@ -113,9 +113,6 @@ def import_recurring_to_invoices(user):
                 if not is_anomaly:
                     new_invoices.append(invoice)
             except Exception as e:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.error(f"Failed to audit invoice {invoice.id}: {e}")
                 # Still add to new_invoices even if audit fails
                 new_invoices.append(invoice)

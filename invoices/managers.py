@@ -41,6 +41,9 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
             return
 
         profile = getattr(invoice.user, 'profile', None)
+        # Ensure profile is fresh from DB to get latest VAT settings
+        if profile:
+            profile.refresh_from_db()
         is_registered = getattr(profile, "is_vat_registered", False)
         custom_vat_rate = getattr(profile, "vat_rate", None) or Decimal("15.00")
 
