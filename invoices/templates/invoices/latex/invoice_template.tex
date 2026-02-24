@@ -25,6 +25,11 @@
 \setlength{\parindent}{0pt}
 
 \begin{document}
+{% if is_cancelled %}
+\begin{tikzpicture}[remember picture, overlay]
+  \node[rotate=45, scale=4, opacity=0.15, red] at (current page.center) {CANCELLED};
+\end{tikzpicture}
+{% endif %}
 \noindent
 \begin{minipage}[t]{0.4\textwidth}
     \vspace{0pt} % Sets top anchor for alignment
@@ -70,8 +75,13 @@
 \hfill
 \begin{minipage}[t]{0.4\textwidth}
     \raggedleft
+    {% if is_quote %}
+    \lightheader{QUOTE DETAILS:} \par \vspace{0.1cm}
+    \textbf{Quote \#:} {{ invoice_number }} \\
+    {% else %}
     \lightheader{INVOICE DETAILS:} \par \vspace{0.1cm}
     \textbf{Invoice \#:} {{ invoice_number }} \\
+    {% endif %}
     \textbf{Date:} {{ date_issued }} \\
     \textbf{Due Date:} {{ due_date }}
 \end{minipage}

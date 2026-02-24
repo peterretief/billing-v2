@@ -4,11 +4,11 @@ from items.models import Item
 
 def run():
     print("--- Starting Item Database Cleanup ---")
-    
+
     # Check for items that are linked to an invoice but the 'is_billed' flag didn't flip
     # (Common if the PDF generation crashed mid-task)
     orphans = Item.objects.filter(invoice__isnull=False, is_billed=False)
-    
+
     if not orphans.exists():
         print("No orphaned items found.")
     else:
@@ -23,6 +23,7 @@ def run():
     print(f"Found {pending.count()} items currently waiting for an invoice.")
 
     print("--- Cleanup Finished ---")
+
 
 if __name__ == "__main__":
     run()

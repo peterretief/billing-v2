@@ -11,9 +11,7 @@ class TimesheetManager(models.Manager):
         queryset = self.unbilled(user)
         if client:
             queryset = queryset.filter(client=client)
-        
+
         # Calculation happens at the database level for speed
-        result = queryset.aggregate(
-            total=Sum(F('hours') * F('hourly_rate'))
-        )
-        return result['total'] or 0
+        result = queryset.aggregate(total=Sum(F("hours") * F("hourly_rate")))
+        return result["total"] or 0

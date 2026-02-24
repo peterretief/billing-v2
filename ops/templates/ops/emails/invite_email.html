@@ -1,15 +1,18 @@
 <p>Hello {{ user.username }},</p>
-
-<p>An account has been created for you at <strong>Our System</strong>.</p>
-
-<p>Your account manager ({{ user.userprofile.verified_by.username }}) has pre-configured 
-your business settings for <strong>{{ user.userprofile.company_name }}</strong>.</p>
-
+<p>
+    An account has been created for you at <strong>Our System</strong>.
+</p>
+<p>
+    Your account manager ({{ user.userprofile.verified_by.username }}) has pre-configured
+    your business settings for <strong>{{ user.userprofile.company_name }}</strong>.
+</p>
 <p>Please click the link below to set your password and access your dashboard:</p>
-
-<p><a href="{{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}">
-  Set My Password and Log In
-</a></p>
-
-<p>If you have any questions about your Currency ({{ user.userprofile.currency }}) 
-or VAT settings, please reach out to your manager.</p>
+<p>
+    <a href="{{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}">
+        Set My Password and Log In
+    </a>
+</p>
+<p>
+    If you have any questions about your Currency ({{ user.userprofile.currency }})
+    or VAT settings, please reach out to your manager.
+</p>

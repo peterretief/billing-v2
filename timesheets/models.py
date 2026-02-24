@@ -21,17 +21,19 @@ class DefaultWorkCategory(models.Model):
 
 def get_unbilled_total(self):
     from timesheets.models import TimesheetEntry
-    return TimesheetEntry.objects.filter(
-        client=self, 
-        is_billed=False
-    ).aggregate(total=models.Sum(models.F('hours') * models.F('hourly_rate')))['total'] or 0
 
+    return (
+        TimesheetEntry.objects.filter(client=self, is_billed=False).aggregate(
+            total=models.Sum(models.F("hours") * models.F("hourly_rate"))
+        )["total"]
+        or 0
+    )
 
 
 class WorkCategory(TenantModel):
-    user = models.ForeignKey('core.User', on_delete=models.CASCADE)
-    name = models.CharField(max_length=50) # e.g., "Meeting", "Development"
-    
+    user = models.ForeignKey("core.User", on_delete=models.CASCADE)
+    name = models.CharField(max_length=50)  # e.g., "Meeting", "Development"
+
     # Example: ["Attendees", "Location"] or empty [] for simple comments
     metadata_schema = models.JSONField(default=list, blank=True, help_text="List of extra field names")
 
@@ -39,33 +41,27 @@ class WorkCategory(TenantModel):
         return self.name
 
 
-
 class TimesheetEntry(TenantModel):
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='timesheets')
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="timesheets")
     category = models.ForeignKey(WorkCategory, on_delete=models.SET_NULL, null=True, blank=True)
     date = models.DateField(default=timezone.now)
     hours = models.DecimalField(max_digits=6, decimal_places=2)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
     is_billed = models.BooleanField(default=False)
     invoice = models.ForeignKey(
-        'invoices.Invoice', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='billed_timesheets'
+        "invoices.Invoice", on_delete=models.SET_NULL, null=True, blank=True, related_name="billed_timesheets"
     )
 
-    objects = TimesheetManager() # Attach it here
+    objects = TimesheetManager()  # Attach it here
 
     class Meta:
-        ordering = ['-date']
+        ordering = ["-date"]
 
     # Defined only once
     metadata = models.JSONField(default=dict, blank=True)
 
-
-    @property   
+    @property
     def formatted_metadata(self):
         """
         Returns a string of metadata for the Timesheet Report or Template.
@@ -73,14 +69,13 @@ class TimesheetEntry(TenantModel):
         """
         if not self.metadata:
             return ""
-    
+
         # Create the string
         text = ", ".join([f"{k}: {v}" for k, v in self.metadata.items() if v])
-    
+
         # Safety fix for your LaTeX PDFs:
         # Escape characters that break LaTeX if they appear in your metadata
-        return text.replace('&', r'\&').replace('$', r'\$').replace('%', r'\%')
-
+        return text.replace("&", r"\&").replace("$", r"\$").replace("%", r"\%")
 
     @property
     def metadata_json(self):
@@ -88,7 +83,7 @@ class TimesheetEntry(TenantModel):
         return json.dumps(self.metadata)
 
     class Meta:
-        ordering = ['-date']
+        ordering = ["-date"]
         verbose_name_plural = "Timesheet Entries"
 
     def __str__(self):

@@ -12,6 +12,7 @@ from invoices.models import Invoice
 
 User = get_user_model()
 
+
 class DeletedInvoiceReportTest(TestCase):
     """Test that deleted invoices do not appear in reports or querysets."""
 
@@ -19,18 +20,13 @@ class DeletedInvoiceReportTest(TestCase):
         """Set up unique data for every test run."""
         unique_id = uuid.uuid4().hex[:8]
         self.user = User.objects.create_user(
-            username=f'user_{unique_id}',
-            email=f'test_{unique_id}@example.com',
-            password='password123'
+            username=f"user_{unique_id}", email=f"test_{unique_id}@example.com", password="password123"
         )
-        
+
         self.profile, _ = UserProfile.objects.get_or_create(user=self.user)
         self.profile.save()
 
-        self.client_obj = Client.objects.create(
-            user=self.user,
-            name="Report Test Client"
-        )
+        self.client_obj = Client.objects.create(user=self.user, name="Report Test Client")
 
         self.invoice_number = f"INV-{unique_id.upper()}"
         today = timezone.now().date()
@@ -39,10 +35,10 @@ class DeletedInvoiceReportTest(TestCase):
             user=self.user,
             client=self.client_obj,
             number=self.invoice_number,
-            status='POSTED',
+            status="POSTED",
             date_issued=today,
             due_date=today + timedelta(days=14),  # <--- FIXED: Added due_date
-            total_amount=Decimal('1000.00')
+            total_amount=Decimal("1000.00"),
         )
 
     def test_deleted_invoice_completely_removed_from_database(self):
@@ -61,19 +57,17 @@ class DeletedInvoiceReportTest(TestCase):
         """Verify multi-tenancy holds during reporting."""
         other_id = uuid.uuid4().hex[:8]
         other_user = User.objects.create_user(
-            username=f'other_{other_id}',
-            email=f'other_{other_id}@example.com',
-            password='password123'
+            username=f"other_{other_id}", email=f"other_{other_id}@example.com", password="password123"
         )
         today = timezone.now().date()
-        
+
         Invoice.objects.create(
             user=other_user,
             client=Client.objects.create(user=other_user, name="Other"),
             number=f"INV-OTHER-{other_id}",
-            status='POSTED',
+            status="POSTED",
             date_issued=today,
             due_date=today + timedelta(days=14),  # <--- FIXED: Added due_date
         )
-        
+
         self.assertEqual(Invoice.objects.filter(user=self.user).count(), 1)

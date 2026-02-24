@@ -16,36 +16,31 @@ from items.services import import_recurring_to_invoices
 class BillingEngineTest(TestCase):
     def setUp(self):
         # 1. Setup User and ensure Profile exists
-        self.user = get_user_model().objects.create_user(username='testpeter', password='password')
+        self.user = get_user_model().objects.create_user(username="testpeter", password="password")
         UserProfile.objects.get_or_create(user=self.user)
         self.user.is_active = True
         self.user.save()
 
         self.client = Client.objects.create(user=self.user, name="Test Client")
-        
+
         # 2. Create the Policy
-        self.policy = BillingPolicy.objects.create(
-            user=self.user,
-            name="Monthly Plan",
-            run_day=4,
-            is_active=True
-        )
+        self.policy = BillingPolicy.objects.create(user=self.user, name="Monthly Plan", run_day=4, is_active=True)
 
     @freeze_time("2026-02-04")
     def test_billing_generates_invoice_on_correct_day(self):
         # Force the date back so it doesn't trip the "Already billed today" safety
         last_month = timezone.now().date() - timedelta(days=32)
-        
+
         Item.objects.create(
             user=self.user,
             client=self.client,
-            billing_policy=self.policy, # <--- KEY: LINK TO THE POLICY
+            billing_policy=self.policy,  # <--- KEY: LINK TO THE POLICY
             description="Subscription",
-            unit_price=Decimal('100.00'),
+            unit_price=Decimal("100.00"),
             quantity=1,
             is_recurring=True,
             is_billed=False,
-            last_billed_date=last_month
+            last_billed_date=last_month,
         )
 
         # We pass the user explicitly to bypass TenantModel middleware issues

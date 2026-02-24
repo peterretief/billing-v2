@@ -118,6 +118,7 @@
                                     {% else %}
                                         <span class="badge bg-success"><i class="bi bi-list-check me-1"></i>Items</span>
                                     {% endif %}
+                                    {% if invoice.is_quote %}<span class="badge bg-secondary"><i class="bi bi-file-text me-1"></i>Quote</span>{% endif %}
                                 </td>
                                 <td>
                                     {% if invoice.is_overdue %}

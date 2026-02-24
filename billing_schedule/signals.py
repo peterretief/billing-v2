@@ -12,10 +12,5 @@ def create_default_billing_policy(sender, instance, created, **kwargs):
         BillingPolicy.objects.get_or_create(
             user=instance,
             run_day=1,  # The unique constraint field
-            defaults={
-                'name': "Default Monthly Schedule",
-                'is_active': True,
-                'special_rule': 'NONE'
-            }
+            defaults={"name": "Default Monthly Schedule", "is_active": True, "special_rule": "NONE"},
         )
-

@@ -7,9 +7,12 @@
         <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
             <div>
                 <h2 class="mb-0">Invoice #{{ invoice.number|default:invoice.id }}</h2>
-                <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'OVERDUE' %}bg-danger{% else %}bg-warning text-dark{% endif %} px-3 py-2 mt-2">
-                    {{ invoice.get_status_display }}
-                </span>
+                <div class="mt-2 d-flex gap-2">
+                    <span class="badge {% if invoice.status == 'PAID' %}bg-success{% elif invoice.status == 'OVERDUE' %}bg-danger{% else %}bg-warning text-dark{% endif %} px-3 py-2">
+                        {{ invoice.get_status_display }}
+                    </span>
+                    {% if invoice.is_quote %}<span class="badge bg-info px-3 py-2">📋 Quote</span>{% endif %}
+                </div>
             </div>
             <div class="d-flex gap-2 flex-wrap">
                 <!-- Back to List -->
@@ -57,7 +60,13 @@
                             <a class="dropdown-item"
                                href="{% url 'invoices:invoice_pdf' invoice.pk %}"
                                target="_blank">
-                                <i class="bi bi-file-pdf me-2"></i>Invoice PDF
+                                <i class="bi bi-file-pdf me-2"></i>
+                                {% if invoice.is_quote %}
+                                    Quote
+                                {% else %}
+                                    Invoice
+                                {% endif %}
+                                PDF
                             </a>
                         </li>
                         {% if invoice.billed_timesheets.count > 0 %}
@@ -90,6 +99,40 @@
                         {% endif %}
                         {% if invoice.billed_timesheets.count > 0 %}
                             <li>{% include "invoices/partials/timesheet_attach_toggle_form.html" with invoice=invoice %}</li>
+                        {% endif %}
+                        {% if invoice.status == 'DRAFT' %}
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <form method="post"
+                                      action="{% url 'invoices:toggle_quote_status' invoice.pk %}"
+                                      style="display: inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-file-text me-2"></i>
+                                        {% if invoice.is_quote %}
+                                            Convert to Invoice
+                                        {% else %}
+                                            Convert to Quote
+                                        {% endif %}
+                                    </button>
+                                </form>
+                            </li>
+                        {% elif invoice.is_quote %}
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li>
+                                <form method="post"
+                                      action="{% url 'invoices:convert_quote_to_invoice' invoice.pk %}"
+                                      style="display: inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">
+                                        <i class="bi bi-check-circle me-2"></i>Accept Quote & Convert
+                                    </button>
+                                </form>
+                            </li>
                         {% endif %}
                         {% if invoice.status == 'DRAFT' %}
                             <li>
@@ -228,7 +271,7 @@
                         <tr>
                             <th class="ps-4">Date</th>
                             <th>Reference</th>
-                            <th class="text-end pe-4">Amount</th>
+                            <th class="text-end pe-4">Payment</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -236,7 +279,15 @@
                             <tr class="small">
                                 <td class="ps-4 text-muted">{{ payment.date_paid|date:"d M Y" }}</td>
                                 <td>{{ payment.reference }}</td>
-                                <td class="text-end pe-4 fw-bold">{{ request.user.profile.currency }} {{ payment.amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end pe-4 fw-bold">
+                                    {% if payment.amount > 0 and payment.credit_applied > 0 %}
+                                        {{ request.user.profile.currency }} {{ payment.amount|floatformat:2|intcomma }} + {{ request.user.profile.currency }} {{ payment.credit_applied|floatformat:2|intcomma }} credit
+                                    {% elif payment.credit_applied > 0 %}
+                                        {{ request.user.profile.currency }} {{ payment.credit_applied|floatformat:2|intcomma }} credit
+                                    {% else %}
+                                        {{ request.user.profile.currency }} {{ payment.amount|floatformat:2|intcomma }}
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% empty %}
                             <tr>

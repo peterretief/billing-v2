@@ -1,39 +1,33 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h2>Edit Invoice #{{ invoice.pk }}</h2>
-
-<form method="post">
-    {% csrf_token %}
-    
-    <div class="card mb-4 p-3">
-        {{ form.as_p }}
-    </div>
-
-    <h3>Items</h3>
-    {{ formset.management_form }}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Description</th>
-                <th>Quantity</th>
-                <th>Price</th>
-                <th>Delete?</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item_form in formset %}
+    <h2>Edit Invoice #{{ invoice.pk }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="card mb-4 p-3">{{ form.as_p }}</div>
+        <h3>Items</h3>
+        {{ formset.management_form }}
+        <table class="table">
+            <thead>
                 <tr>
-                    <td>{{ item_form.id }}{{ item_form.description }}</td>
-                    <td>{{ item_form.quantity }}</td>
-                    <td>{{ item_form.unit_price }}</td>
-                    <td>{{ item_form.DELETE }}</td>
+                    <th>Description</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Delete?</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <button type="submit" class="btn btn-primary">Save Changes</button>
-    <a href="{% url 'invoices:invoice_detail' invoice.pk %}" class="btn btn-secondary">Cancel</a>
-</form>
+            </thead>
+            <tbody>
+                {% for item_form in formset %}
+                    <tr>
+                        <td>{{ item_form.id }}{{ item_form.description }}</td>
+                        <td>{{ item_form.quantity }}</td>
+                        <td>{{ item_form.unit_price }}</td>
+                        <td>{{ item_form.DELETE }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="{% url 'invoices:invoice_detail' invoice.pk %}"
+           class="btn btn-secondary">Cancel</a>
+    </form>
 {% endblock %}

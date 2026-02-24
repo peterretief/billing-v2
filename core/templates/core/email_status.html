@@ -24,10 +24,7 @@
                             <th>Latest Update</th>
                         </tr>
                     </thead>
-                    <tbody id="email-status-body"
-                           hx-get="{% url 'core:email_status_rows' %}"
-                           hx-trigger="load"
-                           hx-swap="innerHTML">
+                    <tbody id="email-status-body">
                     </tbody>
                 </table>
             </div>

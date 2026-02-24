@@ -1,8 +1,10 @@
 {% extends "admin/base_site.html" %}
-
 {% block nav-global %}
     {% if user.is_superuser %}
-        <a href="{% url 'admin_dashboard' %}" style="padding-left: 20px; padding-top: 5px; color: #fff;">Superuser Dashboard</a>
+        <a href="{% url 'admin_dashboard' %}"
+           style="padding-left: 20px;
+                  padding-top: 5px;
+                  color: #fff">Superuser Dashboard</a>
     {% endif %}
     {{ block.super }}
 {% endblock %}

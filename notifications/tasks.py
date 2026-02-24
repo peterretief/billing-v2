@@ -10,10 +10,11 @@ def generate_notifications_async(user_id):
     """
     # Import User model inside the task to avoid AppRegistryNotReady error
     from core.models import User
+
     try:
         user = User.objects.get(pk=user_id)
         generate_notifications(user)
     except User.DoesNotExist:
-        print(f"User with id {user_id} not found for notification generation.")
+        pass  # Silently ignore missing users
     except Exception as e:
-        print(f"Error generating notifications for user {user_id}: {e}")
+        pass  # Celery will retry on failure

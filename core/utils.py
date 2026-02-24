@@ -1,6 +1,3 @@
-from django.db.models import Avg, StdDev
-from statistics import stdev
-from decimal import Decimal
 
 from invoices.models import Invoice
 
@@ -11,96 +8,173 @@ def get_anomaly_status(user, invoice):
     """
     Detects anomalies relative to the user's own billing history.
     Uses mean and standard deviation to adapt to currency variance.
-    
+
     For weaker currencies (ZAR, INR, etc), higher variance is expected.
     For stronger currencies (EUR, GBP, etc), lower variance is expected.
-    
+
     Flags invoices that are statistical outliers (>2 std devs from mean).
     Adapts thresholds based on coefficient of variation.
+    
+    Respects user's audit settings (enabled/disabled, sensitivity, triggers).
+    
+    Returns tuple: (is_anomaly, comment, audit_context)
+    - audit_context: Dict with comparison stats and history info for tracking
     """
     comments = []
     is_anomaly = False
-    
+    audit_context = {
+        "checks_run": [],
+        "comparison_invoices_count": 0,
+        "comparison_mean": None,
+        "comparison_stddev": None,
+        "comparison_cv": None,
+    }
+
+    # Check if audit is enabled for this user
+    if not hasattr(user, "profile") or not user.profile.audit_enabled:
+        return False, "Audit disabled", audit_context
+
+    # Get user's settings
+    profile = user.profile
+    triggers = profile.get_audit_triggers()
+    sensitivity = profile.audit_sensitivity
+
     # Get user's currency
-    currency = user.profile.currency if hasattr(user, 'profile') else 'R'
+    currency = profile.currency if hasattr(user, "profile") else "R"
 
     # 1. Zero or no items — always a problem regardless of currency
-    has_no_items = not invoice.billed_items.exists()
-    zero_total = float(invoice.total_amount) == 0
+    if triggers.get("detect_no_items", True):
+        audit_context["checks_run"].append("detect_no_items")
+        has_no_items = not invoice.billed_items.exists()
+        if has_no_items:
+            is_anomaly = True
+            comments.append("No line items on invoice")
 
-    if has_no_items:
-        is_anomaly = True
-        comments.append("No line items on invoice")
-
-    if zero_total:
-        is_anomaly = True
-        comments.append("Invoice total is zero")
+    if triggers.get("detect_zero_total", True):
+        audit_context["checks_run"].append("detect_zero_total")
+        zero_total = float(invoice.total_amount) == 0
+        if zero_total:
+            is_anomaly = True
+            comments.append("Invoice total is zero")
 
     # 2. Statistical anomaly using standard deviation (accounts for currency variance)
-    recent_invoices = Invoice.objects.filter(
-        user=user,
-        status__in=['PENDING', 'PAID']
-    ).values_list('total_amount', flat=True)[:50]  # Last 50 invoices
-    
-    if len(recent_invoices) >= 2:  # Need at least 2 data points for std dev
-        amounts = [float(a) for a in recent_invoices]
-        mean = sum(amounts) / len(amounts)
-        
-        if mean > 0:
-            # Calculate standard deviation (adapts to currency)
-            variance = sum((x - mean) ** 2 for x in amounts) / len(amounts)
-            std_dev = variance ** 0.5
-            
-            # Coefficient of variation (CV) measures relative variance
-            # CV > 0.8 means high variance (weaker currencies often have this)
-            # CV < 0.2 means low variance (stable invoice patterns)
-            cv = std_dev / mean if mean > 0 else 0
-            
-            current_amount = float(invoice.total_amount)
-            
-            # Minimum threshold to prevent false positives
-            # Even with low variance, allow up to 15% variance as natural
-            min_threshold = mean * 0.15
-            adjusted_std_dev = max(std_dev, min_threshold)
-            
-            # Adaptive threshold: more lenient for high-variance currencies
-            if cv > 0.8:
-                # High variance: use 2.5 sigma (catches ~1.2% outliers)
-                threshold_upper = mean + (2.5 * adjusted_std_dev)
-                threshold_lower = mean - (2 * adjusted_std_dev)
-            elif cv > 0.5:
-                # Medium variance: use 2 sigma (catches ~2.3% outliers)
-                threshold_upper = mean + (2 * adjusted_std_dev)
-                threshold_lower = mean - (1.5 * adjusted_std_dev)
-            else:
-                # Low variance (stable): use 1.5 sigma (catches ~6.7% outliers)
-                threshold_upper = mean + (1.5 * adjusted_std_dev)
-                threshold_lower = mean - (1.5 * adjusted_std_dev)
-            
-            # Flag high outliers
-            if current_amount > threshold_upper:
-                ratio = current_amount / mean
-                is_anomaly = True
-                comments.append(f"Invoice is {ratio:.1f}x above your average (high outlier)")
-            
-            # Flag low outliers (but only if significantly low)
-            if 0 < current_amount < threshold_lower and current_amount < mean * 0.1:
-                ratio = current_amount / mean if mean > 0 else 0
-                is_anomaly = True
-                comments.append(f"Invoice is unusually low — {ratio*100:.1f}% of average")
+    if triggers.get("detect_statistical_outliers", True):
+        audit_context["checks_run"].append("detect_statistical_outliers")
+        recent_invoices = Invoice.objects.filter(user=user, status__in=["PENDING", "PAID"]).values_list(
+            "total_amount", flat=True
+        )[:50]  # Last 50 invoices
+
+        audit_context["comparison_invoices_count"] = len(recent_invoices)
+
+        if len(recent_invoices) >= 2:  # Need at least 2 data points for std dev
+            amounts = [float(a) for a in recent_invoices]
+            mean = sum(amounts) / len(amounts)
+
+            if mean > 0:
+                # Calculate standard deviation (adapts to currency)
+                variance = sum((x - mean) ** 2 for x in amounts) / len(amounts)
+                std_dev = variance**0.5
+
+                # Store for audit tracking
+                audit_context["comparison_mean"] = mean
+                audit_context["comparison_stddev"] = std_dev
+
+                # Coefficient of variation (CV) measures relative variance
+                # CV > 0.8 means high variance (weaker currencies often have this)
+                # CV < 0.2 means low variance (stable invoice patterns)
+                cv = std_dev / mean if mean > 0 else 0
+                audit_context["comparison_cv"] = cv
+
+                current_amount = float(invoice.total_amount)
+
+                # Minimum threshold to prevent false positives
+                # Even with low variance, allow up to 15% variance as natural
+                min_threshold = mean * 0.15
+                adjusted_std_dev = max(std_dev, min_threshold)
+
+                # Adaptive threshold based on sensitivity setting
+                if sensitivity == "STRICT":
+                    # Strict: use 1.5 sigma (catches ~6.7% outliers)
+                    threshold_upper = mean + (1.5 * adjusted_std_dev)
+                    threshold_lower = mean - (1.5 * adjusted_std_dev)
+                elif sensitivity == "LENIENT":
+                    # Lenient: use 2.5 sigma (catches ~1.2% outliers)
+                    threshold_upper = mean + (2.5 * adjusted_std_dev)
+                    threshold_lower = mean - (2 * adjusted_std_dev)
+                else:
+                    # Medium (default): use 2 sigma (catches ~2.3% outliers)
+                    threshold_upper = mean + (2 * adjusted_std_dev)
+                    threshold_lower = mean - (1.5 * adjusted_std_dev)
+
+                # Flag high outliers
+                if current_amount > threshold_upper:
+                    ratio = current_amount / mean
+                    is_anomaly = True
+                    comments.append(f"Invoice is {ratio:.1f}x above your average (high outlier)")
+
+                # Flag low outliers (but only if significantly low)
+                if 0 < current_amount < threshold_lower and current_amount < mean * 0.1:
+                    ratio = current_amount / mean if mean > 0 else 0
+                    is_anomaly = True
+                    comments.append(f"Invoice is unusually low — {ratio * 100:.1f}% of average")
+        else:
+            comments.append("Building history (insufficient invoices for comparison)")
 
     # 3. No client email — will fail to send
-    if not invoice.client.email:
-        is_anomaly = True
-        comments.append("Client has no email address")
+    if triggers.get("detect_missing_email", True):
+        audit_context["checks_run"].append("detect_missing_email")
+        if not invoice.client.email:
+            is_anomaly = True
+            comments.append("Client has no email address")
+
+    # 4. Business logic checks: VAT configuration
+    if triggers.get("detect_vat_mismatch", True):
+        audit_context["checks_run"].append("detect_vat_mismatch")
+        profile = user.profile if hasattr(user, "profile") else None
+        
+        # Check if VAT is being charged
+        if invoice.tax_amount and float(invoice.tax_amount) > 0:
+            # VAT is being charged, so there should be a VAT number
+            if profile and not profile.vat_number:
+                is_anomaly = True
+                comments.append("VAT is charged but no VAT number registered")
+            
+            # Also check if VAT mode matches profile registration status
+            if profile and invoice.tax_mode == "FULL" and not profile.is_vat_registered:
+                is_anomaly = True
+                comments.append("VAT charged but profile not registered as VAT-liable")
+
+    # 5. Business logic checks: Duplicate items
+    if triggers.get("detect_duplicate_items", True):
+        audit_context["checks_run"].append("detect_duplicate_items")
+        items = invoice.billed_items.all()
+        
+        if items.count() > 1:
+            # Create a list of (description, quantity) tuples to check for duplicates
+            item_signatures = []
+            duplicates = []
+            
+            for item in items:
+                # Use description as the key (case-insensitive)
+                sig = item.description.lower().strip()
+                if sig in item_signatures:
+                    duplicates.append(item.description)
+                else:
+                    item_signatures.append(sig)
+            
+            if duplicates:
+                is_anomaly = True
+                dup_list = ", ".join(set(duplicates))
+                comments.append(f"Duplicate items detected: {dup_list}")
 
     comment = " | ".join(comments) if comments else "OK"
-    return is_anomaly, comment
+    return is_anomaly, comment, audit_context
+
 
 def get_isolated_queryset(user, model_class):
     """
-    The 'Unix Filter' for your data. 
-    Pass in a user and a model (like Invoice), 
+    The 'Unix Filter' for your data.
+    Pass in a user and a model (like Invoice),
     and it returns only the records they are allowed to see.
     """
     qs = model_class.objects.all()
@@ -110,7 +184,7 @@ def get_isolated_queryset(user, model_class):
         return qs
 
     # 2. Staff/Managers: See data for groups they manage
-    if user.is_staff or getattr(user, 'is_ops', False):
+    if user.is_staff or getattr(user, "is_ops", False):
         managed_groups = UserGroup.objects.filter(manager=user)
         return qs.filter(group__in=managed_groups)
 

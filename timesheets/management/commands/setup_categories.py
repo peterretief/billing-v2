@@ -5,33 +5,22 @@ from timesheets.models import WorkCategory
 
 
 class Command(BaseCommand):
-    help = 'Setup initial work categories'
+    help = "Setup initial work categories"
 
     def handle(self, *args, **options):
         User = get_user_model()
         # Get your first user (or adjust as needed)
-        user = User.objects.first() 
-        
+        user = User.objects.first()
+
         categories = [
-            {
-                'name': 'Meeting',
-                'schema': ['Attendees', 'Meeting_Link', 'Notes']
-            },
-            {
-                'name': 'Site Visit',
-                'schema': ['Location', 'Authorized_By', 'Kilometers']
-            },
-            {
-                'name': 'Consulting',
-                'schema': ['Project_Phase', 'Stakeholder']
-            }
+            {"name": "Meeting", "schema": ["Attendees", "Meeting_Link", "Notes"]},
+            {"name": "Site Visit", "schema": ["Location", "Authorized_By", "Kilometers"]},
+            {"name": "Consulting", "schema": ["Project_Phase", "Stakeholder"]},
         ]
 
         for cat in categories:
             obj, created = WorkCategory.objects.get_or_create(
-                user=user,
-                name=cat['name'],
-                defaults={'metadata_schema': cat['schema']}
+                user=user, name=cat["name"], defaults={"metadata_schema": cat["schema"]}
             )
             status = "Created" if created else "Already exists"
-            self.stdout.write(self.style.SUCCESS(f'{status}: {cat["name"]}'))
+            self.stdout.write(self.style.SUCCESS(f"{status}: {cat['name']}"))

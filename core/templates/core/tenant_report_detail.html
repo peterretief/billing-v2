@@ -1,74 +1,75 @@
 {% extends "base.html" %}
 {% load humanize %}
-
 {% block content %}
-<div class="container py-4">
-    <div class="mb-4 d-flex justify-content-between align-items-start">
-        <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item"><a href="{% url 'core:portfolio_summary' %}">Portfolio</a></li>
-                    <li class="breadcrumb-item active">Tenant Report</li>
-                </ol>
-            </nav>
-            <h2 class="fw-bold">{{ tenant.company_name|default:tenant.user.username }}</h2>
-            <p class="text-muted">{{ tenant.user.email }}</p>
+    <div class="container py-4">
+        <div class="mb-4 d-flex justify-content-between align-items-start">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'core:portfolio_summary' %}">Portfolio</a>
+                        </li>
+                        <li class="breadcrumb-item active">Tenant Report</li>
+                    </ol>
+                </nav>
+                <h2 class="fw-bold">{{ tenant.company_name|default:tenant.user.username }}</h2>
+                <p class="text-muted">{{ tenant.user.email }}</p>
+            </div>
+            <button class="btn btn-outline-dark d-print-none" onclick="window.print()">
+                <i class="bi bi-printer"></i> Print Statement
+            </button>
         </div>
-        <button class="btn btn-outline-dark d-print-none" onclick="window.print()">
-            <i class="bi bi-printer"></i> Print Statement
-        </button>
-    </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="card bg-light border-0 shadow-sm p-3">
-                <div class="small text-muted text-uppercase fw-bold">Total Invoiced</div>
-                <div class="fs-2 fw-bold text-primary">{{ tenant.currency }} {{ total_invoiced|floatformat:2|intcomma }}</div>
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card bg-light border-0 shadow-sm p-3">
+                    <div class="small text-muted text-uppercase fw-bold">Total Invoiced</div>
+                    <div class="fs-2 fw-bold text-primary">{{ tenant.currency }} {{ total_invoiced|floatformat:2|intcomma }}</div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-light border-0 shadow-sm p-3">
+                    <div class="small text-muted text-uppercase fw-bold">Total Balance Due</div>
+                    <div class="fs-2 fw-bold text-danger">{{ tenant.currency }} {{ total_outstanding|floatformat:2|intcomma }}</div>
+                </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card bg-light border-0 shadow-sm p-3">
-                <div class="small text-muted text-uppercase fw-bold">Total Balance Due</div>
-                <div class="fs-2 fw-bold text-danger">{{ tenant.currency }} {{ total_outstanding|floatformat:2|intcomma }}</div>
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th class="text-end">Total Amount</th>
+                            <th class="text-end">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inv in invoices %}
+                            <tr>
+                                <td>
+                                    <strong>{{ inv.invoice_number }}</strong>
+                                </td>
+                                <td>{{ inv.date_issued|date:"d M Y" }}</td>
+                                <td>
+                                    {% if inv.balance_due == 0 %}
+                                        <span class="badge bg-success-subtle text-success">Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-warning-subtle text-warning">Outstanding</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">{{ inv.total_amount|floatformat:2|intcomma }}</td>
+                                <td class="text-end fw-bold">{{ inv.balance_due|floatformat:2|intcomma }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">No invoices generated for this tenant.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
-
-    <div class="card border-0 shadow-sm">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>Invoice #</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th class="text-end">Total Amount</th>
-                        <th class="text-end">Balance</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for inv in invoices %}
-                    <tr>
-                        <td><strong>{{ inv.invoice_number }}</strong></td>
-                        <td>{{ inv.date_issued|date:"d M Y" }}</td>
-                        <td>
-                            {% if inv.balance_due == 0 %}
-                                <span class="badge bg-success-subtle text-success">Paid</span>
-                            {% else %}
-                                <span class="badge bg-warning-subtle text-warning">Outstanding</span>
-                            {% endif %}
-                        </td>
-                        <td class="text-end">{{ inv.total_amount|floatformat:2|intcomma }}</td>
-                        <td class="text-end fw-bold">{{ inv.balance_due|floatformat:2|intcomma }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">No invoices generated for this tenant.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
 {% endblock %}

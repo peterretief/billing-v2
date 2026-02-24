@@ -12,7 +12,5 @@ def mark_client_onboarding_complete(sender, instance, created, **kwargs):
         # Find the specific onboarding notification for this user
         # We look for the message string we used in services.py
         Notification.objects.filter(
-            user=instance.user, 
-            message__icontains="Step 2: Create your first client",
-            is_read=False
+            user=instance.user, message__icontains="Step 2: Create your first client", is_read=False
         ).update(is_read=True)

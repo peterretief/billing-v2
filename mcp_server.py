@@ -7,6 +7,7 @@ mcp = FastMCP("Billing-Project-Manager")
 
 PROJECT_ROOT = "/opt/billing_v2"
 
+
 @mcp.tool()
 def list_billing_files(path: str = "."):
     """Lists files in the billing project to help with organization."""
@@ -16,15 +17,17 @@ def list_billing_files(path: str = "."):
     except Exception as e:
         return str(e)
 
+
 @mcp.tool()
 def read_project_file(file_path: str):
     """Reads a specific file (like a .tex or .py file) from the project."""
     full_path = os.path.join(PROJECT_ROOT, file_path)
     try:
-        with open(full_path, 'r') as f:
+        with open(full_path, "r") as f:
             return f.read()
     except Exception as e:
         return str(e)
+
 
 @mcp.tool()
 def write_project_file(file_path: str, content: str):
@@ -33,15 +36,16 @@ def write_project_file(file_path: str, content: str):
     full_path = os.path.abspath(os.path.join(PROJECT_ROOT, file_path))
     if not full_path.startswith(PROJECT_ROOT):
         return "Error: Cannot write outside of project directory."
-        
+
     try:
         # Create directories if they don't exist
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, 'w', encoding='utf-8') as f:
+        with open(full_path, "w", encoding="utf-8") as f:
             f.write(content)
         return f"Successfully wrote to {file_path}"
     except Exception as e:
         return str(e)
+
 
 if __name__ == "__main__":
     print("MCP Server script started.")

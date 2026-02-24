@@ -8,18 +8,18 @@ from .services import import_recurring_to_invoices
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name="run_automated_billing_cycle") # Use a clean, explicit name
+@shared_task(name="run_automated_billing_cycle")  # Use a clean, explicit name
 def run_automated_billing_cycle():
     """
-    Heartbeat task: Runs once a day to process all 
+    Heartbeat task: Runs once a day to process all
     recurring items for all active users.
     """
     User = get_user_model()
     # We only run this for active users to save resources
     active_users = User.objects.filter(is_active=True)
-    
+
     total_invoices = 0
-    
+
     for user in active_users:
         try:
             processed = import_recurring_to_invoices(user)

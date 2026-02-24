@@ -33,114 +33,125 @@ from .models import TimesheetEntry, WorkCategory
 
 @login_required
 def get_client_rate(request):
-    client_id = request.GET.get('client')
+    client_id = request.GET.get("client")
     client = get_object_or_404(Client, id=client_id, user=request.user)
     # Return just the input field with the new value
-    return HttpResponse(f'<input type="number" name="hourly_rate" id="id_hourly_rate" value="{client.default_hourly_rate}" class="form-control">')
+    return HttpResponse(
+        f'<input type="number" name="hourly_rate" id="id_hourly_rate" value="{client.default_hourly_rate}" class="form-control">'
+    )
+
 
 @login_required
 def export_metadata_pdf(request, invoice_id):
     try:
         invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
         # Fetch entries linked to this invoice
-        entries = TimesheetEntry.objects.filter(invoice=invoice).select_related('category').order_by('date')
-        
+        entries = TimesheetEntry.objects.filter(invoice=invoice).select_related("category").order_by("date")
+
         if not entries.exists():
             messages.error(request, "No timesheet entries found for this invoice.")
-            return redirect('invoices:invoice_detail', pk=invoice_id)
-        
+            return redirect("invoices:invoice_detail", pk=invoice_id)
+
         # Group by Category Name
         grouped_entries = defaultdict(list)
         for entry in entries:
             cat_name = entry.category.name if entry.category else "General"
             # Escape LaTeX special characters in category name
-            cat_name = cat_name.replace('&', r'\&').replace('$', r'\$').replace('%', r'\%').replace('_', r'\_').replace('^', r'\textasciicircum{}').replace('~', r'\textasciitilde{}')
+            cat_name = (
+                cat_name.replace("&", r"\&")
+                .replace("$", r"\$")
+                .replace("%", r"\%")
+                .replace("_", r"\_")
+                .replace("^", r"\textasciicircum{}")
+                .replace("~", r"\textasciitilde{}")
+            )
             grouped_entries[cat_name].append(entry)
 
         context = {
-            'invoice_number': invoice.number,
-            'client_name': invoice.client.name,
-            'date_generated': timezone.now().strftime('%d %b %Y'),
-            'grouped_data': dict(grouped_entries), # Pass the dictionary
-            'total_hours': sum(e.hours for e in entries),
+            "invoice_number": invoice.number,
+            "client_name": invoice.client.name,
+            "date_generated": timezone.now().strftime("%d %b %Y"),
+            "grouped_data": dict(grouped_entries),  # Pass the dictionary
+            "total_hours": sum(e.hours for e in entries),
         }
 
         # 1. Render the LaTeX string
-        tex_content = render_to_string('timesheets/reports/metadata_report.tex', context)
-        
+        tex_content = render_to_string("timesheets/reports/metadata_report.tex", context)
+
         # 2. Save to temporary file and compile
-        temp_dir = os.path.join(settings.BASE_DIR, 'tmp')
-        if not os.path.exists(temp_dir): 
+        temp_dir = os.path.join(settings.BASE_DIR, "tmp")
+        if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
-        
-        tex_file_path = os.path.join(temp_dir, f'report_{invoice.id}.tex')
-        with open(tex_file_path, 'w') as f:
+
+        tex_file_path = os.path.join(temp_dir, f"report_{invoice.id}.tex")
+        with open(tex_file_path, "w") as f:
             f.write(tex_content)
 
         # Run pdflatex (ensure pdflatex is installed on your server)
         result = subprocess.run(
-            ['pdflatex', '-interaction=nonstopmode', '-output-directory', temp_dir, tex_file_path],
+            ["pdflatex", "-interaction=nonstopmode", "-output-directory", temp_dir, tex_file_path],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
         )
-        
+
         if result.returncode != 0:
             # Log the actual error for debugging
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"pdflatex error for invoice {invoice_id}:")
             logger.error(f"STDOUT: {result.stdout}")
             logger.error(f"STDERR: {result.stderr}")
             messages.error(request, "Failed to generate timesheet PDF. Check server logs for LaTeX error.")
-            return redirect('invoices:invoice_detail', pk=invoice_id)
+            return redirect("invoices:invoice_detail", pk=invoice_id)
 
         # 3. Return the PDF
-        pdf_path = tex_file_path.replace('.tex', '.pdf')
+        pdf_path = tex_file_path.replace(".tex", ".pdf")
         if not os.path.exists(pdf_path):
             messages.error(request, "PDF file was not generated successfully.")
-            return redirect('invoices:invoice_detail', pk=invoice_id)
-            
-        with open(pdf_path, 'rb') as f:
-            response = HttpResponse(f.read(), content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="Work_Log_{invoice.number}.pdf"'
+            return redirect("invoices:invoice_detail", pk=invoice_id)
+
+        with open(pdf_path, "rb") as f:
+            response = HttpResponse(f.read(), content_type="application/pdf")
+            response["Content-Disposition"] = f'attachment; filename="Work_Log_{invoice.number}.pdf"'
             return response
-            
+
     except Exception as e:
         messages.error(request, f"Error generating timesheet report: {str(e)}")
-        return redirect('invoices:invoice_detail', pk=invoice_id)
+        return redirect("invoices:invoice_detail", pk=invoice_id)
+
 
 @login_required
 def manage_categories(request):
     # Fetch all categories belonging to the user
-    categories = WorkCategory.objects.filter(user=request.user).order_by('name')
-    
-    if request.method == 'POST':
+    categories = WorkCategory.objects.filter(user=request.user).order_by("name")
+
+    if request.method == "POST":
         form = WorkCategoryForm(request.POST)
         if form.is_valid():
             category = form.save(commit=False)
             category.user = request.user
             category.save()
             messages.success(request, f"Category '{category.name}' created successfully!")
-            return redirect('timesheets:manage_categories')
+            return redirect("timesheets:manage_categories")
     else:
         form = WorkCategoryForm()
 
-    return render(request, 'timesheets/manage_categories.html', {
-        'categories': categories,
-        'form': form
-    })
+    return render(request, "timesheets/manage_categories.html", {"categories": categories, "form": form})
+
 
 @login_required
 def invoice_time_report(request, invoice_id):
     # Fetch the invoice
     invoice = get_object_or_404(Invoice, id=invoice_id, user=request.user)
-    
+
     # Fetch all timesheet entries linked to THIS invoice
-    entries = TimesheetEntry.objects.filter(
-        invoice=invoice, 
-        user=request.user
-    ).select_related('category', 'client').order_by('date')
+    entries = (
+        TimesheetEntry.objects.filter(invoice=invoice, user=request.user)
+        .select_related("category", "client")
+        .order_by("date")
+    )
 
     # Grouping by category for a cleaner report
     report_data = defaultdict(list)
@@ -149,126 +160,123 @@ def invoice_time_report(request, invoice_id):
         report_data[entry.category.name if entry.category else "Standard"].append(entry)
         total_hours += entry.hours
 
-    return render(request, 'timesheets/reports/invoice_detail.html', {
-        'invoice': invoice,
-        'report_data': dict(report_data),
-        'total_hours': total_hours,
-        'entries': entries
-    })
+    return render(
+        request,
+        "timesheets/reports/invoice_detail.html",
+        {"invoice": invoice, "report_data": dict(report_data), "total_hours": total_hours, "entries": entries},
+    )
 
 
 @login_required
 def manage_categories(request):
     categories = WorkCategory.objects.filter(user=request.user)
-    if request.method == 'POST':
+    if request.method == "POST":
         form = WorkCategoryForm(request.POST)
         if form.is_valid():
             category = form.save(commit=False)
             category.user = request.user
             category.save()
             messages.success(request, "Category created!")
-            return redirect('timesheets:manage_categories')
+            return redirect("timesheets:manage_categories")
     else:
         form = WorkCategoryForm()
-    
-    return render(request, 'timesheets/manage_categories.html', {
-        'categories': categories,
-        'form': form
-    })
+
+    return render(request, "timesheets/manage_categories.html", {"categories": categories, "form": form})
 
 
 @login_required
 def get_category_fields(request):
-    category_id = request.GET.get('category')
+    category_id = request.GET.get("category")
     if category_id:
         category = get_object_or_404(WorkCategory, id=category_id, user=request.user)
         # category.metadata_schema is your list like ['Attendees', 'Location']
-        return render(request, 'timesheets/includes/category_fields.html', {
-            'schema': category.metadata_schema
-        })
+        return render(request, "timesheets/includes/category_fields.html", {"schema": category.metadata_schema})
     return HttpResponse("")  # Return nothing if "Standard Work" is selected
-    
 
 
 class TimesheetListView(LoginRequiredMixin, ListView):
     model = TimesheetEntry
-    template_name = 'timesheets/timesheet_list.html'
-    context_object_name = 'entries'
+    template_name = "timesheets/timesheet_list.html"
+    context_object_name = "entries"
 
     def get_queryset(self):
         """Only show uninvoiced items in the main table view."""
-        return TimesheetEntry.objects.filter(
-            user=self.request.user, 
-            is_billed=False
-        ).order_by('-date')
+        return TimesheetEntry.objects.filter(user=self.request.user, is_billed=False).order_by("-date")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.now().date()
-        
+
         start_of_week = today - timedelta(days=today.weekday())
         start_of_month = today.replace(day=1)
 
         # FETCH CATEGORIES FOR THE MODAL
-        categories = WorkCategory.objects.filter(user=self.request.user).order_by('name')
+        categories = WorkCategory.objects.filter(user=self.request.user).order_by("name")
 
-        clients = Client.objects.filter(user=self.request.user).annotate(
-            weekly_actual=Coalesce(
-                Sum('timesheets__hours', filter=Q(timesheets__date__gte=start_of_week)), 
-                Value(0, output_field=DecimalField())
-            ),
-            monthly_actual=Coalesce(
-                Sum('timesheets__hours', filter=Q(timesheets__date__gte=start_of_month)), 
-                Value(0, output_field=DecimalField())
+        clients = (
+            Client.objects.filter(user=self.request.user)
+            .annotate(
+                weekly_actual=Coalesce(
+                    Sum("timesheets__hours", filter=Q(timesheets__date__gte=start_of_week)),
+                    Value(0, output_field=DecimalField()),
+                ),
+                monthly_actual=Coalesce(
+                    Sum("timesheets__hours", filter=Q(timesheets__date__gte=start_of_month)),
+                    Value(0, output_field=DecimalField()),
+                ),
             )
-        ).order_by('name')
+            .order_by("name")
+        )
 
         client_stats = []
         for c in clients:
-            client_stats.append({
-                'client': c,
-                'weekly_actual': c.weekly_actual,
-                'weekly_target': c.weekly_target_hours,
-                'weekly_percent': float((c.weekly_actual / c.weekly_target_hours * 100)) if c.weekly_target_hours > 0 else 0,
-            })
+            client_stats.append(
+                {
+                    "client": c,
+                    "weekly_actual": c.weekly_actual,
+                    "weekly_target": c.weekly_target_hours,
+                    "weekly_percent": float((c.weekly_actual / c.weekly_target_hours * 100))
+                    if c.weekly_target_hours > 0
+                    else 0,
+                }
+            )
 
         all_month_qs = TimesheetEntry.objects.filter(user=self.request.user, date__gte=start_of_month)
-        totals = all_month_qs.aggregate(
-            total_hours=Sum('hours'),
-            total_value=Sum(F('hours') * F('hourly_rate'))
-        )
-        
-        total_val = totals['total_value'] or Decimal('0.00')
-        target_amount = Decimal('50000.00')
+        totals = all_month_qs.aggregate(total_hours=Sum("hours"), total_value=Sum(F("hours") * F("hourly_rate")))
 
-        invoices = Invoice.objects.filter(user=self.request.user).order_by('-date_issued')
-        context.update({
-            'client_stats': client_stats,
-            'clients': clients,
-            'categories': categories,
-            'total_hours': totals['total_hours'] or 0,
-            'total_value': total_val,
-            'target_amount': target_amount,
-            'progress_percent': float(min((total_val / target_amount) * 100, 100)) if target_amount > 0 else 0,
-            'timesheet_form': TimesheetEntryForm(),
-            'invoices': invoices,
-        })
+        total_val = totals["total_value"] or Decimal("0.00")
+        target_amount = Decimal("50000.00")
+
+        invoices = Invoice.objects.filter(user=self.request.user).order_by("-date_issued")
+        context.update(
+            {
+                "client_stats": client_stats,
+                "clients": clients,
+                "categories": categories,
+                "total_hours": totals["total_hours"] or 0,
+                "total_value": total_val,
+                "target_amount": target_amount,
+                "progress_percent": float(min((total_val / target_amount) * 100, 100)) if target_amount > 0 else 0,
+                "timesheet_form": TimesheetEntryForm(),
+                "invoices": invoices,
+            }
+        )
         return context
+
 
 # --- 2. LOGGING, EDITING & DELETION ---
 
 
-
 @login_required
 def log_time(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = TimesheetEntryForm(request.POST)
         if form.is_valid():
             entry = form.save(commit=False)
             entry.user = request.user
 
             # Capture the Category ID
-            category_id = request.POST.get('category')
+            category_id = request.POST.get("category")
             if category_id:
                 entry.category_id = category_id
 
@@ -277,79 +285,75 @@ def log_time(request):
                 entry.hourly_rate = entry.client.default_hourly_rate
 
             # Handle Metadata
-            meta_data = {k.replace('meta_', ''): v for k, v in request.POST.items() 
-                         if k.startswith('meta_') and v.strip()}
+            meta_data = {
+                k.replace("meta_", ""): v for k, v in request.POST.items() if k.startswith("meta_") and v.strip()
+            }
             entry.metadata = meta_data
 
             # Handle attach_to_invoice boolean (store in metadata or custom logic)
-            attach_to_invoice = form.cleaned_data.get('attach_to_invoice', False)
-            entry.metadata['attach_to_invoice'] = attach_to_invoice
+            attach_to_invoice = form.cleaned_data.get("attach_to_invoice", False)
+            entry.metadata["attach_to_invoice"] = attach_to_invoice
 
             entry.save()
 
             messages.success(request, f"Logged {entry.hours}h for {entry.client.name}.")
-            response = redirect('timesheets:timesheet_list')
-            response['HX-Trigger'] = 'timesheetAdded'
+            response = redirect("timesheets:timesheet_list")
+            response["HX-Trigger"] = "timesheetAdded"
             return response
         else:
             messages.error(request, "Please correct the errors below.")
-            return redirect('timesheets:timesheet_list')
+            return redirect("timesheets:timesheet_list")
 
-    return redirect('timesheets:timesheet_list')
+    return redirect("timesheets:timesheet_list")
 
 
 @login_required
 def edit_entry(request, pk):
     entry = get_object_or_404(TimesheetEntry, pk=pk, user=request.user)
 
-    if request.method == 'POST':
+    if request.method == "POST":
         form = TimesheetEntryForm(request.POST, instance=entry)
         if form.is_valid():
             entry = form.save(commit=False)
 
-            category_id = request.POST.get('category')
+            category_id = request.POST.get("category")
             if category_id:
                 entry.category_id = category_id
 
             # Re-capture metadata during edit
             meta_data = {}
             for key, value in request.POST.items():
-                if key.startswith('meta_'):
-                    meta_data[key.replace('meta_', '')] = value
-            
+                if key.startswith("meta_"):
+                    meta_data[key.replace("meta_", "")] = value
+
             entry.metadata = meta_data
             entry.save()
             messages.success(request, "Entry updated.")
-            return redirect('timesheets:timesheet_list')
-
-
+            return redirect("timesheets:timesheet_list")
 
     if entry.is_billed:
         messages.error(request, "Cannot edit invoiced entries.")
-        return redirect('timesheets:timesheet_list')
+        return redirect("timesheets:timesheet_list")
 
     form = TimesheetEntryForm(request.POST or None, instance=entry)
-    if request.method == 'POST' and form.is_valid():
+    if request.method == "POST" and form.is_valid():
         entry = form.save(commit=False)
-        
+
         # Update metadata during edit
         meta_data = {}
         for key, value in request.POST.items():
-            if key.startswith('meta_'):
-                meta_data[key.replace('meta_', '')] = value
-        
+            if key.startswith("meta_"):
+                meta_data[key.replace("meta_", "")] = value
+
         entry.metadata = meta_data
         entry.save()
         messages.success(request, "Updated successfully.")
-        return redirect('timesheets:timesheet_list')
-    
+        return redirect("timesheets:timesheet_list")
+
     # Need categories here for the edit template dropdown
     categories = WorkCategory.objects.filter(user=request.user)
-    return render(request, 'timesheets/edit_entry_form.html', {
-        'form': form, 
-        'entry': entry,
-        'categories': categories
-    })
+    return render(request, "timesheets/edit_entry_form.html", {"form": form, "entry": entry, "categories": categories})
+
 
 @login_required
 def delete_entry(request, pk):
@@ -359,40 +363,40 @@ def delete_entry(request, pk):
     else:
         entry.delete()
         messages.success(request, "Entry deleted.")
-    return redirect('timesheets:timesheet_list')
+    return redirect("timesheets:timesheet_list")
+
 
 # --- 3. CONSOLIDATED INVOICE GENERATOR ---
-
 
 
 @login_required
 def generate_invoice_bulk(request):
     # 1. Get the user's business profile settings
     try:
-        profile = request.user.profile 
-    except AttributeError: # Handles cases where profile isn't linked
+        profile = request.user.profile
+    except AttributeError:  # Handles cases where profile isn't linked
         messages.error(request, "Please set up your Business Profile before generating invoices.")
-        return redirect('core:edit_profile')
+        return redirect("core:edit_profile")
 
-    if request.method != 'POST':
-        return redirect('timesheets:timesheet_list')
+    if request.method != "POST":
+        return redirect("timesheets:timesheet_list")
 
-    selected_ids = request.POST.getlist('selected_entries')
+    selected_ids = request.POST.getlist("selected_entries")
     if not selected_ids:
         messages.warning(request, "Select entries first.")
-        return redirect('timesheets:timesheet_list')
+        return redirect("timesheets:timesheet_list")
 
     with transaction.atomic():
         # Select for update prevents other processes from touching these entries during calculation
-        entries = TimesheetEntry.objects.select_for_update(of=('self',)).filter(
-            id__in=selected_ids, 
-            user=request.user, 
-            is_billed=False
-        ).select_related('client', 'category')
+        entries = (
+            TimesheetEntry.objects.select_for_update(of=("self",))
+            .filter(id__in=selected_ids, user=request.user, is_billed=False)
+            .select_related("client", "category")
+        )
 
         if not entries.exists():
             messages.info(request, "No unbilled entries found for the selection.")
-            return redirect('timesheets:timesheet_list')
+            return redirect("timesheets:timesheet_list")
 
         # Group entries by Client
         client_map = defaultdict(list)
@@ -411,16 +415,16 @@ def generate_invoice_bulk(request):
                 client=client,
                 due_date=timezone.now().date() + timedelta(days=client.payment_terms or 14),
                 tax_mode=initial_tax_mode,
-                status=Invoice.Status.DRAFT
+                status=Invoice.Status.DRAFT,
             )
 
             # 3. Aggregate Work Logs into Line Items (Category + Rate)
-            line_items = defaultdict(Decimal) 
+            line_items = defaultdict(Decimal)
             for entry in client_entries:
                 category_name = entry.category.name if entry.category else "General Work"
                 key = (category_name, entry.hourly_rate)
                 line_items[key] += entry.hours
-                
+
                 # Link the original entry to the invoice for the detailed LaTeX report
                 entry.is_billed = True
                 entry.invoice = invoice
@@ -430,43 +434,65 @@ def generate_invoice_bulk(request):
             for (desc, rate), total_h in line_items.items():
                 items.models.Item.objects.create(
                     user=request.user,  # <--- Added missing tenant field
-                    client=client,      # <--- Added missing client field
-                    invoice=invoice, 
-                    description=desc, 
-                    quantity=total_h, 
+                    client=client,  # <--- Added missing client field
+                    invoice=invoice,
+                    description=desc,
+                    quantity=total_h,
                     unit_price=rate,
-                    is_taxable=profile.is_vat_registered
+                    is_taxable=profile.is_vat_registered,
                 )
 
             # 5. FINAL STEP: Sync the Snapshots
             # We must do this AFTER items are created so the math is not zero
             invoice.sync_totals()
             invoice.save()
-            
+
             # 6. Add audit logging
             try:
+                from core.models import BillingAuditLog, AuditHistory
                 from core.utils import get_anomaly_status
-                from core.models import BillingAuditLog
-                is_anomaly, comment = get_anomaly_status(request.user, invoice)
+
+                is_anomaly, comment, audit_context = get_anomaly_status(request.user, invoice)
                 BillingAuditLog.objects.create(
                     user=request.user,
                     invoice=invoice,
                     is_anomaly=is_anomaly,
                     ai_comment=comment,
-                    details={
-                        "total": float(invoice.total_amount),
-                        "source": "timesheet_ui_billing"
-                    }
+                    details={"total": float(invoice.total_amount), "source": "timesheet_ui_billing"},
+                )
+                
+                # Create audit history record for learning
+                AuditHistory.objects.create(
+                    user=request.user,
+                    invoice=invoice,
+                    checks_run=audit_context.get("checks_run", []),
+                    flags_raised=[c for c in comment.split(" | ") if c != "OK"],
+                    comparison_invoices_count=audit_context.get("comparison_invoices_count", 0),
+                    is_flagged=is_anomaly,
+                    comparison_mean=audit_context.get("comparison_mean"),
+                    comparison_stddev=audit_context.get("comparison_stddev"),
+                    comparison_cv=audit_context.get("comparison_cv"),
                 )
                 if is_anomaly:
                     flagged_count += 1
-                    messages.warning(request, mark_safe(f"⚠️ Invoice #{invoice.number} flagged: {comment} <a href='{reverse('invoices:billing_audit_report')}' class='alert-link'>Review in Audit</a>"), extra_tags='safe')
+                    messages.warning(
+                        request,
+                        mark_safe(
+                            f"⚠️ Invoice #{invoice.number} flagged: {comment} <a href='{reverse('invoices:billing_audit_report')}' class='alert-link'>Review in Audit</a>"
+                        ),
+                        extra_tags="safe",
+                    )
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to audit timesheet invoice {invoice.id}: {e}")
                 # Don't fail the creation just because audit failed
 
-        messages.success(request, f"Generated {len(client_map)} invoice(s) as drafts." + (f" {flagged_count} flagged by audit." if flagged_count > 0 else ""))
+        messages.success(
+            request,
+            f"Generated {len(client_map)} invoice(s) as drafts."
+            + (f" {flagged_count} flagged by audit." if flagged_count > 0 else ""),
+        )
 
-    return redirect('invoices:invoice_list')
+    return redirect("invoices:invoice_list")

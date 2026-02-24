@@ -73,11 +73,7 @@ def create_and_invite_tenant(request, ops_user, username, email, company_name, *
             # Step 1: Create User with a temporary, unusable password.
             # The user will never see or use this password.
             temp_password = get_random_string(40)
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=temp_password
-            )
+            user = User.objects.create_user(username=username, email=email, password=temp_password)
 
             # Step 2: Pre-populate the UserProfile with data from the Ops Manager.
             # The UserProfile is created automatically via a post-save signal.
@@ -85,9 +81,9 @@ def create_and_invite_tenant(request, ops_user, username, email, company_name, *
             profile.company_name = company_name
             # Note: To fully implement the "Lock" feature, a 'settings_locked'
             # boolean field could be added to the UserProfile model.
-            profile.currency = extra_profile_data.get('currency', 'GBP')
-            profile.vat_number = extra_profile_data.get('vat_number', '')
-            profile.vat_rate = extra_profile_data.get('vat_rate', 20.00)
+            profile.currency = extra_profile_data.get("currency", "GBP")
+            profile.vat_number = extra_profile_data.get("vat_number", "")
+            profile.vat_rate = extra_profile_data.get("vat_rate", 20.00)
 
             # Step 5 (Partial): Mark who initiated this account for audit purposes.
             # A full implementation would involve a status field on the profile.
@@ -95,27 +91,24 @@ def create_and_invite_tenant(request, ops_user, username, email, company_name, *
             profile.save()
 
             # Step 3: Trigger the password reset email, which serves as the invite.
-            form = PasswordResetForm({'email': user.email})
+            form = PasswordResetForm({"email": user.email})
             if form.is_valid():
                 form.save(
-                    email_template_name='ops/emails/invite_email.html',
-                    subject_template_name='ops/emails/invite_subject.txt',
-                    request=request
+                    email_template_name="ops/emails/invite_email.html",
+                    subject_template_name="ops/emails/invite_subject.txt",
+                    request=request,
                 )
             else:
                 # This case should ideally not be reached if email is valid
                 raise Exception("Failed to initialize password reset for the new user.")
 
-            logger.info(
-                f"Ops User '{ops_user.username}' successfully invited tenant "
-                f"'{username}' ({email})."
-            )
+            logger.info(f"Ops User '{ops_user.username}' successfully invited tenant '{username}' ({email}).")
             return user
 
     except Exception as e:
         logger.error(
             f"Error during tenant invitation for email '{email}': {str(e)}",
-            exc_info=True  # Log the full traceback for debugging
+            exc_info=True,  # Log the full traceback for debugging
         )
         # Re-raise the exception to be handled by the caller.
         raise e
@@ -138,10 +131,7 @@ def populate_monthly_batch():
 
     for user in active_users:
         # get_or_create prevents duplicate queue items if the task re-runs
-        batch_item, created = BillingBatch.objects.get_or_create(
-            user=user,
-            scheduled_date=today
-        )
+        batch_item, created = BillingBatch.objects.get_or_create(user=user, scheduled_date=today)
         if created:
             queued_count += 1
 
@@ -156,9 +146,8 @@ def process_ops_queue(limit=50):
     """
     # Grab a batch of unprocessed items
     pending_items = BillingBatch.objects.filter(
-        is_processed=False,
-        scheduled_date=timezone.now().date()
-    ).select_related('user', 'user__userprofile')[:limit]
+        is_processed=False, scheduled_date=timezone.now().date()
+    ).select_related("user", "user__userprofile")[:limit]
 
     processed_count = 0
 
@@ -173,8 +162,8 @@ def process_ops_queue(limit=50):
                 item.is_processed = True
                 item.processed_at = timezone.now()
                 item.metadata = {
-                    'invoices_created': len(results),
-                    'currency_used': getattr(item.user.profile, 'currency', 'USD')
+                    "invoices_created": len(results),
+                    "currency_used": getattr(item.user.profile, "currency", "USD"),
                 }
                 item.save()
                 processed_count += 1

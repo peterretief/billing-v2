@@ -1,105 +1,109 @@
 {% extends "base.html" %}
-
 {% block title %}{{ group.name }}{% endblock %}
-
 {% block content %}
-<div class="container py-4">
-    <div class="mb-4 d-flex justify-content-between align-items-start">
-        <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-2">
-                    <li class="breadcrumb-item"><a href="{% url 'core:staff_groups_list' %}">My Groups</a></li>
-                    <li class="breadcrumb-item active">{{ group.name }}</li>
-                </ol>
-            </nav>
-            <h1 class="h2 mb-0">{{ group.name }}</h1>
-            {% if group.description %}
-                <p class="text-muted mt-2">{{ group.description }}</p>
+    <div class="container py-4">
+        <div class="mb-4 d-flex justify-content-between align-items-start">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'core:staff_groups_list' %}">My Groups</a>
+                        </li>
+                        <li class="breadcrumb-item active">{{ group.name }}</li>
+                    </ol>
+                </nav>
+                <h1 class="h2 mb-0">{{ group.name }}</h1>
+                {% if group.description %}<p class="text-muted mt-2">{{ group.description }}</p>{% endif %}
+            </div>
+            <div class="btn-group" role="group">
+                <a href="{% url 'core:staff_add_group_member' group.id %}"
+                   class="btn btn-success">
+                    <i class="bi bi-plus-circle"></i> Add Member
+                </a>
+                <a href="{% url 'core:staff_groups_list' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back
+                </a>
+            </div>
+        </div>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show"
+                     role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Group Members ({{ members.count }})</h5>
+            </div>
+            {% if members %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Added By</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in members %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ member.user.username }}</strong>
+                                    </td>
+                                    <td>
+                                        <small>{{ member.user.email }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ member.get_role_display }}</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ member.added_by.username }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        <form method="post"
+                                              action="{% url 'core:staff_remove_group_member' group.id member.id %}"
+                                              style="display: inline">
+                                            {% csrf_token %}
+                                            <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Remove user from group?')">
+                                                <i class="bi bi-trash"></i> Remove
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="card-body">
+                    <p class="text-muted mb-0">No members in this group yet.</p>
+                </div>
             {% endif %}
         </div>
-        <div class="btn-group" role="group">
-            <a href="{% url 'core:staff_add_group_member' group.id %}" class="btn btn-success">
-                <i class="bi bi-plus-circle"></i> Add Member
-            </a>
-            <a href="{% url 'core:staff_groups_list' %}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left"></i> Back
-            </a>
-        </div>
-    </div>
-
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Group Information</h5>
             </div>
-        {% endfor %}
-    {% endif %}
-
-    <div class="card shadow-sm">
-        <div class="card-header bg-light">
-            <h5 class="mb-0">Group Members ({{ members.count }})</h5>
-        </div>
-        {% if members %}
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Added By</th>
-                            <th class="text-end">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for member in members %}
-                        <tr>
-                            <td>
-                                <strong>{{ member.user.username }}</strong>
-                            </td>
-                            <td>
-                                <small>{{ member.user.email }}</small>
-                            </td>
-                            <td>
-                                <span class="badge bg-info">{{ member.get_role_display }}</span>
-                            </td>
-                            <td>
-                                <small class="text-muted">{{ member.added_by.username }}</small>
-                            </td>
-                            <td class="text-end">
-                                <form method="post" action="{% url 'core:staff_remove_group_member' group.id member.id %}" style="display: inline;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove user from group?')">
-                                        <i class="bi bi-trash"></i> Remove
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
             <div class="card-body">
-                <p class="text-muted mb-0">No members in this group yet.</p>
+                <dl class="row">
+                    <dt class="col-sm-3">Created:</dt>
+                    <dd class="col-sm-9">
+                        {{ group.created_at|date:"M d, Y H:i" }}
+                    </dd>
+                    <dt class="col-sm-3">Last Updated:</dt>
+                    <dd class="col-sm-9">
+                        {{ group.updated_at|date:"M d, Y H:i" }}
+                    </dd>
+                </dl>
             </div>
-        {% endif %}
-    </div>
-
-    <div class="card shadow-sm mt-4">
-        <div class="card-header bg-light">
-            <h5 class="mb-0">Group Information</h5>
-        </div>
-        <div class="card-body">
-            <dl class="row">
-                <dt class="col-sm-3">Created:</dt>
-                <dd class="col-sm-9">{{ group.created_at|date:"M d, Y H:i" }}</dd>
-                
-                <dt class="col-sm-3">Last Updated:</dt>
-                <dd class="col-sm-9">{{ group.updated_at|date:"M d, Y H:i" }}</dd>
-            </dl>
         </div>
     </div>
-</div>
 {% endblock %}

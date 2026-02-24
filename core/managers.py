@@ -5,6 +5,7 @@ class TenantManager(models.Manager):
     """
     The base manager for all user-owned data.
     """
+
     def for_user(self, user):
         """
         Shortcut to filter records by the logged-in user.
@@ -13,6 +14,6 @@ class TenantManager(models.Manager):
         return self.get_queryset().filter(user=user)
 
     def get_queryset(self):
-        # You could also override this to always filter, 
+        # You could also override this to always filter,
         # but for_user() is safer for debugging.
         return super().get_queryset()

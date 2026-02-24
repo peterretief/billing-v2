@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Audit & Anomaly Detection Settings{% endblock %}
+{% block content %}
+    <div class="container my-5">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-shield-alt"></i> Audit & Anomaly Detection Settings
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-4">
+                            Configure how the system detects and flags unusual invoices. You can turn the audit system
+                            on/off, adjust sensitivity levels, and select which checks to enable.
+                        </p>
+                        <form method="post" class="needs-validation">
+                            {% csrf_token %}
+                            <!-- Enable/Disable Section -->
+                            <div class="mb-4 p-3 bg-light rounded">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-toggle-on"></i> Enable Anomaly Detection
+                                </h5>
+                                <div class="form-check form-switch">
+                                    {{ form.audit_enabled }}
+                                    <label class="form-check-label" for="{{ form.audit_enabled.id_for_label }}">
+                                        Enable automatic anomaly detection for all invoices
+                                    </label>
+                                </div>
+                                {% if form.audit_enabled.help_text %}
+                                    <small class="text-muted d-block mt-2">{{ form.audit_enabled.help_text|safe }}</small>
+                                {% endif %}
+                            </div>
+                            <!-- Sensitivity Level Section -->
+                            <div class="mb-4 p-3 bg-light rounded">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-sliders-h"></i> Detection Sensitivity
+                                </h5>
+                                <div class="mb-3">
+                                    {{ form.audit_sensitivity }}
+                                    {% if form.audit_sensitivity.help_text %}
+                                        <small class="text-muted d-block mt-2">{{ form.audit_sensitivity.help_text|safe }}</small>
+                                    {% endif %}
+                                </div>
+                                <!-- Sensitivity Explanation -->
+                                <div class="alert alert-info mt-3" role="alert">
+                                    <strong>How sensitivity works:</strong>
+                                    <ul class="mb-0 mt-2 ps-3">
+                                        <li>
+                                            <strong>Strict:</strong> Uses 1.5σ - Flags ~6.7% of invoices (most aggressive)
+                                        </li>
+                                        <li>
+                                            <strong>Medium:</strong> Uses 2.0σ - Flags ~2.3% of invoices (recommended)
+                                        </li>
+                                        <li>
+                                            <strong>Lenient:</strong> Uses 2.5σ - Flags ~1.2% of invoices (least aggressive)
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <!-- Triggers Section -->
+                            <div class="mb-4 p-3 bg-light rounded">
+                                <h5 class="mb-3">
+                                    <i class="fas fa-check-circle"></i> Audit Checks
+                                </h5>
+                                <p class="text-muted small mb-3">Select which specific checks should be enabled:</p>
+                                {% for field in trigger_fields %}
+                                    <div class="form-check mb-2">
+                                        {{ field }}
+                                        <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <!-- Form Actions -->
+                            <div class="mt-5">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save"></i> Save Settings
+                                </button>
+                                <a href="{% url 'invoices:invoice_list' %}"
+                                   class="btn btn-secondary btn-lg">
+                                    <i class="fas fa-times"></i> Cancel
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <!-- Information Panel -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle"></i> What Gets Flagged?
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">The audit system checks for:</p>
+                        <ul>
+                            <li>
+                                <strong>Zero totals:</strong> Invoices with no amount
+                            </li>
+                            <li>
+                                <strong>Missing items:</strong> Invoices with no line items
+                            </li>
+                            <li>
+                                <strong>Statistical outliers:</strong> Amounts significantly different from your history
+                            </li>
+                            <li>
+                                <strong>Missing email:</strong> Client has no email address for delivery
+                            </li>
+                            <li>
+                                <strong>VAT inconsistencies:</strong> VAT charged but no VAT number registered
+                            </li>
+                            <li>
+                                <strong>Duplicate items:</strong> Same item appearing multiple times on invoice
+                            </li>
+                        </ul>
+                        <p class="mt-3 text-muted small">
+                            When enabled, flagged invoices appear in your <a href="{% url 'invoices:billing_audit_report' %}">Audit Report</a>
+                            for manual review before sending.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <!-- Sidebar Info -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Quick Tips</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <h6 class="text-primary">🚫 Turn It Off?</h6>
+                            <p class="small text-muted">Uncheck "Enable Anomaly Detection" to process all invoices without any audit checks.</p>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-primary">🎯 Too Many Flags?</h6>
+                            <p class="small text-muted">Try a "Lenient" setting to reduce false positives.</p>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-primary">🔍 Specific Checks?</h6>
+                            <p class="small text-muted">Disable individual checks if they don't apply to your workflow.</p>
+                        </div>
+                        <div>
+                            <h6 class="text-primary">📊 Review Flagged Invoices</h6>
+                            <p class="small text-muted">
+                                Visit the <a href="{% url 'invoices:billing_audit_report' %}">Audit Report</a> to see flagged invoices and approve them for sending.
+                            </p>
+                        </div>
+                        <div class="mt-3 pt-3 border-top">
+                            <h6 class="text-primary">📈 View Audit History</h6>
+                            <p class="small text-muted">
+                                See <a href="{% url 'core:audit_history' %}">Audit History & Statistics</a> to understand what historical invoices are used for comparison.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

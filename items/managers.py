@@ -12,7 +12,5 @@ class ItemManager(models.Manager):
         if client:
             queryset = queryset.filter(client=client)
 
-        result = queryset.aggregate(
-            total=Sum(F('quantity') * F('unit_price'))
-        )
-        return result['total'] or 0
+        result = queryset.aggregate(total=Sum(F("quantity") * F("unit_price")))
+        return result["total"] or 0

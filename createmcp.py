@@ -19,7 +19,7 @@ def read_settings() -> dict:
         return {}
 
     try:
-        with open(SETTINGS_FILE, 'r') as f:
+        with open(SETTINGS_FILE, "r") as f:
             # Handle empty file case
             content = f.read()
             if not content:
@@ -43,13 +43,13 @@ if __name__ == "__main__":
         print("\n--- Successfully read settings ---")
         # Pretty-print the settings using json.dumps for clear formatting
         print(json.dumps(settings_data, indent=4))
-        
+
         # Example of how to access a specific setting
         api_key = settings_data.get("api_key")
         if api_key:
             print(f"\nAPI Key found: {api_key}")
         else:
             print("\nAPI Key not found in settings.")
-            
+
     else:
         print("\nCould not read settings. The file might be missing, empty, or contain invalid JSON.")

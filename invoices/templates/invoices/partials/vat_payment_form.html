@@ -1,4 +1,6 @@
-<form hx-post="{% url 'invoices:record_vat_payment' %}" hx-target="#tax-summary-section" class="card p-3 shadow-sm">
+<form hx-post="{% url 'invoices:record_vat_payment' %}"
+      hx-target="#tax-summary-section"
+      class="card p-3 shadow-sm">
     {% csrf_token %}
     {{ form.tax_type }}
     <div class="row g-2">

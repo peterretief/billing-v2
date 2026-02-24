@@ -8,8 +8,11 @@ from .models import DefaultWorkCategory, WorkCategory
 
 User = get_user_model()
 
+
 @receiver(post_save, sender=User)
 def create_default_work_categories(sender, instance, created, **kwargs):
-	if created:
-		for default in DefaultWorkCategory.objects.all():
-			WorkCategory.objects.get_or_create(user=instance, name=default.name, defaults={"metadata_schema": default.metadata_schema})
+    if created:
+        for default in DefaultWorkCategory.objects.all():
+            WorkCategory.objects.get_or_create(
+                user=instance, name=default.name, defaults={"metadata_schema": default.metadata_schema}
+            )

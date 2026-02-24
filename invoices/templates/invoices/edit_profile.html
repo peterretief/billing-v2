@@ -1,33 +1,29 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container mt-5">
-    <h2>Edit Business Profile</h2>
-    <hr>
-    <form method="post">
-        {% csrf_token %}
-        
-        <div class="row">
-            <div class="col-md-6">
-                <h4>Business Information</h4>
-                {{ form.company_name.label_tag }} {{ form.company_name }}
-                {{ form.address.label_tag }} {{ form.address }}
-                <div class="row">
-                    <div class="col-6">{{ form.vat_number.label_tag }} {{ form.vat_number }}</div>
-                    <div class="col-6">{{ form.tax_rate.label_tag }} {{ form.tax_rate }}</div>
+    <div class="container mt-5">
+        <h2>Edit Business Profile</h2>
+        <hr>
+        <form method="post">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-6">
+                    <h4>Business Information</h4>
+                    {{ form.company_name.label_tag }} {{ form.company_name }}
+                    {{ form.address.label_tag }} {{ form.address }}
+                    <div class="row">
+                        <div class="col-6">{{ form.vat_number.label_tag }} {{ form.vat_number }}</div>
+                        <div class="col-6">{{ form.tax_rate.label_tag }} {{ form.tax_rate }}</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h4>Banking Details</h4>
+                    {{ form.bank_name.label_tag }} {{ form.bank_name }}
+                    {{ form.account_holder.label_tag }} {{ form.account_holder }}
+                    {{ form.account_number.label_tag }} {{ form.account_number }}
+                    {{ form.branch_code.label_tag }} {{ form.branch_code }}
                 </div>
             </div>
-
-            <div class="col-md-6">
-                <h4>Banking Details</h4>
-                {{ form.bank_name.label_tag }} {{ form.bank_name }}
-                {{ form.account_holder.label_tag }} {{ form.account_holder }}
-                {{ form.account_number.label_tag }} {{ form.account_number }}
-                {{ form.branch_code.label_tag }} {{ form.branch_code }}
-            </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
-    </form>
-</div>
+            <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
+        </form>
+    </div>
 {% endblock %}

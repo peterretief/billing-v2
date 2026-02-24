@@ -1,87 +1,84 @@
 {% extends "base.html" %}
-
 {% block content %}
-<div class="container mt-5 mb-5">
-    <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
-        <a href="{% url 'invoices:invoice_list' %}" class="btn btn-link text-decoration-none">
-            <i class="bi bi-arrow-left"></i> Back to Invoices
-        </a>
-        <button onclick="window.print();" class="btn btn-dark">
-            <i class="bi bi-printer me-2"></i> Print Report
-        </button>
-    </div>
-
-    <div class="card shadow-sm">
-        <div class="card-body p-5">
-            <div class="row mb-4">
-                <div class="col-sm-6">
-                    <h2 class="fw-bold text-uppercase">Time Detail Report</h2>
-                    <p class="text-muted">Linked to Invoice: <strong>#{{ invoice.invoice_number }}</strong></p>
+    <div class="container mt-5 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-4 d-print-none">
+            <a href="{% url 'invoices:invoice_list' %}"
+               class="btn btn-link text-decoration-none">
+                <i class="bi bi-arrow-left"></i> Back to Invoices
+            </a>
+            <button onclick="window.print();" class="btn btn-dark">
+                <i class="bi bi-printer me-2"></i> Print Report
+            </button>
+        </div>
+        <div class="card shadow-sm">
+            <div class="card-body p-5">
+                <div class="row mb-4">
+                    <div class="col-sm-6">
+                        <h2 class="fw-bold text-uppercase">Time Detail Report</h2>
+                        <p class="text-muted">
+                            Linked to Invoice: <strong>#{{ invoice.invoice_number }}</strong>
+                        </p>
+                    </div>
+                    <div class="col-sm-6 text-sm-end">
+                        <h5 class="fw-bold">{{ invoice.client.name }}</h5>
+                        <p class="text-muted small">Generated on: {{ invoice.date_created|date:"d M Y" }}</p>
+                    </div>
                 </div>
-                <div class="col-sm-6 text-sm-end">
-                    <h5 class="fw-bold">{{ invoice.client.name }}</h5>
-                    <p class="text-muted small">Generated on: {{ invoice.date_created|date:"d M Y" }}</p>
-                </div>
-            </div>
-
-            <hr>
-
-            {% for cat_name, entries in report_data.items %}
-                <h5 class="mt-4 mb-3 fw-bold text-primary">{{ cat_name }}</h5>
-                <div class="table-responsive">
-                    <table class="table table-hover border">
-                        <thead class="table-light small text-uppercase">
-                            <tr>
-                                <th style="width: 15%">Date</th>
-                                <th style="width: 45%">Work Description & Metadata</th>
-                                <th style="width: 20%" class="text-center">Rate</th>
-                                <th style="width: 20%" class="text-end">Hours</th>
+                <hr>
+                {% for cat_name, entries in report_data.items %}
+                    <h5 class="mt-4 mb-3 fw-bold text-primary">{{ cat_name }}</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover border">
+                            <thead class="table-light small text-uppercase">
+                                <tr>
+                                    <th style="width: 15%">Date</th>
+                                    <th style="width: 45%">Work Description & Metadata</th>
+                                    <th style="width: 20%" class="text-center">Rate</th>
+                                    <th style="width: 20%" class="text-end">Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in entries %}
+                                    <tr>
+                                        <td>{{ entry.date|date:"d M Y" }}</td>
+                                        <td>
+                                            <div class="fw-bold">{{ entry.category.name|default:"General Work" }}</div>
+                                            {% if entry.metadata %}
+                                                <div class="mt-1">
+                                                    {% for key, val in entry.metadata.items %}
+                                                        <span class="badge bg-light text-dark border me-1 fw-normal">
+                                                            <strong>{{ key|title }}:</strong> {{ val }}
+                                                        </span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">{{ request.user.profile.currency }} {{ entry.hourly_rate }}</td>
+                                        <td class="text-end fw-bold">{{ entry.hours }}h</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
+                <div class="row mt-5">
+                    <div class="col-md-6 offset-md-6">
+                        <table class="table table-borderless">
+                            <tr class="border-top">
+                                <td class="fw-bold h5">Total Hours</td>
+                                <td class="text-end h5 fw-bold">{{ total_hours }}h</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {% for entry in entries %}
-                            <tr>
-                                <td>{{ entry.date|date:"d M Y" }}</td>
-                                <td>
-                                    <div class="fw-bold">{{ entry.category.name|default:"General Work" }}</div>
-                                    {% if entry.metadata %}
-                                        <div class="mt-1">
-                                            {% for key, val in entry.metadata.items %}
-                                                <span class="badge bg-light text-dark border me-1 fw-normal">
-                                                    <strong>{{ key|title }}:</strong> {{ val }}
-                                                </span>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </td>
-                                <td class="text-center">{{ request.user.profile.currency }} {{ entry.hourly_rate }}</td>
-                                <td class="text-end fw-bold">{{ entry.hours }}h</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% endfor %}
-
-            <div class="row mt-5">
-                <div class="col-md-6 offset-md-6">
-                    <table class="table table-borderless">
-                        <tr class="border-top">
-                            <td class="fw-bold h5">Total Hours</td>
-                            <td class="text-end h5 fw-bold">{{ total_hours }}h</td>
-                        </tr>
-                    </table>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
-
-<style>
+    <style>
     @media print {
         body { background-color: white !important; }
         .card { border: none !important; box-shadow: none !important; }
         .container { width: 100% !important; max-width: 100% !important; }
     }
-</style>
+    </style>
 {% endblock %}

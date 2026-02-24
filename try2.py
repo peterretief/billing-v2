@@ -10,11 +10,12 @@ def log(msg):
     print(f">>> [DEBUG] {msg}")
     sys.stdout.flush()
 
+
 log("Starting the Item-driven Billing Test...")
 
 # 1. Fetch User
 User = get_user_model()
-target_username = 'peter' 
+target_username = "peter"
 user = User.objects.filter(username=target_username).first()
 
 if not user:
@@ -25,7 +26,7 @@ else:
     # 2. Check the Queue
     templates = Item.objects.filter(user=user, is_recurring=True)
     log(f"Master Queue: Found {templates.count()} templates for this user.")
-    
+
     for t in templates:
         log(f"  - Found Template: {t.description} (Client: {t.client})")
 

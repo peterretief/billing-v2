@@ -5,7 +5,7 @@ import django
 from django.utils import timezone
 
 # Set up Django environment
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core_project.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core_project.settings")
 django.setup()
 
 from clients.models import Client
@@ -17,37 +17,31 @@ from timesheets.models import TimesheetEntry, WorkCategory
 
 def seed_data():
     # 1. Create User
-    user, created = User.objects.get_or_create(
-        username='peter_test',
-        email='peter@example.com'
-    )
-    user.set_password('password123')
+    user, created = User.objects.get_or_create(username="peter_test", email="peter@example.com")
+    user.set_password("password123")
     user.save()
-    
+
     # 2. Update Profile
     profile = user.profile
     profile.company_name = "Peter's Consulting"
-    profile.vat_rate = Decimal('15.00')
+    profile.vat_rate = Decimal("15.00")
     profile.save()
 
     # 3. Create Client
     client = Client.objects.create(
-        user=user,
-        name='Acme Corp',
-        email='finance@acme.com',
-        address='123 Innovation Drive'
+        user=user, name="Acme Corp", email="finance@acme.com", address="123 Innovation Drive"
     )
 
     # 4. Create Work Category
-    cat = WorkCategory.objects.create(user=user, name='Development')
+    cat = WorkCategory.objects.create(user=user, name="Development")
 
     # 5. Create an Invoice (Draft)
     invoice = Invoice.objects.create(
         user=user,
         client=client,
-        number='INV-2026-001',
+        number="INV-2026-001",
         due_date=timezone.now().date() + timezone.timedelta(days=14),
-        tax_mode='FULL'
+        tax_mode="FULL",
     )
 
     # 6. Add a Line Item
@@ -55,10 +49,10 @@ def seed_data():
         user=user,
         client=client,
         invoice=invoice,
-        description='Server Migration',
-        unit_price=Decimal('5000.00'),
+        description="Server Migration",
+        unit_price=Decimal("5000.00"),
         quantity=1,
-        is_billed=True
+        is_billed=True,
     )
 
     # 7. Add a Timesheet Entry
@@ -67,10 +61,10 @@ def seed_data():
         client=client,
         invoice=invoice,
         category=cat,
-        description='API Integration Work',
-        hours=Decimal('10.5'),
-        hourly_rate=Decimal('850.00'),
-        is_billed=True
+        description="API Integration Work",
+        hours=Decimal("10.5"),
+        hourly_rate=Decimal("850.00"),
+        is_billed=True,
     )
 
     # 8. Sync and Save
@@ -80,5 +74,6 @@ def seed_data():
     print(f"Success! Created Invoice {invoice.number} for {client.name}")
     print(f"Total Amount: R {invoice.total_amount}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     seed_data()

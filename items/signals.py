@@ -12,8 +12,6 @@ def mark_item_complete(sender, instance, created, **kwargs):
     Mark 'add item' onboarding task as read when an item is created.
     """
     if created:
-        Notification.objects.filter(
-            user=instance.user,
-            message="Step 3: Add your first item.",
-            is_read=False
-        ).update(is_read=True)
+        Notification.objects.filter(user=instance.user, message="Step 3: Add your first item.", is_read=False).update(
+            is_read=True
+        )

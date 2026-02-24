@@ -171,6 +171,9 @@
                                     <li>
                                         <a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-person-gear me-2 text-muted"></i> Profile</a>
                                     </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'core:audit_settings' %}"><i class="bi bi-shield-check me-2 text-info"></i> Audit Settings</a>
+                                    </li>
                                     {# Added: Portfolio and Admin links inside the dropdown for staff convenience #}
                                     {% if user.is_staff or user.is_superuser %}
                                         <li>

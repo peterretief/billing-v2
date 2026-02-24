@@ -1,55 +1,46 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}Manage Groups{% endblock %}
-
 {% block content %}
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2>Your Groups</h2>
-                <a href="{% url 'core:staff_group_create' %}" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Create Group
-                </a>
-            </div>
-
-            {% if groups %}
-                <div class="row">
-                    {% for group in groups %}
-                        <div class="col-md-6 col-lg-4 mb-4">
-                            <div class="card h-100 shadow-sm">
-                                <div class="card-body">
-                                    <h5 class="card-title">{{ group.name }}</h5>
-                                    {% if group.description %}
-                                        <p class="card-text text-muted small">{{ group.description }}</p>
-                                    {% endif %}
-                                    <div class="mb-3">
-                                        <span class="badge badge-info">
-                                            {{ group.members.count }} member{{ group.members.count|pluralize }}
-                                        </span>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Your Groups</h2>
+                    <a href="{% url 'core:staff_group_create' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Create Group
+                    </a>
+                </div>
+                {% if groups %}
+                    <div class="row">
+                        {% for group in groups %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title">{{ group.name }}</h5>
+                                        {% if group.description %}<p class="card-text text-muted small">{{ group.description }}</p>{% endif %}
+                                        <div class="mb-3">
+                                            <span class="badge badge-info">{{ group.members.count }} member{{ group.members.count|pluralize }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="card-footer bg-white border-top">
+                                        <a href="{% url 'core:staff_group_detail' group.id %}"
+                                           class="btn btn-sm btn-outline-primary w-100">View & Manage</a>
                                     </div>
                                 </div>
-                                <div class="card-footer bg-white border-top">
-                                    <a href="{% url 'core:staff_group_detail' group.id %}" class="btn btn-sm btn-outline-primary w-100">
-                                        View & Manage
-                                    </a>
-                                </div>
                             </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="alert alert-info" role="alert">
-                    <i class="fas fa-info-circle"></i> You haven't created any groups yet.
-                    <a href="{% url 'core:staff_group_create' %}">Create your first group</a>
-                </div>
-            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle"></i> You haven't created any groups yet.
+                        <a href="{% url 'core:staff_group_create' %}">Create your first group</a>
+                    </div>
+                {% endif %}
+            </div>
         </div>
     </div>
-</div>
-
-<style>
+    <style>
     .card {
         transition: transform 0.2s;
     }
@@ -60,5 +51,5 @@
         background-color: #17a2b8;
         color: white;
     }
-</style>
+    </style>
 {% endblock %}

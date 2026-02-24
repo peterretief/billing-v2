@@ -5,6 +5,7 @@ from timesheets.models import DefaultWorkCategory, WorkCategory
 
 User = get_user_model()
 
+
 class DefaultCategorySignalTest(TestCase):
     def setUp(self):
         # Ensure there are some default categories
