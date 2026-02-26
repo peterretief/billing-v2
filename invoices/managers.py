@@ -271,13 +271,13 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         Comparison: Shows VAT collected from customers vs VAT already paid to SARS (tax authority).
         
         Calculations:
-            - 'collected': Total VAT from all PAID invoices (money received from customers)
+            - 'collected': Total VAT from all POSTED invoices (invoices sent to customers become a liability)
             - 'paid': Total VAT already remitted to SARS (from TaxPayment records)
             - 'outstanding': collected - paid = VAT still owed to SARS
         
         Returns:
             {
-                'collected': Decimal - VAT collected from customers (only PAID invoices)
+                'collected': Decimal - VAT collected from customers (PENDING, PAID, OVERDUE invoices)
                 'paid': Decimal - VAT remitted to tax authority
                 'outstanding': Decimal - Outstanding VAT liability
             }
@@ -291,8 +291,10 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
             - Quarterly/annual tax submissions
         
         Data Sources:
-            - Invoice.tax_amount from PAID invoices
+            - Invoice.tax_amount from posted (non-DRAFT, non-CANCELLED) invoices
             - TaxPayment.amount records where tax_type='VAT'
+        
+        Note: VAT becomes a liability when invoice is POSTED, not when paid
         """
         # Local import to prevent Circular Import error if TaxPayment is in models.py
         from .models import TaxPayment
@@ -300,8 +302,8 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         users_to_filter = [user]
         if user.is_ops:
             users_to_filter.extend(list(user.added_users.all()))
-        # 1. Total VAT collected from customers (Only from PAID invoices, excluding quotes)
-        collected = self.filter(user__in=users_to_filter, status="PAID", is_quote=False).aggregate(
+        # 1. Total VAT collected from customers (Posted invoices: PENDING, PAID, OVERDUE - excludes DRAFT and CANCELLED)
+        collected = self.filter(user__in=users_to_filter, status__in=["PENDING", "PAID", "OVERDUE"], is_quote=False).aggregate(
             res=Coalesce(Sum("tax_amount"), Decimal("0.00"))
         )["res"]
 
