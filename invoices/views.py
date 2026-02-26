@@ -239,9 +239,9 @@ def dashboard(request):
     quote_total = Invoice.objects.get_user_quote_total(request.user)
     total_outstanding = Invoice.objects.get_total_outstanding(request.user)
 
-    # Get draft invoices separately and recent invoices
+    # Get draft invoices separately and recent posted invoices
     draft_invoices = invoices.filter(status="DRAFT").order_by("-date_issued", "-id")[:3]
-    recent_all_invoices = invoices.order_by("-date_issued", "-id")[:5]
+    recent_invoices = invoices.exclude(status="DRAFT").order_by("-date_issued", "-id")[:5]
 
     context = {
         "queued_items_value": queued_items["total_value"] or Decimal("0.00"),
@@ -252,7 +252,7 @@ def dashboard(request):
         "total_outstanding": total_outstanding,
         "tax_summary": Invoice.objects.get_tax_summary(request.user),
         "draft_invoices": draft_invoices,
-        "recent_invoices": recent_all_invoices,
+        "recent_invoices": recent_invoices,
         "flagged_count": flagged_count,
     }
 
