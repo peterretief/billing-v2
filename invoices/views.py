@@ -837,16 +837,8 @@ def record_vat_payment(request):
             payment = form.save(commit=False)
             payment.user = request.user
             payment.save()
-            # Return success message and refresh the VAT section
-            context = {
-                "tax_summary": Invoice.objects.get_tax_summary(request.user),
-                "message": f"✓ VAT payment of {request.user.profile.currency|default:GLOBAL_CURRENCY} {payment.amount} recorded successfully"
-            }
-            return render(
-                request,
-                "invoices/partials/vat_payment_success.html",
-                context
-            )
+            messages.success(request, f"✓ VAT payment of {payment.amount} recorded successfully")
+            return redirect("invoices:dashboard")
     return render(
         request, "invoices/partials/vat_payment_form.html", {"form": VATPaymentForm(initial={"tax_type": "VAT"})}
     )

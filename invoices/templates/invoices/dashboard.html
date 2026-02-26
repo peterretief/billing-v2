@@ -228,9 +228,8 @@
                                     <i class="bi bi-receipt me-2"></i>VAT Liability
                                 </h6>
                                 <button class="btn btn-sm btn-warning"
-                                        hx-get="{% url 'invoices:record_vat_payment' %}"
-                                        hx-target="#vatPaymentForm"
-                                        hx-swap="innerHTML">
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#vatPaymentModal">
                                     <i class="bi bi-plus-lg"></i> Record Payment
                                 </button>
                             </div>
@@ -253,7 +252,6 @@
                                     {{ GLOBAL_CURRENCY }}{{ tax_summary.outstanding|default:"0.00"|floatformat:2 }}
                                 </span>
                             </div>
-                            <div id="vatPaymentForm" class="mt-3"></div>
                         </div>
                     </div>
                 {% endif %}
@@ -275,5 +273,60 @@
     </div>
     <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" id="paymentModalContent"></div>
+    </div>
+    <div class="modal fade"
+         id="vatPaymentModal"
+         tabindex="-1"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record VAT Payment to SARS</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <form hx-post="{% url 'invoices:record_vat_payment' %}"
+                      hx-target="#vatPaymentModal .modal-body"
+                      hx-on::after-request="if(event.detail.xhr.status===200) {setTimeout(() => location.reload(), 1000)}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="id_payment_date" class="form-label">Payment Date</label>
+                            <input type="date"
+                                   class="form-control"
+                                   id="id_payment_date"
+                                   name="payment_date"
+                                   required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_amount" class="form-label">Amount</label>
+                            <input type="number"
+                                   class="form-control"
+                                   id="id_amount"
+                                   name="amount"
+                                   step="0.01"
+                                   required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_reference" class="form-label">Reference (e.g. VAT201 Jan 2026)</label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="id_reference"
+                                   name="reference"
+                                   placeholder="e.g. VAT201 Jan 2026">
+                        </div>
+                        <input type="hidden" name="tax_type" value="VAT">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-check-lg me-1"></i>Record Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 {% endblock %}
