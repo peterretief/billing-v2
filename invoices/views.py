@@ -233,6 +233,10 @@ def dashboard(request):
     quote_total = Invoice.objects.get_user_quote_total(request.user)
     total_outstanding = Invoice.objects.get_total_outstanding(request.user)
 
+    # Get draft invoices separately and recent invoices
+    draft_invoices = invoices.filter(status="DRAFT").order_by("-date_issued", "-id")[:3]
+    recent_all_invoices = invoices.order_by("-date_issued", "-id")[:5]
+
     context = {
         "unbilled_value": (unbilled_ts["total_value"] or Decimal("0.00"))
         + (unbilled_items["total_value"] or Decimal("0.00")),
@@ -240,7 +244,8 @@ def dashboard(request):
         "total_quotes": quote_total,
         "total_outstanding": total_outstanding,
         "tax_summary": Invoice.objects.get_tax_summary(request.user),
-        "recent_invoices": invoices.order_by("-date_issued", "-id")[:5],
+        "draft_invoices": draft_invoices,
+        "recent_invoices": recent_all_invoices,
         "flagged_count": flagged_count,
     }
 
