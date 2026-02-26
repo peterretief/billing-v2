@@ -128,6 +128,17 @@ def generate_invoice_pdf(invoice, template_name="invoice_template.tex"):
                     "row_subtotal": f"{(item.quantity * item.unit_price):,.2f}",
                 }
             )
+        # Add timesheets to the items list
+        for timesheet in invoice.billed_timesheets.all():
+            description = tex_safe(timesheet.category.name) if timesheet.category else "Timesheet Entry"
+            items_list.append(
+                {
+                    "description": description,
+                    "quantity": f"{timesheet.hours:.2f}",
+                    "unit_price": f"{timesheet.hourly_rate:,.2f}",
+                    "row_subtotal": f"{(timesheet.hours * timesheet.hourly_rate):,.2f}",
+                }
+            )
     context["items"] = items_list
 
     # 4. Render and Compile
@@ -231,6 +242,17 @@ def render_invoice_tex(invoice, template_name="invoice_template.tex"):
                     "quantity": f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
                     "unit_price": f"{item.unit_price:,.2f}",
                     "row_subtotal": f"{(item.quantity * item.unit_price):,.2f}",
+                }
+            )
+        # Add timesheets to the items list
+        for timesheet in invoice.billed_timesheets.all():
+            description = tex_safe(timesheet.category.name) if timesheet.category else "Timesheet Entry"
+            items_list.append(
+                {
+                    "description": description,
+                    "quantity": f"{timesheet.hours:.2f}",
+                    "unit_price": f"{timesheet.hourly_rate:,.2f}",
+                    "row_subtotal": f"{(timesheet.hours * timesheet.hourly_rate):,.2f}",
                 }
             )
     context["items"] = items_list
