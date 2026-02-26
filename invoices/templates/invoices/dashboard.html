@@ -98,10 +98,14 @@
                                                        class="btn btn-outline-primary">
                                                         <i class="bi bi-pencil"></i> Edit
                                                     </a>
-                                                    <a href="{% url 'invoices:send_invoice' inv.pk %}"
-                                                       class="btn btn-success">
-                                                        <i class="bi bi-send"></i> Send
-                                                    </a>
+                                                    <form method="post"
+                                                          action="{% url 'invoices:send_invoice' inv.pk %}"
+                                                          style="display: inline">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-success">
+                                                            <i class="bi bi-send"></i> Send
+                                                        </button>
+                                                    </form>
                                                 </div>
                                             </td>
                                         </tr>
