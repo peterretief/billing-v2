@@ -208,7 +208,10 @@ def dashboard(request):
         unbilled_ts = TimesheetEntry.objects.filter(user__in=users_to_show, is_billed=False).aggregate(
             total_value=Sum(F("hours") * F("hourly_rate")),
         )
-        unbilled_items = Item.objects.filter(user__in=users_to_show, is_billed=False).aggregate(
+        unbilled_items = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=False).aggregate(
+            total_value=Sum(F("quantity") * F("unit_price"))
+        )
+        queued_items = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=True).aggregate(
             total_value=Sum(F("quantity") * F("unit_price"))
         )
         flagged_count = (
@@ -221,7 +224,10 @@ def dashboard(request):
         unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
             total_value=Sum(F("hours") * F("hourly_rate")),
         )
-        unbilled_items = Item.objects.filter(user=request.user, is_billed=False).aggregate(
+        unbilled_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False).aggregate(
+            total_value=Sum(F("quantity") * F("unit_price"))
+        )
+        queued_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).aggregate(
             total_value=Sum(F("quantity") * F("unit_price"))
         )
         flagged_count = (
@@ -238,7 +244,8 @@ def dashboard(request):
     recent_all_invoices = invoices.order_by("-date_issued", "-id")[:5]
 
     context = {
-        "unbilled_value": (unbilled_ts["total_value"] or Decimal("0.00"))
+        "queued_items_value": queued_items["total_value"] or Decimal("0.00"),
+        "unbilled_wip_value": (unbilled_ts["total_value"] or Decimal("0.00"))
         + (unbilled_items["total_value"] or Decimal("0.00")),
         "total_billed": Invoice.objects.get_active_billed_total(request.user),
         "total_quotes": quote_total,
