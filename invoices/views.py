@@ -1004,4 +1004,4 @@ def send_invoice(request, pk):
     else:
         messages.error(request, f"Failed to send invoice. Check email settings.")
     
-    return redirect("invoices:invoice_detail", pk=pk)
+    return redirect("invoices:dashboard")
