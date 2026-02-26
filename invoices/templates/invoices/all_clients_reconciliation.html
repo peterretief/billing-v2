@@ -66,8 +66,8 @@
                 <div class="card">
                     <div class="card-body">
                         <h6 class="card-title text-muted">Net Position</h6>
-                        <h4 class="{% if totals.outstanding > totals.payments %}text-danger{% else %}text-success{% endif %}">
-                            {{ currency }} {{ totals.outstanding|add:totals.credits|floatformat:2 }}
+                        <h4 class="{% if totals.net_position > 0 %}text-danger{% else %}text-success{% endif %}">
+                            {{ currency }} {{ totals.net_position|floatformat:2 }}
                         </h4>
                     </div>
                 </div>

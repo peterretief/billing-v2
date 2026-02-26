@@ -13,4 +13,8 @@ urlpatterns = [
     path("edit/<int:pk>/", views.client_edit, name="client_edit"),
     # 3. Financial Statement
     path("statement/<int:pk>/", views.client_statement, name="client_statement"),
+    path("statement/<int:pk>/csv/", views.client_statement_csv, name="client_statement_csv"),
+    # 4. Summary Dashboard
+    path("summary/", views.clients_summary_dashboard, name="clients_summary_dashboard"),
+    path("summary/<int:pk>/", views.client_summary_detail, name="client_summary_detail"),
 ]

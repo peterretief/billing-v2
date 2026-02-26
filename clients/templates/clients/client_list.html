@@ -33,6 +33,10 @@
                 </div>
             </div>
             <div class="col-md-8 text-end">
+                <a href="{% url 'clients:clients_summary_dashboard' %}"
+                   class="btn btn-outline-primary me-2">
+                    <i class="bi bi-bar-chart"></i> View Summary Dashboard
+                </a>
                 <a href="{% url 'invoices:billing_audit_report' %}"
                    class="btn btn-link text-decoration-none text-muted">
                     <i class="bi bi-shield-check me-1"></i> View AI Audit History

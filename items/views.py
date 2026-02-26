@@ -115,9 +115,20 @@ def generate_invoice_from_items(request):
         return redirect("core:edit_profile")
 
     with transaction.atomic():
+        # Use manager method to check if items can be invoiced
+        can_invoice, count_already_invoiced = Item.objects.can_be_invoiced(selected_ids)
+        
+        if not can_invoice:
+            messages.error(
+                request, 
+                f"Cannot create invoice: {count_already_invoiced} selected item(s) are already linked to invoice(s). "
+                "Items can only be invoiced once."
+            )
+            return redirect("items:item_list")
+        
         items = (
             Item.objects.select_for_update()
-            .filter(id__in=selected_ids, user=request.user, is_billed=False, is_recurring=False)
+            .filter(id__in=selected_ids, user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True)
             .select_related("client")
         )
 

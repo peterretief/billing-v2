@@ -28,8 +28,8 @@ class GlobalRevenueDashboard(UserPassesTestMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Global Aggregates
-        context["grand_total"] = Invoice.objects.aggregate(Sum("total_amount"))["total_amount__sum"] or 0
+        # Global Aggregates using manager method
+        context["grand_total"] = Invoice.objects.get_grand_total_billed()
         context["invoice_count"] = Invoice.objects.count()
 
         # Revenue per Tenant (User)

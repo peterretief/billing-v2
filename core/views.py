@@ -307,7 +307,9 @@ def superuser_dashboard(request):
     total_users = User.objects.count()
     recent_users = User.objects.order_by("-date_joined")[:5]
     all_invoices = Invoice.objects.all()
-    total_revenue = all_invoices.aggregate(total=Sum("total_amount"))["total"] or 0
+    
+    # Use manager method for total revenue
+    total_revenue = Invoice.objects.get_grand_total_billed()
     total_outstanding = sum(invoice.balance_due for invoice in all_invoices)
 
     context = {

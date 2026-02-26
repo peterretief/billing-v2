@@ -42,6 +42,23 @@ class ItemForm(forms.ModelForm):
             # Make the dropdown more readable in the form
             self.fields["billing_policy"].empty_label = "Select a schedule (Optional)"
 
+        # Disable client field if item is already linked to an invoice
+        if self.instance and self.instance.pk and self.instance.invoice_id:
+            self.fields["client"].disabled = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Prevent changing client if item is already in an invoice (business rule from ItemManager)
+        if self.instance and self.instance.pk and self.instance.invoice_id:
+            if cleaned_data.get("client") != self.instance.client:
+                raise forms.ValidationError(
+                    "Cannot change the client for items that are already linked to an invoice. "
+                    "The item must stay with its original client."
+                )
+        
+        return cleaned_data
+
 
 class ServiceItemForm(forms.ModelForm):
     class Meta:

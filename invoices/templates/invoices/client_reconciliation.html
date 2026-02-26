@@ -53,10 +53,47 @@
                 </form>
             </div>
         </div>
+        <!-- Verification Alert -->
+        {% if report.has_verification_errors %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>⚠️ RECONCILIATION VERIFICATION ERRORS:</strong>
+                <p class="mt-2 mb-0">
+                    The reconciliation calculations do not match using dual verification methods. This indicates a data inconsistency:
+                </p>
+                <ul class="mt-2 mb-0">
+                    {% for error in report.verification_errors %}
+                        <li>
+                            <code>{{ error }}</code>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endif %}
+        {% if report.verification_warnings %}
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Verification Warnings:</strong>
+                <ul class="mt-2 mb-0">
+                    {% for warning in report.verification_warnings %}<li>{{ warning }}</li>{% endfor %}
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endif %}
         <!-- Summary Section -->
-        <div class="card mb-4">
-            <div class="card-header bg-light">
+        <div class="card mb-4 {% if report.has_verification_errors %}border-danger{% else %}border-success{% endif %}">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Summary</h5>
+                {% if not report.has_verification_errors %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle me-1"></i>Dual Verification ✓
+                    </span>
+                {% else %}
+                    <span class="badge bg-danger">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Verification Failed
+                    </span>
+                {% endif %}
             </div>
             <div class="card-body">
                 <div class="row">
@@ -92,11 +129,15 @@
                         <table class="table table-sm table-borderless">
                             <tbody>
                                 <tr>
-                                    <td class="fw-bold">Payments Received:</td>
+                                    <td class="fw-bold">Payments Received (Cash):</td>
                                     <td class="text-success">- {{ currency }} {{ report.summary.payments_received|floatformat:2 }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="fw-bold">Credit Notes:</td>
+                                    <td class="fw-bold">Credit Applied to Invoices:</td>
+                                    <td class="text-success">- {{ currency }} {{ report.summary.credit_in_payments|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Credit Notes Issued:</td>
                                     <td class="text-success">- {{ currency }} {{ report.summary.credit_notes_issued|floatformat:2 }}</td>
                                 </tr>
                                 <tr class="border-top-2">

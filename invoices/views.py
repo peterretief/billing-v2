@@ -157,9 +157,8 @@ def get_payment_modal(request, pk):
 
     from invoices.models import Coupon, CreditNote
 
-    available_credit = CreditNote.objects.filter(user=request.user, client=invoice.client).aggregate(
-        total=Coalesce(Sum("balance"), Decimal("0.00"))
-    )["total"]
+    # Use manager method for available credit
+    available_credit = CreditNote.objects.get_client_credit_balance(invoice.client)
 
     # Get valid coupons for this user
     from django.utils import timezone
@@ -229,22 +228,16 @@ def dashboard(request):
             BillingAuditLog.objects.filter(user=request.user, is_anomaly=True).exclude(invoice__status="PAID").count()
         )
 
-    stats = invoices.exclude(status__in=["DRAFT", "CANCELLED"], is_quote=True).aggregate(
-        billed=Sum("total_amount"), paid=Sum("payments__amount")
-    )
-
-    # Get quote totals (including DRAFT quotes waiting to be sent)
-    quote_totals = invoices.filter(is_quote=True).exclude(status="CANCELLED").aggregate(
-        total=Sum("total_amount")
-    )
-
+    # Use manager methods for stats - centralized calculations
+    user_stats = Invoice.objects.get_user_stats(request.user)
+    quote_total = Invoice.objects.get_user_quote_total(request.user)
     total_outstanding = Invoice.objects.get_total_outstanding(request.user)
 
     context = {
         "unbilled_value": (unbilled_ts["total_value"] or Decimal("0.00"))
         + (unbilled_items["total_value"] or Decimal("0.00")),
-        "total_billed": stats["billed"] or Decimal("0.00"),
-        "total_quotes": quote_totals["total"] or Decimal("0.00"),
+        "total_billed": Invoice.objects.get_active_billed_total(request.user),
+        "total_quotes": quote_total,
         "total_outstanding": total_outstanding,
         "tax_summary": Invoice.objects.get_tax_summary(request.user),
         "recent_invoices": invoices.order_by("-date_issued", "-id")[:5],
@@ -385,6 +378,7 @@ def invoice_create(request):
                     )
                     
                     # Create audit history record for learning
+                    AuditHistory.objects.filter(invoice=invoice).delete()
                     AuditHistory.objects.create(
                         user=request.user,
                         invoice=invoice,
@@ -569,7 +563,8 @@ def bulk_post(request):
                     details={"total": float(inv.total_amount), "source": "bulk_post"},
                 )
                 
-                # Create audit history record for learning
+                # Create or update audit history record for learning
+                AuditHistory.objects.filter(invoice=inv).delete()
                 AuditHistory.objects.create(
                     user=request.user,
                     invoice=inv,

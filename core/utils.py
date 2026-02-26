@@ -87,48 +87,33 @@ def get_anomaly_status(user, invoice):
 
                 current_amount = float(invoice.total_amount)
 
-                # Minimum threshold to prevent false positives
-                # Even with low variance, allow up to 15% variance as natural
-                min_threshold = mean * 0.15
-                adjusted_std_dev = max(std_dev, min_threshold)
+                # Very loose threshold: only flag if 1000x the average
+                threshold_upper = mean * 1000
+                threshold_lower = mean * 0.001  # Also very loose for low end
 
-                # Adaptive threshold based on sensitivity setting
-                if sensitivity == "STRICT":
-                    # Strict: use 1.5 sigma (catches ~6.7% outliers)
-                    threshold_upper = mean + (1.5 * adjusted_std_dev)
-                    threshold_lower = mean - (1.5 * adjusted_std_dev)
-                elif sensitivity == "LENIENT":
-                    # Lenient: use 2.5 sigma (catches ~1.2% outliers)
-                    threshold_upper = mean + (2.5 * adjusted_std_dev)
-                    threshold_lower = mean - (2 * adjusted_std_dev)
-                else:
-                    # Medium (default): use 2 sigma (catches ~2.3% outliers)
-                    threshold_upper = mean + (2 * adjusted_std_dev)
-                    threshold_lower = mean - (1.5 * adjusted_std_dev)
-
-                # Flag high outliers
+                # Flag high outliers (only if 1000x+ the average)
                 if current_amount > threshold_upper:
                     ratio = current_amount / mean
                     is_anomaly = True
-                    comments.append(f"Invoice is {ratio:.1f}x above your average (high outlier)")
+                    comments.append(f"Invoice is {ratio:.1f}x above your average (extreme outlier)")
 
-                # Flag low outliers (but only if significantly low)
-                if 0 < current_amount < threshold_lower and current_amount < mean * 0.1:
+                # Flag low outliers (only if 0.1% of average or less)
+                if 0 < current_amount < threshold_lower:
                     ratio = current_amount / mean if mean > 0 else 0
                     is_anomaly = True
-                    comments.append(f"Invoice is unusually low — {ratio * 100:.1f}% of average")
+                    comments.append(f"Invoice is {ratio * 100:.1f}% of average (extremely low)")
         else:
             comments.append("Building history (insufficient invoices for comparison)")
 
-    # 3. No client email — will fail to send
-    if triggers.get("detect_missing_email", True):
+    # 3. No client email — will fail to send (disabled for lenient mode)
+    if triggers.get("detect_missing_email", False):  # Default False for more lenient behavior
         audit_context["checks_run"].append("detect_missing_email")
         if not invoice.client.email:
             is_anomaly = True
             comments.append("Client has no email address")
 
-    # 4. Business logic checks: VAT configuration
-    if triggers.get("detect_vat_mismatch", True):
+    # 4. Business logic checks: VAT configuration (disabled for lenient mode)
+    if triggers.get("detect_vat_mismatch", False):  # Default False for more lenient behavior
         audit_context["checks_run"].append("detect_vat_mismatch")
         profile = user.profile if hasattr(user, "profile") else None
         

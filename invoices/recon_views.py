@@ -39,7 +39,7 @@ except ImportError:
 def client_reconciliation_statement(request, client_id):
     """
     Generate reconciliation statement for a specific client.
-    Shows summary and detailed transaction list.
+    Shows summary and detailed transaction list with DUAL VERIFICATION.
     """
     client = get_object_or_404(Client, id=client_id, user=request.user)
 
@@ -59,7 +59,7 @@ def client_reconciliation_statement(request, client_id):
     except ValueError:
         end_date = date.today()
 
-    # Generate reconciliation
+    # Generate reconciliation with dual verification
     recon = ClientReconciliation(client, request.user, start_date, end_date)
     report_data = recon.get_full_report()
 
@@ -95,6 +95,7 @@ def all_clients_reconciliation(request):
     total_outstanding = sum(s["outstanding_balance"] for s in summaries)
     total_payments = sum(s["total_payments"] for s in summaries)
     total_credits = sum(s["credit_balance"] for s in summaries)
+    total_net_position = sum(s["net_position"] for s in summaries)
 
     context = {
         "summaries": summaries,
@@ -104,6 +105,7 @@ def all_clients_reconciliation(request):
             "outstanding": total_outstanding,
             "payments": total_payments,
             "credits": total_credits,
+            "net_position": total_net_position,
             "client_count": len(summaries),
         },
     }
@@ -165,7 +167,8 @@ def client_reconciliation_pdf(request, client_id):
         ["Opening Balance", f"{request.user.profile.currency} {summary['opening_balance']:.2f}"],
         ["Invoices Sent", f"{request.user.profile.currency} {summary['invoices_sent']:.2f}"],
         ["Invoices Cancelled", f"{request.user.profile.currency} {summary['invoices_cancelled']:.2f}"],
-        ["Payments Received", f"{request.user.profile.currency} {summary['payments_received']:.2f}"],
+        ["Payments Received (Cash)", f"{request.user.profile.currency} {summary['payments_received']:.2f}"],
+        ["Credit Applied to Invoices", f"{request.user.profile.currency} {summary['credit_in_payments']:.2f}"],
         ["Credit Notes Issued", f"{request.user.profile.currency} {summary['credit_notes_issued']:.2f}"],
         ["Closing Balance", f"{request.user.profile.currency} {summary['closing_balance']:.2f}"],
     ]
@@ -327,8 +330,9 @@ def client_reconciliation_csv(request, client_id):
     writer.writerow(["Opening Balance", f"{summary['opening_balance']:.2f}"])
     writer.writerow(["Invoices Sent", f"{summary['invoices_sent']:.2f}"])
     writer.writerow(["Invoices Cancelled", f"{summary['invoices_cancelled']:.2f}"])
-    writer.writerow(["Payments Received", f"{summary['payments_received']:.2f}"])
-    writer.writerow(["Credit Notes", f"{summary['credit_notes_issued']:.2f}"])
+    writer.writerow(["Payments Received (Cash)", f"{summary['payments_received']:.2f}"])
+    writer.writerow(["Credit Applied to Invoices", f"{summary['credit_in_payments']:.2f}"])
+    writer.writerow(["Credit Notes Issued", f"{summary['credit_notes_issued']:.2f}"])
     writer.writerow(["Closing Balance", f"{summary['closing_balance']:.2f}"])
     writer.writerow([])
 
@@ -422,9 +426,9 @@ def list_credit_notes(request):
     """
     credit_notes = CreditNote.objects.filter(user=request.user).select_related("client").order_by("-issued_date")
 
-    # Calculate summary stats
-    total_issued = credit_notes.aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-    total_available = credit_notes.aggregate(total=Coalesce(Sum("balance"), Decimal("0.00")))["total"]
+    # Calculate summary stats using manager methods
+    total_issued = CreditNote.objects.get_user_total_credits_issued(request.user)
+    total_available = CreditNote.objects.get_user_total_available_credit(request.user)
     total_used = total_issued - total_available
 
     context = {

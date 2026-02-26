@@ -1,6 +1,27 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% block content %}
+    <style>
+        /* Style for cancelled invoices */
+        tr.cancelled-invoice {
+            opacity: 0.7;
+            text-decoration: line-through;
+        }
+
+        tr.cancelled-invoice td {
+            color: #888;
+        }
+
+        /* Style for quotes */
+        .quote-badge {
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        tr.quote-row {
+            background-color: #f9f3cd;
+        }
+    </style>
     <div class="container mt-4" style="font-family: 'Calibri', sans-serif;">
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
@@ -41,13 +62,14 @@
             <div class="col-md-8">
                 <div class="card shadow-sm border-0">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-                        <h5 class="mb-0 fw-bold">Invoice History</h5>
+                        <h5 class="mb-0 fw-bold">Invoice & Quote History</h5>
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="ps-4">Invoice #</th>
+                                    <th class="ps-4">Document #</th>
+                                    <th>Type</th>
                                     <th>Date</th>
                                     <th>Status</th>
                                     <th class="text-end">Total</th>
@@ -57,11 +79,18 @@
                             </thead>
                             <tbody>
                                 {% for inv in invoices %}
-                                    <tr>
+                                    <tr {% if inv.status == 'CANCELLED' %}class="cancelled-invoice"{% elif inv.is_quote %}class="quote-row"{% endif %}>
                                         <td class="ps-4 fw-bold">{{ inv.number|default:inv.id }}</td>
+                                        <td>
+                                            {% if inv.is_quote %}
+                                                <span class="badge bg-info">QUOTE</span>
+                                            {% else %}
+                                                <span class="badge bg-primary">INVOICE</span>
+                                            {% endif %}
+                                        </td>
                                         <td>{{ inv.date_issued|date:"d M Y" }}</td>
                                         <td>
-                                            <span class="badge {% if inv.status == 'PAID' %}bg-success {% elif inv.status == 'OVERDUE' %}bg-danger {% else %}bg-warning text-dark{% endif %}">
+                                            <span class="badge {% if inv.status == 'PAID' %}bg-success{% elif inv.status == 'OVERDUE' %}bg-danger{% elif inv.status == 'CANCELLED' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
                                                 {{ inv.get_status_display }}
                                             </span>
                                         </td>
@@ -73,9 +102,9 @@
                                             <div class="btn-group">
                                                 <a href="{% url 'invoices:invoice_detail' inv.pk %}"
                                                    class="btn btn-sm btn-outline-primary">
-                                                    <i class="bi bi-eye"></i> View & Pay
+                                                    <i class="bi bi-eye"></i> View
                                                 </a>
-                                                {% if inv.status != 'DRAFT' %}
+                                                {% if inv.status != 'DRAFT' and not inv.is_quote %}
                                                     <form action="{% url 'invoices:resend_invoice' inv.pk %}"
                                                           method="post"
                                                           class="d-inline">
@@ -92,15 +121,17 @@
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="6" class="text-center py-5 text-muted">No invoice history found for this client.</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                        <td colspan="7" class="text-center py-5 text-muted">
+                                            No invoice or quot
+                                            <td colspan="6" class="text-center py-5 text-muted">No invoice history found for this client.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="modal fade" id="logTimeModal" tabindex="-1"></div>
-{% endblock %}
+        <div class="modal fade" id="logTimeModal" tabindex="-1"></div>
+    {% endblock %}

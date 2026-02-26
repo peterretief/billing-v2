@@ -9,13 +9,18 @@
                     Business Dashboard
                 </h2>
             </div>
-            {% if flagged_count > 0 %}
-                <div class="col-md-4 text-end">
-                    <div class="alert alert-danger mb-0 py-2 shadow-sm">
+            <div class="col-md-4 text-end">
+                {% if flagged_count > 0 %}
+                    <div class="alert alert-danger mb-2 py-2 shadow-sm d-inline-block">
                         <i class="bi bi-shield-lock-fill me-2"></i><strong>{{ flagged_count }}</strong> Anomaly Found
                     </div>
-                </div>
-            {% endif %}
+                    <br>
+                {% endif %}
+                <a href="{% url 'clients:clients_summary_dashboard' %}"
+                   class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-bar-chart"></i> Client Summary
+                </a>
+            </div>
         </div>
         <div class="row g-4">
             <div class="col-lg-8">

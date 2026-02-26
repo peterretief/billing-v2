@@ -16,6 +16,26 @@ class TimesheetEntryForm(forms.ModelForm):
             "category": forms.Select(attrs={"class": "form-select"}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Disable client field if timesheet is already linked to an invoice
+        if self.instance and self.instance.pk and self.instance.invoice_id:
+            self.fields["client"].disabled = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Prevent changing client if timesheet is already in an invoice (business rule from TimesheetManager)
+        if self.instance and self.instance.pk and self.instance.invoice_id:
+            if cleaned_data.get("client") != self.instance.client:
+                raise forms.ValidationError(
+                    "Cannot change the client for timesheets that are already linked to an invoice. "
+                    "The timesheet must stay with its original client."
+                )
+        
+        return cleaned_data
+
 
 class WorkCategoryForm(forms.ModelForm):
     # This helps users enter comma-separated values for fields

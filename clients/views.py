@@ -1,7 +1,11 @@
+import csv
+from datetime import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import DetailView, ListView
 
@@ -12,6 +16,7 @@ from timesheets.forms import TimesheetEntryForm
 
 from .forms import ClientForm
 from .models import Client
+from .summary import ClientSummary, AllClientsSummary
 
 # views.py
 
@@ -91,17 +96,11 @@ def client_statement(request, pk):
     client = get_object_or_404(Client, pk=pk, user=request.user)
     invoices = Invoice.objects.filter(client=client).order_by("-date_issued")
 
-    raw_stats = invoices.aggregate(
-        total_billed=Sum("total_amount"),
-        paid=Sum("total_amount", filter=Q(status="PAID")),
-        unpaid=Sum("total_amount", filter=Q(status__in=["PENDING", "OVERDUE", "DRAFT"])),
-    )
-
-    # Clean the decimals using the utility
+    # Use manager method for totals - simpler and centralized
     stats = {
-        "total_billed": format_currency(raw_stats["total_billed"]),
-        "paid": format_currency(raw_stats["paid"]),
-        "unpaid": format_currency(raw_stats["unpaid"]),
+        "total_billed": format_currency(Invoice.objects.get_client_total_billed(client)),
+        "paid": format_currency(Invoice.objects.get_client_total_paid(client)),
+        "unpaid": format_currency(Invoice.objects.get_client_outstanding(client)),
     }
 
     return render(
@@ -113,3 +112,83 @@ def client_statement(request, pk):
             "stats": stats,
         },
     )
+
+
+@login_required
+def client_statement_csv(request, pk):
+    """Export client statement as CSV"""
+    client = get_object_or_404(Client, pk=pk, user=request.user)
+    invoices = Invoice.objects.filter(client=client).order_by("-date_issued")
+
+    # Create CSV response
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="statement_{client.client_code}_{datetime.now().strftime("%Y%m%d")}.csv"'
+    )
+
+    # Create CSV writer
+    writer = csv.writer(response)
+
+    # Write header
+    writer.writerow(["Client Statement"])
+    writer.writerow([f"Client: {client.name}"])
+    writer.writerow([f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+    writer.writerow([])  # Blank row
+
+    # Write summary stats using manager methods
+    raw_stats = {
+        "total_billed": Invoice.objects.get_client_total_billed(client),
+        "paid": Invoice.objects.get_client_total_paid(client),
+        "unpaid": Invoice.objects.get_client_outstanding(client),
+    }
+    writer.writerow(["SUMMARY"])
+    writer.writerow(["Total Billed", f"{raw_stats['total_billed'] or 0:.2f}"])
+    writer.writerow(["Total Paid", f"{raw_stats['paid'] or 0:.2f}"])
+    writer.writerow(["Current Balance", f"{raw_stats['unpaid'] or 0:.2f}"])
+    writer.writerow([])  # Blank row
+
+    # Write invoices
+    writer.writerow(["Transaction Details"])
+    writer.writerow(["Date", "Invoice #", "Status", "Amount"])
+    for inv in invoices:
+        writer.writerow([inv.date_issued, inv.number, inv.status, f"{inv.total_amount:.2f}"])
+
+    return response
+
+
+# --- CLIENT SUMMARY DASHBOARD VIEWS ---
+
+
+@login_required
+def clients_summary_dashboard(request):
+    """
+    Dashboard showing summary of all clients with quotes, timesheets, items, invoices, and other metrics.
+    Allows drill-down to individual client details.
+    """
+    all_summaries = AllClientsSummary(request.user)
+    summaries = all_summaries.get_all_summaries()
+    totals = all_summaries.get_totals()
+
+    context = {
+        "summaries": summaries,
+        "totals": totals,
+    }
+
+    return render(request, "clients/clients_summary_dashboard.html", context)
+
+
+@login_required
+def client_summary_detail(request, pk):
+    """
+    Detailed summary view for a single client.
+    Shows breakdown of quotes, timesheets, items, invoices, and other metrics.
+    """
+    client = get_object_or_404(Client, pk=pk, user=request.user)
+    summary = ClientSummary(client).get_summary()
+
+    context = {
+        "client": client,
+        "summary": summary,
+    }
+
+    return render(request, "clients/client_summary_detail.html", context)

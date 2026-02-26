@@ -10,7 +10,7 @@ from django.utils import timezone
 from clients.models import Client
 from core.models import TenantModel
 
-from .managers import InvoiceManager
+from .managers import InvoiceManager, PaymentManager, CreditNoteManager
 
 # invoices/models.py
 
@@ -235,11 +235,75 @@ class Invoice(TenantModel):
         """Call this before saving to update the snapshot fields."""
         Invoice.objects.update_totals(self)
 
+    def clean(self):
+        """
+        Business rule: If a PAID invoice is being cancelled, validate it can be cancelled.
+        The actual credit note creation happens in save().
+        """
+        super().clean()
+        
+        # Check if this invoice exists (has a pk) and status is changing to CANCELLED from PAID
+        if self.pk:
+            try:
+                original = Invoice.objects.get(pk=self.pk)
+                
+                # If transitioning from PAID to CANCELLED
+                if original.status == self.Status.PAID and self.status == self.Status.CANCELLED:
+                    # Validate: payment should never exceed invoice amount
+                    if self.total_paid > self.total_amount:
+                        raise ValidationError(
+                            f"Cannot cancel invoice: Payment ({self.user.profile.currency} {self.total_paid}) "
+                            f"exceeds invoice amount ({self.user.profile.currency} {self.total_amount}). "
+                            f"This is a data integrity error."
+                        )
+            except Invoice.DoesNotExist:
+                pass
+
     def save(self, *args, **kwargs):
         """
-        Directly save the invoice model. Total calculations are handled
-        by the manager or signals to prevent recursion.
+        Enhanced save with business rules:
+        1. Validate data integrity
+        2. Auto-create credit note when PAID invoice is cancelled
         """
+        # Only run full validation if NOT doing an internal field update
+        # (update_fields is used by manager's update_totals for calculated fields)
+        if not kwargs.get("update_fields"):
+            self.full_clean()
+        
+        # Check if this is a status change from PAID to CANCELLED
+        credit_note_created = False
+        if self.pk and not kwargs.get("update_fields"):
+            try:
+                original = Invoice.objects.get(pk=self.pk)
+                
+                if original.status == self.Status.PAID and self.status == self.Status.CANCELLED:
+                    # Auto-create a credit note for the paid amount
+                    from django.db import transaction
+                    
+                    with transaction.atomic():
+                        # Call parent save first
+                        super().save(*args, **kwargs)
+                        
+                        # Create credit note for the paid amount
+                        paid_amount = original.total_paid
+                        if paid_amount > Decimal("0.00"):
+                            CreditNote.objects.create(
+                                user=self.user,
+                                client=self.client,
+                                invoice=self,
+                                note_type=CreditNote.NoteType.CANCELLATION,
+                                amount=paid_amount,
+                                description=f"Credit from cancelled invoice {self.number}. Reason: {self.cancellation_reason or 'No reason provided'}",
+                                reference=f"CN-{self.number}"
+                            )
+                            credit_note_created = True
+                    
+                    if credit_note_created:
+                        return
+            except Invoice.DoesNotExist:
+                pass
+        
+        # Normal save for all other cases
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -252,6 +316,8 @@ class Payment(TenantModel):
     credit_applied = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     date_paid = models.DateField(default=timezone.now)
     reference = models.CharField(max_length=100, blank=True, null=True)  # Ensure blank=True is here
+
+    objects = PaymentManager()
 
     #    def clean(self):
     #        super().clean()
@@ -275,16 +341,42 @@ class Payment(TenantModel):
         if self.invoice.status == "DRAFT":
             raise ValidationError("Cannot add a payment to a 'Draft' invoice.")
 
+        # RULE 1: No payments on CANCELLED invoices
+        if self.invoice.status == "CANCELLED":
+            raise ValidationError("Cannot add a payment to a 'Cancelled' invoice.")
+
+        # RULE 2: Payment + existing payments must not exceed total invoice amount
+        # This is the hardest rule - payment should never exceed (invoice total - other payments)
+        existing_paid = sum(
+            Decimal(str(p.amount + p.credit_applied)) 
+            for p in self.invoice.payments.exclude(pk=self.pk)
+        )
+        total_would_be = existing_paid + self.amount + self.credit_applied
+        
+        if total_would_be > self.invoice.total_amount:
+            currency = self.user.profile.currency
+            raise ValidationError(
+                f"Payment would cause total paid ({currency} {total_would_be}) to exceed "
+                f"invoice amount ({currency} {self.invoice.total_amount}). "
+                f"Current total paid: {currency} {existing_paid}, "
+                f"this payment: {currency} {self.amount + self.credit_applied}"
+            )
+
+        # RULE 3: Check individual cash payment doesn't exceed balance
         if self.amount > self.invoice.balance_due:
             currency = self.user.profile.currency
             raise ValidationError(
-                f"Payment amount ({currency} {self.amount}) cannot exceed the "
+                f"Cash payment amount ({currency} {self.amount}) cannot exceed the "
                 f"balance due ({currency} {self.invoice.balance_due})"
             )
 
-        # Allow amount=0 for credit-only payments
+        # RULE 4: Allow amount=0 for credit-only payments, but not negative
         if self.amount < 0:
             raise ValidationError("Payment amount cannot be negative")
+        
+        # RULE 5: Credit applied should not be negative
+        if self.credit_applied < 0:
+            raise ValidationError("Credit applied cannot be negative")
 
     # invoices/models.py (Payment)
 
@@ -340,6 +432,8 @@ class CreditNote(TenantModel):
     # Audit trail
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = CreditNoteManager()
 
     class Meta:
         ordering = ["-issued_date", "-created_at"]

@@ -387,10 +387,21 @@ def generate_invoice_bulk(request):
         return redirect("timesheets:timesheet_list")
 
     with transaction.atomic():
+        # Use manager method to check if timesheets can be invoiced
+        can_invoice, count_already_invoiced = TimesheetEntry.objects.can_be_invoiced(selected_ids)
+        
+        if not can_invoice:
+            messages.error(
+                request,
+                f"Cannot create invoice: {count_already_invoiced} selected timesheet(s) are already linked to invoice(s). "
+                "Timesheets can only be invoiced once."
+            )
+            return redirect("timesheets:timesheet_list")
+        
         # Select for update prevents other processes from touching these entries during calculation
         entries = (
             TimesheetEntry.objects.select_for_update(of=("self",))
-            .filter(id__in=selected_ids, user=request.user, is_billed=False)
+            .filter(id__in=selected_ids, user=request.user, is_billed=False, invoice__isnull=True)
             .select_related("client", "category")
         )
 
@@ -418,32 +429,14 @@ def generate_invoice_bulk(request):
                 status=Invoice.Status.DRAFT,
             )
 
-            # 3. Aggregate Work Logs into Line Items (Category + Rate)
-            line_items = defaultdict(Decimal)
+            # 3. Link timesheet entries to invoice (no Item duplication)
             for entry in client_entries:
-                category_name = entry.category.name if entry.category else "General Work"
-                key = (category_name, entry.hourly_rate)
-                line_items[key] += entry.hours
-
-                # Link the original entry to the invoice for the detailed LaTeX report
                 entry.is_billed = True
                 entry.invoice = invoice
                 entry.save()
 
-            # 4. Create the Invoice Items
-            for (desc, rate), total_h in line_items.items():
-                items.models.Item.objects.create(
-                    user=request.user,  # <--- Added missing tenant field
-                    client=client,  # <--- Added missing client field
-                    invoice=invoice,
-                    description=desc,
-                    quantity=total_h,
-                    unit_price=rate,
-                    is_taxable=profile.is_vat_registered,
-                )
-
-            # 5. FINAL STEP: Sync the Snapshots
-            # We must do this AFTER items are created so the math is not zero
+            # 4. FINAL STEP: Sync the Snapshots
+            # Invoice calculations will use billed_timesheets directly (no Items created)
             invoice.sync_totals()
             invoice.save()
 

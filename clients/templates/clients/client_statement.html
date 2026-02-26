@@ -1,35 +1,99 @@
 {% extends 'base.html' %}
 {% block content %}
+    <style>
+        /* Style for cancelled invoices */
+        tr.cancelled-invoice {
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+
+        tr.cancelled-invoice td {
+            color: #888;
+        }
+
+        /* Style for quotes */
+        tr.quote-row {
+            background-color: #f9f3cd;
+        }
+
+        @media print {
+
+            /* Hide navbar and other page elements */
+            nav,
+            header,
+            footer,
+            .navbar {
+                display: none !important;
+            }
+
+            /* Hide the print/CSV buttons */
+            .btn-group {
+                display: none !important;
+            }
+
+            /* Remove container padding and margins */
+            .container {
+                margin-top: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* Remove page margins */
+            body {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* Improve table appearance */
+            table {
+                page-break-inside: avoid;
+            }
+
+            tr {
+                page-break-inside: avoid;
+            }
+
+            /* Remove box shadows for cleaner PDF */
+            .shadow-sm {
+                box-shadow: none !important;
+            }
+
+            /* Keep cards but remove shadows */
+            .card {
+                box-shadow: none !important;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Statement: {{ client.name }}</h1>
-            <button class="btn btn-outline-secondary" onclick="window.print()">
-                <i class="bi bi-printer"></i> Print Statement
-            </button>
+            <div class="btn-group" role="group">
+                <button class="btn btn-outline-secondary" onclick="window.print()">
+                    <i class="bi bi-printer"></i> Print
+                </button>
+                <a href="{% url 'clients:client_statement_csv' client.pk %}"
+                   class="btn btn-outline-primary">
+                    <i class="bi bi-download"></i> CSV
+                </a>
+            </div>
         </div>
         <div class="row mb-4">
             <div class="col-md-4">
-                <div class="card border-primary">
-                    <div class="card-body">
-                        <h6 class="text-muted">Total Billed</h6>
-                        <h3 class="text-primary">{{ GLOBAL_CURRENCY }}{{ stats.total_billed|default:"0.00" }}</h3>
-                    </div>
+                <div class="card border-0 shadow-sm bg-dark text-white p-3">
+                    <small class="text-uppercase opacity-75">Total Billed</small>
+                    <h3 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ stats.total_billed|default:"0.00" }}</h3>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card border-success">
-                    <div class="card-body">
-                        <h6 class="text-muted">Total Paid</h6>
-                        <h3 class="text-success">{{ GLOBAL_CURRENCY }}{{ stats.paid|default:"0.00" }}</h3>
-                    </div>
+                <div class="card border-0 shadow-sm bg-success text-white p-3">
+                    <small class="text-uppercase opacity-75">Total Paid</small>
+                    <h3 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ stats.paid|default:"0.00" }}</h3>
                 </div>
             </div>
             <div class="col-md-4">
-                <div class="card border-danger">
-                    <div class="card-body">
-                        <h6 class="text-muted">Current Balance</h6>
-                        <h3 class="text-danger">{{ GLOBAL_CURRENCY }}{{ stats.unpaid|default:"0.00" }}</h3>
-                    </div>
+                <div class="card border-0 shadow-sm bg-danger text-white p-3">
+                    <small class="text-uppercase opacity-75">Current Balance</small>
+                    <h3 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ stats.unpaid|default:"0.00" }}</h3>
                 </div>
             </div>
         </div>
@@ -39,18 +103,26 @@
                     <thead class="table-light">
                         <tr>
                             <th>Date</th>
-                            <th>Invoice #</th>
+                            <th>Document #</th>
+                            <th>Type</th>
                             <th>Status</th>
                             <th class="text-end">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for inv in invoices %}
-                            <tr>
+                            <tr {% if inv.status == 'CANCELLED' %}class="cancelled-invoice"{% elif inv.is_quote %}class="quote-row"{% endif %}>
                                 <td>{{ inv.date_issued }}</td>
                                 <td>{{ inv.number }}</td>
                                 <td>
-                                    <span class="badge {% if inv.status == 'PAID' %}bg-success{% elif inv.status == 'DRAFT' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">
+                                    {% if inv.is_quote %}
+                                        <span class="badge bg-info">QUOTE</span>
+                                    {% else %}
+                                        <span class="badge bg-primary">INVOICE</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {% if inv.status == 'PAID' %}bg-success{% elif inv.status == 'DRAFT' %}bg-secondary{% elif inv.status == 'CANCELLED' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
                                         {{ inv.status }}
                                     </span>
                                 </td>
@@ -58,12 +130,13 @@
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="4" class="text-center py-4">No transactions found.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                                <td colspan="5
+                                    <td colspan="4" class="text-center py-4">No transactions found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
-{% endblock %}
+    {% endblock %}

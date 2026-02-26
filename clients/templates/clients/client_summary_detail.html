@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block content %}
+    <div class="container mt-4">
+        <!-- Header with Navigation -->
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-8">
+                <div class="mb-2">
+                    <a href="{% url 'clients:clients_summary_dashboard' %}"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+                <h2 class="fw-bold mb-0">{{ client.name }}</h2>
+                <p class="text-muted">Detailed summary of quotes, timesheets, items, and invoices</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="btn-group btn-group-sm">
+                    <a href="{% url 'clients:client_detail' client.id %}"
+                       class="btn btn-outline-secondary">
+                        <i class="bi bi-clock-history"></i> Full History
+                    </a>
+                    <a href="{% url 'clients:client_statement' client.id %}"
+                       class="btn btn-outline-primary">
+                        <i class="bi bi-receipt"></i> Statement
+                    </a>
+                </div>
+            </div>
+        </div>
+        <!-- Outstanding Balance Alert -->
+        {% if summary.outstanding.total > 0 %}
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Outstanding Balance:</strong> {{ GLOBAL_CURRENCY }}{{ summary.outstanding.total|floatformat:2|intcomma }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endif %}
+        <!-- Net Position Summary -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-2">Outstanding</h6>
+                                <h4 class="fw-bold text-danger">{{ GLOBAL_CURRENCY }}{{ summary.outstanding.total|floatformat:2|intcomma }}</h4>
+                                <small class="text-muted">Amount owed by client</small>
+                            </div>
+                            <div class="col-md-1 text-center">
+                                <span class="fw-bold text-muted" style="font-size: 1.5rem;">−</span>
+                            </div>
+                            <div class="col-md-5">
+                                <h6 class="text-muted mb-2">Credit Available</h6>
+                                <h4 class="fw-bold text-warning">
+                                    {{ GLOBAL_CURRENCY }}{{ summary.credit_notes.total_value|floatformat:2|intcomma }}
+                                </h4>
+                                <small class="text-muted">Available credit balance</small>
+                            </div>
+                        </div>
+                        <hr class="my-3">
+                        <div class="row">
+                            <div class="col-12 text-center">
+                                <h6 class="text-muted mb-2">NET POSITION</h6>
+                                <h2 class="fw-bold {% if summary.net_position > 0 %}text-danger{% elif summary.net_position < 0 %}text-success{% else %}text-muted{% endif %}">
+                                    {% if summary.net_position > 0 %}
+                                        ↑ {{ GLOBAL_CURRENCY }}{{ summary.net_position|floatformat:2|intcomma }}
+                                        <small class="d-block text-muted fw-normal mt-1">(Client owes you)</small>
+                                    {% elif summary.net_position < 0 %}
+                                        ↓ {{ GLOBAL_CURRENCY }}{{ summary.net_position|floatformat:2|intcomma }}
+                                        <small class="d-block text-muted fw-normal mt-1">(You owe client)</small>
+                                    {% else %}
+                                        {{ GLOBAL_CURRENCY }}0.00
+                                        <small class="d-block text-muted fw-normal mt-1">(Settled)</small>
+                                    {% endif %}
+                                </h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Quotes Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-info">
+                        <h5 class="mb-0 fw-bold text-info">
+                            <i class="bi bi-quote me-2"></i>Quotes
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Pending</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.quotes.pending.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.quotes.pending.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Accepted</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.quotes.accepted.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.quotes.accepted.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 rounded border border-info bg-info">
+                                    <small class="text-muted d-block">Total</small>
+                                    <h5 class="fw-bold mb-1 text-info">{{ summary.quotes.total_count }}</h5>
+                                    <p class="mb-0 text-info">{{ GLOBAL_CURRENCY }}{{ summary.quotes.total_value|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Timesheets Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-info">
+                        <h5 class="mb-0 fw-bold text-primary">
+                            <i class="bi bi-clock me-2"></i>Timesheets
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center mb-3">
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Processed</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.timesheets.processed.count }}</h5>
+                                    <p class="mb-1">{{ summary.timesheets.processed.hours|floatformat:1 }} hours</p>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.timesheets.processed.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Unprocessed</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.timesheets.unprocessed.count }}</h5>
+                                    <p class="mb-1">{{ summary.timesheets.unprocessed.hours|floatformat:1 }} hours</p>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.timesheets.unprocessed.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 rounded border border-primary bg-info">
+                                    <small class="text-muted d-block">Total</small>
+                                    <h5 class="fw-bold mb-1 text-primary">{{ summary.timesheets.total_count }}</h5>
+                                    <p class="mb-1 text-primary">{{ summary.timesheets.total_hours|floatformat:1 }} hours</p>
+                                    <p class="mb-0 text-primary">{{ GLOBAL_CURRENCY }}{{ summary.timesheets.total_value|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Progress Chart -->
+                        {% if summary.timesheets.total_count > 0 %}
+                            <div class="mt-3">
+                                <small class="text-muted d-block mb-2">Processing Status</small>
+                                <div class="progress" style="height: 22px;">
+                                    <div class="progress-bar bg-primary"
+                                         role="progressbar"
+                                         style="width: {{ summary.timesheets.processed_value_pct }}%"
+                                         aria-valuenow="{{ summary.timesheets.processed_value_pct }}"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100">
+                                        <small class="text-white fw-bold">{{ GLOBAL_CURRENCY }}{{ summary.timesheets.processed.total|floatformat:0|intcomma }}/{{ GLOBAL_CURRENCY }}{{ summary.timesheets.total_value|floatformat:0|intcomma }} Processed</small>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Items Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-success">
+                        <h5 class="mb-0 fw-bold text-success">
+                            <i class="bi bi-box me-2"></i>Items
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center mb-3">
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Processed</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.items.processed.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.items.processed.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Unprocessed</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.items.unprocessed.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.items.unprocessed.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 rounded border border-success bg-success">
+                                    <small class="text-muted d-block">Total</small>
+                                    <h5 class="fw-bold mb-1 text-success">{{ summary.items.total_count }}</h5>
+                                    <p class="mb-0 text-success">{{ GLOBAL_CURRENCY }}{{ summary.items.total_value|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Progress Chart -->
+                        {% if summary.items.total_count > 0 %}
+                            <div class="mt-3">
+                                <small class="text-muted d-block mb-2">Processing Status</small>
+                                <div class="progress" style="height: 22px;">
+                                    <div class="progress-bar bg-success"
+                                         role="progressbar"
+                                         style="width: {{ summary.items.processed_value_pct }}%"
+                                         aria-valuenow="{{ summary.items.processed_value_pct }}"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100">
+                                        <small class="text-white fw-bold">{{ GLOBAL_CURRENCY }}{{ summary.items.processed.total|floatformat:0|intcomma }}/{{ GLOBAL_CURRENCY }}{{ summary.items.total_value|floatformat:0|intcomma }} Processed</small>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Invoices Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-secondary">
+                        <h5 class="mb-0 fw-bold text-secondary">
+                            <i class="bi bi-file-earmark-text me-2"></i>Invoices
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-2">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Draft</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.invoices.draft.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.invoices.draft.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Pending</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.invoices.pending.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.invoices.pending.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Overdue</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.invoices.overdue.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.invoices.overdue.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Paid</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.invoices.paid.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.invoices.paid.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Cancelled</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.invoices.cancelled.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.invoices.cancelled.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="p-3 rounded border border-secondary bg-secondary">
+                                    <small class="text-muted d-block">Total</small>
+                                    <h5 class="fw-bold mb-1 text-secondary">{{ summary.invoices.total_count }}</h5>
+                                    <p class="mb-0 text-secondary">{{ GLOBAL_CURRENCY }}{{ summary.invoices.total_value|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Payments Section -->
+        <div class="row mb-4">
+            <div class="col-lg-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-success">
+                        <h5 class="mb-0 fw-bold text-success">
+                            <i class="bi bi-cash-coin me-2"></i>Payments
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-lg-6">
+                                <div class="p-3 rounded border border-success bg-success">
+                                    <small class="text-success d-block">Total Payments Received</small>
+                                    <h4 class="fw-bold mb-0 text-success">{{ GLOBAL_CURRENCY }}{{ summary.payments.total|floatformat:2|intcomma }}</h4>
+                                    <small class="text-muted">{{ summary.payments.count }} transactions</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Email Status Section -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-warning">
+                        <h5 class="mb-0 fw-bold text-warning">
+                            <i class="bi bi-envelope me-2"></i>Email Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Emailed</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.email_status.emailed.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.email_status.emailed.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="p-3 bg-light rounded">
+                                    <small class="text-muted d-block">Not Emailed</small>
+                                    <h5 class="fw-bold mb-1">{{ summary.email_status.not_emailed.count }}</h5>
+                                    <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.email_status.not_emailed.total|floatformat:2|intcomma }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Credit Notes Section -->
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-warning">
+                        <h5 class="mb-0 fw-bold text-warning">
+                            <i class="bi bi-receipt me-2"></i>Credit Notes
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if summary.credit_notes.total_count > 0 %}
+                            <div class="row text-center">
+                                {% if summary.credit_notes.overpayment.count > 0 %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="p-3 bg-light rounded">
+                                            <small class="text-muted d-block">Overpayment</small>
+                                            <h5 class="fw-bold mb-1">{{ summary.credit_notes.overpayment.count }}</h5>
+                                            <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.credit_notes.overpayment.total|floatformat:2|intcomma }}</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if summary.credit_notes.adjustment.count > 0 %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="p-3 bg-light rounded">
+                                            <small class="text-muted d-block">Adjustment</small>
+                                            <h5 class="fw-bold mb-1">{{ summary.credit_notes.adjustment.count }}</h5>
+                                            <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.credit_notes.adjustment.total|floatformat:2|intcomma }}</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if summary.credit_notes.cancellation.count > 0 %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="p-3 bg-light rounded">
+                                            <small class="text-muted d-block">Cancellation</small>
+                                            <h5 class="fw-bold mb-1">{{ summary.credit_notes.cancellation.count }}</h5>
+                                            <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.credit_notes.cancellation.total|floatformat:2|intcomma }}</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if summary.credit_notes.other.count > 0 %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="p-3 bg-light rounded">
+                                            <small class="text-muted d-block">Other</small>
+                                            <h5 class="fw-bold mb-1">{{ summary.credit_notes.other.count }}</h5>
+                                            <p class="mb-0">{{ GLOBAL_CURRENCY }}{{ summary.credit_notes.other.total|floatformat:2|intcomma }}</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                <div class="col-md-12">
+                                    <div class="p-3 rounded border border-warning bg-warning mt-2">
+                                        <small class="text-muted d-block">Total Credits</small>
+                                        <h5 class="fw-bold mb-0 text-warning">
+                                            {{ GLOBAL_CURRENCY }}{{ summary.credit_notes.total_value|floatformat:2|intcomma }}
+                                        </h5>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-inbox text-muted fs-3 d-block mb-2"></i>
+                                <p class="text-muted mb-0">No credit notes issued</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Row for Client Info -->
+        <div class="row mb-4">
+            <!-- Client Info Section -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header p-3 bg-light">
+                        <h5 class="mb-0 fw-bold">
+                            <i class="bi bi-person-badge me-2"></i>Client Info
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Name:</dt>
+                            <dd class="col-sm-8">
+                                {{ client.name }}
+                            </dd>
+                            <dt class="col-sm-4">Contact:</dt>
+                            <dd class="col-sm-8">
+                                {{ client.contact_name|default:"—" }}
+                            </dd>
+                            <dt class="col-sm-4">Email:</dt>
+                            <dd class="col-sm-8">
+                                <a href="mailto:{{ client.email }}">{{ client.email }}</a>
+                            </dd>
+                            <dt class="col-sm-4">Phone:</dt>
+                            <dd class="col-sm-8">
+                                {{ client.phone|default:"—" }}
+                            </dd>
+                            <dt class="col-sm-4">Code:</dt>
+                            <dd class="col-sm-8">
+                                {{ client.client_code }}
+                            </dd>
+                            <dt class="col-sm-4">Payment Terms:</dt>
+                            <dd class="col-sm-8">
+                                {{ client.payment_terms }} days
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        .bg-info-soft {
+            background-color: rgba(23, 162, 184, 0.1);
+        }
+
+        .text-info {
+            color: #17a2b8;
+        }
+
+        .bg-primary-soft {
+            background-color: rgba(0, 123, 255, 0.1);
+        }
+
+        .text-primary {
+            color: #007bff;
+        }
+
+        .bg-success-soft {
+            background-color: rgba(40, 167, 69, 0.1);
+        }
+
+        .text-success {
+            color: #28a745;
+        }
+
+        .bg-secondary-soft {
+            background-color: rgba(108, 117, 125, 0.1);
+        }
+
+        .text-secondary {
+            color: #6c757d;
+        }
+
+        .bg-warning {
+            background-color: rgba(255, 193, 7, 0.1);
+        }
+
+        .text-warning {
+            color: #ffc107;
+        }
+
+        .border-info {
+            border-color: #17a2b8 !important;
+        }
+
+        .border-primary {
+            border-color: #007bff !important;
+        }
+
+        .border-success {
+            border-color: #28a745 !important;
+        }
+
+        .border-secondary {
+            border-color: #6c757d !important;
+        }
+    </style>
+{% endblock %}

@@ -13,7 +13,7 @@ class ClientQuerySet(models.QuerySet):
         """This makes .with_balances() available on the QuerySet"""
         return self.annotate(
             unpaid_total=Coalesce(
-                Sum("invoices__total_amount", filter=Q(invoices__status__in=["DRAFT", "PENDING", "OVERDUE"])),
+                Sum("invoices__total_amount", filter=Q(invoices__status__in=["PENDING", "OVERDUE"])),
                 Decimal("0.00"),
                 output_field=DecimalField(),
             )
