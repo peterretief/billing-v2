@@ -111,6 +111,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "timesheets.context_processors.unbilled_count",
                 "notifications.context_processors.onboarding",
+                "core.context_processors.vat_settings",
                 "core.context_processors.currency_settings",
             ],
         },
