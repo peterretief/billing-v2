@@ -1,0 +1,30 @@
+<div class="alert alert-success alert-dismissible fade show mb-3"
+     role="alert">
+    <i class="bi bi-check-circle me-2"></i>
+    <strong>Payment Recorded!</strong> VAT payment has been saved successfully.
+    <button type="button"
+            class="btn-close"
+            data-bs-dismiss="alert"
+            aria-label="Close"></button>
+</div>
+<div>
+    <div class="mb-3">
+        <span class="d-block small text-muted">Collected from Clients</span>
+        <span class="h5 fw-bold">{{ GLOBAL_CURRENCY }}{{ tax_summary.collected|default:"0.00"|floatformat:2 }}</span>
+    </div>
+    <div class="mb-3">
+        <span class="d-block small text-muted">Total VAT Liability</span>
+        <span class="h5 fw-bold text-warning">{{ GLOBAL_CURRENCY }}{{ tax_summary.vat_liability|default:"0.00"|floatformat:2 }}</span>
+    </div>
+    <div class="mb-3">
+        <span class="d-block small text-muted">Paid to SARS</span>
+        <span class="h5 fw-bold text-success">{{ GLOBAL_CURRENCY }}{{ tax_summary.paid|default:"0.00"|floatformat:2 }}</span>
+    </div>
+    <hr class="my-2 opacity-25">
+    <div class="mb-0">
+        <span class="d-block small text-muted">Outstanding Liability</span>
+        <span class="h4 fw-bold {% if tax_summary.outstanding > 0 %}text-danger{% else %}text-success{% endif %}">
+            {{ GLOBAL_CURRENCY }}{{ tax_summary.outstanding|default:"0.00"|floatformat:2 }}
+        </span>
+    </div>
+</div>
