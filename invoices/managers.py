@@ -268,18 +268,20 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         """
         Calculates VAT liability summary for a user.
         
-        Comparison: Shows VAT collected from customers vs VAT already paid to SARS (tax authority).
+        Comparison: Shows VAT from different invoice statuses vs VAT already paid to SARS.
         
         Calculations:
-            - 'collected': Total VAT from all POSTED invoices (invoices sent to customers become a liability)
+            - 'collected': VAT from PAID invoices only (money actually collected from clients)
+            - 'VAT_liability': Total VAT from all posted invoices (PENDING, PAID, OVERDUE) - represents VAT as a liability
             - 'paid': Total VAT already remitted to SARS (from TaxPayment records)
-            - 'outstanding': collected - paid = VAT still owed to SARS
+            - 'outstanding': VAT_liability - paid = Total VAT still owed to SARS
         
         Returns:
             {
-                'collected': Decimal - VAT collected from customers (PENDING, PAID, OVERDUE invoices)
+                'collected': Decimal - VAT actually received from clients (PAID invoices only)
+                'vat_liability': Decimal - Total VAT liability from posted invoices (becomes payable when invoice is sent)
                 'paid': Decimal - VAT remitted to tax authority
-                'outstanding': Decimal - Outstanding VAT liability
+                'outstanding': Decimal - Outstanding VAT liability to SARS
             }
         
         User Hierarchy: If user.is_ops, includes stats for all assigned users (multi-user ops)
@@ -291,7 +293,7 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
             - Quarterly/annual tax submissions
         
         Data Sources:
-            - Invoice.tax_amount from posted (non-DRAFT, non-CANCELLED) invoices
+            - Invoice.tax_amount from different statuses
             - TaxPayment.amount records where tax_type='VAT'
         
         Note: VAT becomes a liability when invoice is POSTED, not when paid
@@ -302,17 +304,28 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         users_to_filter = [user]
         if user.is_ops:
             users_to_filter.extend(list(user.added_users.all()))
-        # 1. Total VAT collected from customers (Posted invoices: PENDING, PAID, OVERDUE - excludes DRAFT and CANCELLED)
-        collected = self.filter(user__in=users_to_filter, status__in=["PENDING", "PAID", "OVERDUE"], is_quote=False).aggregate(
+        
+        # 1. VAT actually collected (money received from clients) - PAID invoices only
+        collected = self.filter(user__in=users_to_filter, status="PAID", is_quote=False).aggregate(
             res=Coalesce(Sum("tax_amount"), Decimal("0.00"))
         )["res"]
 
-        # 2. Total VAT already paid to SARS
+        # 2. Total VAT liability (posted invoices: PENDING, PAID, OVERDUE - excludes DRAFT and CANCELLED)
+        vat_liability = self.filter(user__in=users_to_filter, status__in=["PENDING", "PAID", "OVERDUE"], is_quote=False).aggregate(
+            res=Coalesce(Sum("tax_amount"), Decimal("0.00"))
+        )["res"]
+
+        # 3. Total VAT already paid to SARS
         paid = TaxPayment.objects.filter(user__in=users_to_filter, tax_type="VAT").aggregate(
             res=Coalesce(Sum("amount"), Decimal("0.00"))
         )["res"]
 
-        return {"collected": collected, "paid": paid, "outstanding": collected - paid}
+        return {
+            "collected": collected, 
+            "vat_liability": vat_liability,
+            "paid": paid, 
+            "outstanding": vat_liability - paid
+        }
 
     def get_tax_year_dates(self):
         """Returns the start and end dates of the current SA Tax Year."""

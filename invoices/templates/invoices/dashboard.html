@@ -239,6 +239,10 @@
                                 <span class="h5 fw-bold">{{ GLOBAL_CURRENCY }}{{ tax_summary.collected|default:"0.00"|floatformat:2 }}</span>
                             </div>
                             <div class="mb-3">
+                                <span class="d-block small text-muted">Total VAT Liability</span>
+                                <span class="h5 fw-bold text-warning">{{ GLOBAL_CURRENCY }}{{ tax_summary.vat_liability|default:"0.00"|floatformat:2 }}</span>
+                            </div>
+                            <div class="mb-3">
                                 <span class="d-block small text-muted">Paid to SARS</span>
                                 <span class="h5 fw-bold text-success">{{ GLOBAL_CURRENCY }}{{ tax_summary.paid|default:"0.00"|floatformat:2 }}</span>
                             </div>
