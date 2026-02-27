@@ -2,11 +2,12 @@ import datetime
 import re
 import uuid
 
-from django.db.models.signals import post_save, pre_save
+from django.db import models
+from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 
-from invoices.models import Invoice
+from invoices.models import Invoice, Payment
 
 # --- 1. Total Calculations (Standard Only) ---
 
@@ -106,3 +107,38 @@ def update_items_on_sent(sender, instance, **kwargs):
         Item.objects.filter(
             user=instance.user, client=instance.client, is_recurring=True, description__in=item_descriptions
         ).update(last_billed_date=timezone.now().date())
+
+
+# --- 4. Delete Signal Handlers (Critical for Data Integrity) ---
+
+
+@receiver(post_delete, sender=Payment)
+def recalculate_invoice_on_payment_delete(sender, instance, **kwargs):
+    """
+    When a payment is deleted, trigger invoice total recalculation via the manager.
+    This ensures data consistency when payments are deleted via admin or API.
+    balance_due is a calculated property, so we just need to trigger the manager recalc.
+    """
+    try:
+        invoice = instance.invoice
+        if invoice:
+            # Use the manager to recalculate invoice status and totals
+            Invoice.objects.update_totals(invoice)
+    except Exception as e:
+        pass  # Silently fail to avoid blocking the deletion
+
+
+@receiver(post_delete, sender='items.Item')
+def recalculate_invoice_on_item_delete(sender, instance, **kwargs):
+    """
+    When an item is deleted, recalculate the invoice's total_amount and status.
+    This ensures data consistency when items are deleted via admin or API.
+    """
+    try:
+        invoice = instance.invoice
+        if invoice:
+            # Use the manager to recalculate totals
+            from invoices.models import Invoice as InvoiceModel
+            InvoiceModel.objects.update_totals(invoice)
+    except Exception as e:
+        print(f"Error recalculating invoice on item delete: {e}")

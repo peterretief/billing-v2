@@ -275,6 +275,16 @@
                                     <td class="text-end pe-4 fw-bold">{{ request.user.profile.currency }} {{ item.total|floatformat:2|intcomma }}</td>
                                 </tr>
                             {% endfor %}
+                            {% for timesheet in invoice.billed_timesheets.all %}
+                                <tr class="align-middle">
+                                    <td class="ps-4">{{ timesheet.category.name|default:"Timesheet" }}</td>
+                                    <td class="text-end">{{ timesheet.hours }}</td>
+                                    <td class="text-end">{{ request.user.profile.currency }} {{ timesheet.hourly_rate|floatformat:2|intcomma }}</td>
+                                    <td class="text-end pe-4 fw-bold">
+                                        {{ request.user.profile.currency }} {{ timesheet.total_value|floatformat:2|intcomma }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
                         </tbody>
                         <tfoot class="table-group-divider">
                             <tr>

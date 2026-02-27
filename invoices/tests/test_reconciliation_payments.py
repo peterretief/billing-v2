@@ -21,15 +21,31 @@ class PaymentValidationTest(TestCase):
 
     def setUp(self):
         """Create test user, client, and invoice."""
+        from datetime import timedelta
+        from django.utils import timezone
+        from items.models import Item
+        
         self.user = User.objects.create_user(username="testuser", password="testpass")
         self.client = Client.objects.create(user=self.user, name="Test Client", email="test@example.com")
+        today = timezone.now().date()
         self.invoice = Invoice.objects.create(
             user=self.user,
             client=self.client,
             number="INV-001",
             status="PENDING",
-            total_amount=Decimal("1000.00"),
+            date_issued=today,
+            due_date=today + timedelta(days=14),
         )
+        # Add item to set total_amount
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
+            invoice=self.invoice,
+            quantity=Decimal("1.0"),
+            unit_price=Decimal("1000.00"),
+        )
+        self.invoice.sync_totals()
+        self.invoice.save()
 
     def test_payment_cash_cannot_exceed_invoice(self):
         """Test that cash payment cannot exceed invoice total."""
@@ -80,6 +96,9 @@ class ReconciliationCalcuationTest(TestCase):
 
     def setUp(self):
         """Create test data."""
+        from datetime import timedelta
+        from items.models import Item
+        
         self.user = User.objects.create_user(username="testuser", password="testpass")
         self.client = Client.objects.create(user=self.user, name="Test Client", email="test@example.com")
 
@@ -89,18 +108,36 @@ class ReconciliationCalcuationTest(TestCase):
             client=self.client,
             number="INV-001",
             status="PENDING",
-            total_amount=Decimal("1000.00"),
             date_issued=date(2026, 1, 1),
+            due_date=date(2026, 1, 15),
         )
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
+            invoice=self.invoice1,
+            quantity=Decimal("1.0"),
+            unit_price=Decimal("1000.00"),
+        )
+        self.invoice1.sync_totals()
+        self.invoice1.save()
 
         self.invoice2 = Invoice.objects.create(
             user=self.user,
             client=self.client,
             number="INV-002",
             status="PENDING",
-            total_amount=Decimal("500.00"),
             date_issued=date(2026, 1, 15),
+            due_date=date(2026, 1, 29),
         )
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
+            invoice=self.invoice2,
+            quantity=Decimal("1.0"),
+            unit_price=Decimal("500.00"),
+        )
+        self.invoice2.sync_totals()
+        self.invoice2.save()
 
     def test_reconciliation_separates_cash_and_credit(self):
         """Test that reconciliation summary correctly separates cash and credit payments."""

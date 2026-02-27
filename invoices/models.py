@@ -46,11 +46,6 @@ class Invoice(TenantModel):
         logs.sort(key=lambda l: (priority.get(l.status.upper(), 0), l.created_at), reverse=True)
         return logs[0].status
 
-    class TaxMode(models.TextChoices):
-        NONE = "NONE", "Exempt (No VAT)"
-        FULL = "FULL", "VAT on Whole Invoice"
-        MIXED = "MIXED", "Mixed (Item-by-Item)"
-
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
         PENDING = "PENDING", "Pending / Sent"
@@ -104,7 +99,6 @@ class Invoice(TenantModel):
 
     billing_type = models.CharField(max_length=10, choices=BillingType.choices, default=BillingType.SERVICE)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
-    tax_mode = models.CharField(max_length=10, choices=TaxMode.choices, default=TaxMode.NONE)
     cancellation_reason = models.TextField(blank=True, null=True, help_text="Reason for cancellation")
 
     # Financial Snapshots (Keep these - they are your "Source of Truth")
@@ -120,7 +114,9 @@ class Invoice(TenantModel):
     objects = InvoiceManager()
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["user", "number"], name="unique_invoice_per_tenant")]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "number"], name="unique_invoice_per_tenant")
+        ]
         ordering = ["-date_issued", "-id"]
 
     @property
@@ -151,29 +147,20 @@ class Invoice(TenantModel):
     def calculated_vat(self):
         from decimal import Decimal
 
-        if self.tax_mode == self.TaxMode.NONE:
-            return Decimal("0.00")
-
-        # Ensure user profile and vat_rate exist, with a fallback.
+        # Check if user is VAT registered
         try:
+            is_registered = self.user.profile.is_vat_registered
             rate = self.user.profile.vat_rate / Decimal(100)
         except (AttributeError, TypeError):
-            rate = Decimal("0.00")  # Fallback if profile or vat_rate is not set
+            is_registered = False
+            rate = Decimal("0.00")
 
-        taxable_subtotal = Decimal("0.00")
+        # If not registered, no VAT
+        if not is_registered:
+            return Decimal("0.00")
 
-        if self.tax_mode == self.TaxMode.FULL:
-            # VAT on the whole invoice subtotal
-            taxable_subtotal = self.calculated_subtotal
-
-        elif self.tax_mode == self.TaxMode.MIXED:
-            # VAT only on taxable items
-            item_total = sum(item.total for item in self.billed_items.filter(is_taxable=True))
-            # You might want to decide if timesheets can be taxable in mixed mode.
-            # For now, we'll assume they are not individually taxable.
-            taxable_subtotal = item_total
-
-        return (taxable_subtotal * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # If registered, apply VAT to all items
+        return (self.calculated_subtotal * rate).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @property
     def calculated_total(self):
@@ -540,7 +527,7 @@ class VATReport(TenantModel):
 class TaxPayment(TenantModel):
     payment_date = models.DateField(default=timezone.now)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    reference = models.CharField(max_length=100, help_text="e.g., VAT201 Period 2026/01")  # noqa: E501
+    reference = models.CharField(max_length=100, blank=True, null=True, help_text="e.g., VAT201 Period 2026/01. Leave blank for auto-generated reference.")  # noqa: E501
     tax_type = models.CharField(max_length=20, default="VAT", choices=[("VAT", "VAT"), ("INCOME_TAX", "Income Tax")])
 
     def __str__(self):

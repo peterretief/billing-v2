@@ -114,7 +114,6 @@ class GenerateInvoiceBulkTests(BaseBillingTest):
             user=self.user,
             client=self.client_obj,
             due_date=timezone.now().date(),
-            tax_mode=Invoice.TaxMode.NONE,
             status=Invoice.Status.DRAFT,
         )
 
@@ -130,7 +129,6 @@ class GenerateInvoiceBulkTests(BaseBillingTest):
                 description=desc,
                 quantity=total_h,
                 unit_price=rate,
-                is_taxable=False,
             )
 
         # Mark entries as billed
@@ -164,7 +162,6 @@ class GenerateInvoiceBulkTests(BaseBillingTest):
             user=self.user,
             client=self.client_obj,
             due_date=timezone.now().date(),
-            tax_mode=Invoice.TaxMode.NONE,
             status=Invoice.Status.DRAFT,
         )
 
@@ -177,7 +174,6 @@ class GenerateInvoiceBulkTests(BaseBillingTest):
             description=category_name,
             quantity=Decimal("5.00"),
             unit_price=Decimal("120.00"),
-            is_taxable=False,
         )
 
         items = invoice.billed_items.all()

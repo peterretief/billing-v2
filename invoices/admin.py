@@ -3,7 +3,7 @@ from django.contrib import admin
 
 from core.models import BillingAuditLog
 
-from .models import Coupon, CreditNote, Invoice, InvoiceEmailStatusLog
+from .models import Coupon, CreditNote, Invoice, InvoiceEmailStatusLog, Payment
 
 
 @admin.register(InvoiceEmailStatusLog)
@@ -61,3 +61,19 @@ class InvoiceAdmin(admin.ModelAdmin):
 
     # Optional: Add a filter on the right sidebar
     list_filter = ("status", "is_template", "date_issued")
+    
+    def has_delete_permission(self, request):
+        """Prevent deletion of invoices to maintain data integrity."""
+        return False
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ("invoice", "amount", "credit_applied", "date_paid", "reference")
+    list_filter = ("date_paid", "invoice__client")
+    search_fields = ("invoice__number", "reference")
+    readonly_fields = ("invoice",)
+    
+    def has_delete_permission(self, request):
+        """Prevent deletion of payments to maintain invoice balance_due calculations."""
+        return False

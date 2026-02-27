@@ -26,43 +26,91 @@
             <div class="col-lg-8">
                 <div class="row g-3 mb-4">
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm bg-info text-white p-3">
+                        <div class="card border-0 shadow-sm bg-info text-white p-3"
+                             data-bs-toggle="tooltip"
+                             data-bs-title="Recurring items queued for future billing cycles">
                             <small class="text-uppercase opacity-75">Queued Items</small>
                             <h3 class="fw-bold mb-0">
                                 {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ queued_items_value|floatformat:2|intcomma }}
                             </h3>
+                            {% if queued_items_count %}
+                                <small class="d-block text-info-50 mt-2">{{ queued_items_count }} queued item{{ queued_items_count|pluralize }}</small>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm bg-primary text-white p-3">
+                        <div class="card border-0 shadow-sm bg-primary text-white p-3"
+                             data-bs-toggle="tooltip"
+                             data-bs-title="Work in progress not yet billed (timesheets and items)">
                             <small class="text-uppercase opacity-75">Unbilled WIP</small>
                             <h3 class="fw-bold mb-0">
                                 {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ unbilled_wip_value|floatformat:2|intcomma }}
                             </h3>
+                            {% if unbilled_ts_count or unbilled_items_count %}
+                                <small class="d-block text-primary-50 mt-2">
+                                    {{ unbilled_ts_count }} timesheet{{ unbilled_ts_count|pluralize }}, {{ unbilled_items_count }} item{{ unbilled_items_count|pluralize }}
+                                </small>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm bg-dark text-white p-3">
+                        <div class="card border-0 shadow-sm bg-dark text-white p-3"
+                             data-bs-toggle="tooltip"
+                             data-bs-title="All invoices issued (excluding discarded and cancelled invoices)">
                             <small class="text-uppercase opacity-75">Total Billed</small>
                             <h3 class="fw-bold mb-0">
                                 {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ total_billed|floatformat:2|intcomma }}
                             </h3>
+                            {% if total_billed_invoices %}
+                                <small class="d-block text-secondary-50 mt-2">
+                                    {{ total_billed_invoices }} invoice{{ total_billed_invoices|pluralize }}
+                                </small>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm bg-danger text-white p-3">
+                        <div class="card border-0 shadow-sm bg-danger text-white p-3"
+                             data-bs-toggle="tooltip"
+                             data-bs-title="Unpaid invoice amounts still owed by clients">
                             <small class="text-uppercase opacity-75">Outstanding</small>
                             <h3 class="fw-bold mb-0">
                                 {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ total_outstanding|floatformat:2|intcomma }}
                             </h3>
+                            {% if outstanding_invoices_count %}
+                                <small class="d-block text-danger-50 mt-2">
+                                    {{ outstanding_invoices_count }} outstanding invoice{{ outstanding_invoices_count|pluralize }}
+                                </small>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm bg-warning text-dark p-3">
+                        <div class="card border-0 shadow-sm bg-warning text-dark p-3"
+                             data-bs-toggle="tooltip"
+                             data-bs-title="Quote amounts pending client acceptance">
                             <small class="text-uppercase opacity-75">Pending Quotes</small>
                             <h3 class="fw-bold mb-0">
                                 {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ total_quotes|floatformat:2|intcomma }}
                             </h3>
+                            {% if pending_quotes_count %}
+                                <small class="d-block text-warning-50 mt-2">
+                                    {{ pending_quotes_count }} pending quote{{ pending_quotes_count|pluralize }}
+                                </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm bg-success text-white p-3"
+                             data-bs-toggle="tooltip"
+                             data-bs-title="Total amount received on invoices marked as Paid">
+                            <small class="text-uppercase opacity-75">Payment from Client</small>
+                            <h3 class="fw-bold mb-0">
+                                {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ total_paid_invoices|floatformat:2|intcomma }}
+                            </h3>
+                            {% if paid_invoices %}
+                                <small class="d-block text-success-50 mt-2">
+                                    {{ paid_invoices|length }} paid invoice{{ paid_invoices|length|pluralize }}
+                                </small>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -152,11 +200,16 @@
                                                    class="btn btn-outline-secondary">
                                                     <i class="bi bi-eye"></i> View
                                                 </a>
-                                                {% if inv.status == 'PAID' or inv.status == 'CANCELLED' or inv.status == 'DRAFT' %}
+                                                {% if inv.status == 'PAID' %}
+                                                    <button class="btn btn-sm btn-success" disabled title="Invoice paid">
+                                                        <i class="bi bi-check-circle"></i>
+                                                        <span class="d-none d-md-inline">Paid</span>
+                                                    </button>
+                                                {% elif inv.status == 'CANCELLED' or inv.status == 'DRAFT' %}
                                                     <button class="btn btn-sm btn-outline-secondary"
                                                             disabled
-                                                            title="{% if inv.status == 'PAID' %}Already paid{% elif inv.status == 'CANCELLED' %}Invoice cancelled{% else %}Not yet sent{% endif %}">
-                                                        <i class="bi bi-{% if inv.status == 'PAID' %}check-circle{% elif inv.status == 'CANCELLED' %}x-circle{% else %}lock{% endif %}"></i>
+                                                            title="{% if inv.status == 'CANCELLED' %}Invoice cancelled{% else %}Not yet sent{% endif %}">
+                                                        <i class="bi bi-{% if inv.status == 'CANCELLED' %}x-circle{% else %}lock{% endif %}"></i>
                                                     </button>
                                                 {% elif not is_manager_view %}
                                                     <button class="btn btn-sm btn-success"
@@ -181,6 +234,51 @@
                         </table>
                     </div>
                 </div>
+                {% if paid_invoices %}
+                    <div class="card border-0 shadow-sm border-start border-4 border-success mb-4">
+                        <div class="card-header bg-success bg-opacity-10 py-3 border-0">
+                            <h5 class="mb-0 fw-bold text-success">
+                                <i class="bi bi-check-circle me-2"></i>Recent Paid Invoices ({{ paid_invoices|length }})
+                            </h5>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3">Invoice</th>
+                                        <th>Client</th>
+                                        <th>Amount</th>
+                                        <th class="text-end pe-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for inv in paid_invoices %}
+                                        <tr>
+                                            <td class="ps-3">
+                                                <span class="fw-bold">#{{ inv.number }}</span>
+                                                <div class="small text-muted">{{ inv.date_issued|date:"d M Y" }}</div>
+                                            </td>
+                                            <td>{{ inv.client.name }}</td>
+                                            <td class="fw-bold">{{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ inv.total_amount|intcomma }}</td>
+                                            <td class="text-end pe-3">
+                                                <div class="btn-group btn-group-sm shadow-sm">
+                                                    <a href="{% url 'invoices:invoice_detail' inv.pk %}"
+                                                       class="btn btn-outline-primary">
+                                                        <i class="bi bi-pencil"></i> View
+                                                    </a>
+                                                    <button class="btn btn-sm btn-success" disabled title="Invoice paid">
+                                                        <i class="bi bi-check-circle"></i>
+                                                        <span class="d-none d-md-inline">Paid</span>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
             <div class="col-lg-4">
                 <div class="card border-0 shadow-sm mb-4 bg-light">
@@ -234,24 +332,59 @@
                                 </button>
                             </div>
                             <div class="mb-3">
-                                <span class="d-block small text-muted">Collected from Clients</span>
-                                <span class="h5 fw-bold">{{ GLOBAL_CURRENCY }}{{ tax_summary.collected|default:"0.00"|floatformat:2 }}</span>
+                                <span class="d-block small text-muted">Liability Accrued</span>
+                                <span class="h5 fw-bold text-info">{{ GLOBAL_CURRENCY }}{{ tax_summary.accrued|default:"0.00"|floatformat:2 }}</span>
+                                <small class="text-muted">(Posted invoices)</small>
                             </div>
                             <div class="mb-3">
-                                <span class="d-block small text-muted">Total VAT Liability</span>
-                                <span class="h5 fw-bold text-warning">{{ GLOBAL_CURRENCY }}{{ tax_summary.vat_liability|default:"0.00"|floatformat:2 }}</span>
+                                <span class="d-block small text-muted">Liability Collected</span>
+                                <span class="h5 fw-bold text-primary">{{ GLOBAL_CURRENCY }}{{ tax_summary.collected|default:"0.00"|floatformat:2 }}</span>
+                                <small class="text-muted">(From clients)</small>
                             </div>
                             <div class="mb-3">
-                                <span class="d-block small text-muted">Paid to SARS</span>
+                                <span class="d-block small text-muted">VAT Paid to SARS</span>
                                 <span class="h5 fw-bold text-success">{{ GLOBAL_CURRENCY }}{{ tax_summary.paid|default:"0.00"|floatformat:2 }}</span>
                             </div>
                             <hr class="my-2 opacity-25">
-                            <div class="mb-0">
+                            <div class="mb-3">
                                 <span class="d-block small text-muted">Outstanding Liability</span>
-                                <span class="h4 fw-bold {% if tax_summary.outstanding > 0 %}text-danger{% else %}text-success{% endif %}">
+                                <span class="h4 fw-bold"
+                                      style="color: {% if tax_summary.outstanding > 0 %}#8b0000{% else %}#006600{% endif %} !important; text-shadow: 0 0 2px rgba(0,0,0,0.3);">
                                     {{ GLOBAL_CURRENCY }}{{ tax_summary.outstanding|default:"0.00"|floatformat:2 }}
                                 </span>
                             </div>
+                            {% if recent_vat_payments %}
+                                <hr class="my-3 opacity-25">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold text-muted mb-0">Recent Payments</h6>
+                                        <button class="btn btn-xs btn-link text-muted p-0"
+                                                hx-get="{% url 'invoices:vat_payment_history' %}"
+                                                hx-target="#paymentHistoryContent"
+                                                hx-trigger="click"
+                                                hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentHistoryModal')).show();"
+                                                title="View all payments">
+                                            <small>View All →</small>
+                                        </button>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-borderless mb-0 small">
+                                            <tbody>
+                                                {% for payment in recent_vat_payments|slice:":5" %}
+                                                    <tr>
+                                                        <td class="ps-0">
+                                                            <span class="text-muted">{{ payment.payment_date|date:"d M Y" }}</span>
+                                                        </td>
+                                                        <td class="text-end pe-0">
+                                                            <strong>{{ GLOBAL_CURRENCY }}{{ payment.amount|floatformat:2 }}</strong>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 {% endif %}
@@ -287,46 +420,28 @@
                             data-bs-dismiss="modal"
                             aria-label="Close"></button>
                 </div>
-                <form hx-post="{% url 'invoices:record_vat_payment' %}"
-                      hx-target="#vatPaymentModal .modal-body"
-                      hx-on::after-request="if(event.detail.xhr.status===200) {setTimeout(() => location.reload(), 1000)}">
-                    {% csrf_token %}
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="id_payment_date" class="form-label">Payment Date</label>
-                            <input type="date"
-                                   class="form-control"
-                                   id="id_payment_date"
-                                   name="payment_date"
-                                   required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="id_amount" class="form-label">Amount</label>
-                            <input type="number"
-                                   class="form-control"
-                                   id="id_amount"
-                                   name="amount"
-                                   step="0.01"
-                                   required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="id_reference" class="form-label">Reference (e.g. VAT201 Jan 2026)</label>
-                            <input type="text"
-                                   class="form-control"
-                                   id="id_reference"
-                                   name="reference"
-                                   placeholder="e.g. VAT201 Jan 2026">
-                        </div>
-                        <input type="hidden" name="tax_type" value="VAT">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-warning">
-                            <i class="bi bi-check-lg me-1"></i>Record Payment
-                        </button>
-                    </div>
-                </form>
+                <div class="modal-body"
+                     hx-get="{% url 'invoices:record_vat_payment' %}"
+                     hx-trigger="load">
+                    <p class="text-muted">Loading form...</p>
+                </div>
             </div>
         </div>
     </div>
+    <div class="modal fade"
+         id="paymentHistoryModal"
+         tabindex="-1"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" id="paymentHistoryContent"></div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const tooltipElements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltipElements.forEach(function(element) {
+                new bootstrap.Tooltip(element);
+            });
+        });
+    </script>
 {% endblock %}

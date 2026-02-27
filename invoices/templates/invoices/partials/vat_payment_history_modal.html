@@ -1,0 +1,128 @@
+<div class="modal-header">
+    <h5 class="modal-title">VAT Payment History & Tracking</h5>
+    <button type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"></button>
+</div>
+<div class="modal-body">
+    <!-- Summary Cards -->
+    {% if tax_summary %}
+        <div class="row g-2 mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 bg-info bg-opacity-10 p-3"
+                     data-bs-toggle="tooltip"
+                     data-bs-title="Total VAT liability from all posted invoices (both PENDING and PAID status)">
+                    <small class="text-muted">Liability Accrued</small>
+                    <h5 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ tax_summary.accrued|floatformat:2 }}</h5>
+                    <small class="text-muted d-block mt-1">(Invoices Posted)</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-primary bg-opacity-10 p-3"
+                     data-bs-toggle="tooltip"
+                     data-bs-title="VAT received from clients whose invoices are marked as PAID">
+                    <small class="text-muted">Liability Collected</small>
+                    <h5 class="fw-bold mb-0">{{ GLOBAL_CURRENCY }}{{ tax_summary.collected|floatformat:2 }}</h5>
+                    <small class="text-muted d-block mt-1">(From Clients)</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 bg-success bg-opacity-10 p-3"
+                     data-bs-toggle="tooltip"
+                     data-bs-title="VAT payments already remitted to the tax authority (SARS)">
+                    <small class="text-muted">VAT Paid to SARS</small>
+                    <h5 class="fw-bold text-success mb-0">{{ GLOBAL_CURRENCY }}{{ tax_summary.paid|floatformat:2 }}</h5>
+                    <small class="text-muted d-block mt-1">(Tax Duty)</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 {% if tax_summary.outstanding > 0 %}bg-danger{% else %}bg-success{% endif %} bg-opacity-10 p-3"
+                     data-bs-toggle="tooltip"
+                     data-bs-title="VAT liability still owed to SARS = Liability Accrued minus VAT Paid">
+                    <small class="text-muted">Outstanding Liability</small>
+                    <h5 class="fw-bold mb-0" style="color: #1a1a1a;">{{ GLOBAL_CURRENCY }}{{ tax_summary.outstanding|floatformat:2 }}</h5>
+                    <small class="text-muted d-block mt-1">(Still Owed)</small>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    <!-- Timeline -->
+    {% if events %}
+        <h6 class="fw-bold text-muted mb-3">Activity Timeline</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover small">
+                <thead class="table-light">
+                    <tr>
+                        <th data-bs-toggle="tooltip" data-bs-title="Date of the transaction">Date</th>
+                        <th data-bs-toggle="tooltip"
+                            data-bs-title="Type of event: SET (invoice posted), COLLECTED (client paid), or VAT PAID (payment to SARS)">
+                            Event
+                        </th>
+                        <th class="text-end"
+                            data-bs-toggle="tooltip"
+                            data-bs-title="Amount for this event">Amount</th>
+                        <th class="text-end"
+                            data-bs-toggle="tooltip"
+                            data-bs-title="Running total of VAT liability accrued">Accrued</th>
+                        <th class="text-end"
+                            data-bs-toggle="tooltip"
+                            data-bs-title="Running total of VAT collected from clients">Collected</th>
+                        <th class="text-end"
+                            data-bs-toggle="tooltip"
+                            data-bs-title="Running total of VAT paid to SARS">VAT Paid</th>
+                        <th class="text-end"
+                            data-bs-toggle="tooltip"
+                            data-bs-title="Running VAT still owed to SARS">Outstanding</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in events %}
+                        <tr {% if event.type == 'payment' %}class="table-success table-opacity-25"{% elif event.type == 'collected' %}class="table-primary table-opacity-10"{% endif %}>
+                            <td>{{ event.date|date:"d M Y" }}</td>
+                            <td>
+                                <span class="badge {% if event.type == 'accrued' %}bg-info{% elif event.type == 'collected' %}bg-primary{% else %}bg-success{% endif %}">
+                                    {% if event.type == 'accrued' %}
+                                        SET
+                                    {% elif event.type == 'collected' %}
+                                        COLLECTED
+                                    {% else %}
+                                        VAT PAID
+                                    {% endif %}
+                                </span>
+                                <br>
+                                <small>{{ event.description }}</small>
+                            </td>
+                            <td class="text-end fw-bold">{{ GLOBAL_CURRENCY }}{{ event.amount|floatformat:2 }}</td>
+                            <td class="text-end">{{ GLOBAL_CURRENCY }}{{ event.accrued_running|floatformat:2 }}</td>
+                            <td class="text-end">{{ GLOBAL_CURRENCY }}{{ event.collected_running|floatformat:2 }}</td>
+                            <td class="text-end">{{ GLOBAL_CURRENCY }}{{ event.paid_running|floatformat:2 }}</td>
+                            <td class="text-end fw-bold">{{ GLOBAL_CURRENCY }}{{ event.outstanding_running|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-light text-center py-4">
+            <p class="text-muted mb-0">No VAT activity recorded yet.</p>
+        </div>
+    {% endif %}
+</div>
+<div class="modal-footer">
+    <a href="{% url 'invoices:export_vat_payments_csv' %}"
+       class="btn btn-primary"
+       download>
+        <i class="bi bi-download me-1"></i> Download CSV
+    </a>
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+</div>
+<script>
+    // Initialize Bootstrap tooltips in this modal
+    document.addEventListener('shown.bs.modal', function() {
+        const tooltipElements = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltipElements.forEach(function(element) {
+            new bootstrap.Tooltip(element);
+        });
+    });
+</script>

@@ -58,7 +58,6 @@ class Command(BaseCommand):
                 number=str(i),  # Testing your manual numbering logic
                 status=Invoice.Status.DRAFT,
                 due_date=timezone.now().date() + timedelta(days=14),
-                tax_mode=Invoice.TaxMode.FULL,
             )
 
             InvoiceItem.objects.create(
@@ -66,7 +65,6 @@ class Command(BaseCommand):
                 description=f"Consulting Services Batch {i}",
                 quantity=Decimal("1.0"),
                 unit_price=Decimal("1000.00"),
-                is_taxable=True,
             )
 
             # Sync snapshots so the totals aren't 0.00

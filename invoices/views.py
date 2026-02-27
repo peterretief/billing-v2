@@ -119,6 +119,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import BooleanField, Case, F, Prefetch, Q, Sum, When
+from django.db.models.functions import Coalesce
 from django.forms import inlineformset_factory
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -137,12 +138,12 @@ from items.models import Item
 from timesheets.models import TimesheetEntry
 
 from .forms import InvoiceForm, VATPaymentForm
-from .models import Payment, VATReport
+from .models import Payment, VATReport, TaxPayment
 from .utils import email_invoice_to_client, generate_invoice_pdf
 
 # --- FORMSET DEFINITION ---
 InvoiceItemFormSet = inlineformset_factory(
-    Invoice, Item, fields=("description", "quantity", "unit_price", "is_taxable"), extra=1, can_delete=True
+    Invoice, Item, fields=("description", "quantity", "unit_price"), extra=1, can_delete=True
 )
 
 
@@ -208,7 +209,7 @@ def dashboard(request):
         unbilled_ts = TimesheetEntry.objects.filter(user__in=users_to_show, is_billed=False).aggregate(
             total_value=Sum(F("hours") * F("hourly_rate")),
         )
-        unbilled_items = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=False).aggregate(
+        unbilled_items = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=False, invoice__isnull=True).aggregate(
             total_value=Sum(F("quantity") * F("unit_price"))
         )
         queued_items = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=True).aggregate(
@@ -219,12 +220,19 @@ def dashboard(request):
             .exclude(invoice__status="PAID")
             .count()
         )
+        # Get counts for dashboard cards
+        queued_items_count = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=True).count()
+        unbilled_ts_count = TimesheetEntry.objects.filter(user__in=users_to_show, is_billed=False).count()
+        unbilled_items_count = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=False, invoice__isnull=True).count()
+        total_billed_invoices = invoices.exclude(status__in=["DRAFT", "DISCARDED", "CANCELLED"]).count()
+        outstanding_invoices_count = invoices.exclude(status__in=["DRAFT", "PAID", "DISCARDED", "CANCELLED"]).count()
+        pending_quotes_count = invoices.filter(is_quote=True).count()
     else:
         invoices = Invoice.objects.filter(user=request.user).select_related("client")
         unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
             total_value=Sum(F("hours") * F("hourly_rate")),
         )
-        unbilled_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False).aggregate(
+        unbilled_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).aggregate(
             total_value=Sum(F("quantity") * F("unit_price"))
         )
         queued_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).aggregate(
@@ -233,27 +241,49 @@ def dashboard(request):
         flagged_count = (
             BillingAuditLog.objects.filter(user=request.user, is_anomaly=True).exclude(invoice__status="PAID").count()
         )
+        # Get counts for dashboard cards
+        queued_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).count()
+        unbilled_ts_count = TimesheetEntry.objects.filter(user=request.user, is_billed=False).count()
+        unbilled_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).count()
+        total_billed_invoices = invoices.exclude(status__in=["DRAFT", "DISCARDED", "CANCELLED"]).count()
+        outstanding_invoices_count = invoices.exclude(status__in=["DRAFT", "PAID", "DISCARDED", "CANCELLED"]).count()
+        pending_quotes_count = invoices.filter(is_quote=True).count()
 
     # Use manager methods for stats - centralized calculations
     user_stats = Invoice.objects.get_user_stats(request.user)
     quote_total = Invoice.objects.get_user_quote_total(request.user)
     total_outstanding = Invoice.objects.get_total_outstanding(request.user)
 
-    # Get draft invoices separately and recent posted invoices
-    draft_invoices = invoices.filter(status="DRAFT").order_by("-date_issued", "-id")[:3]
-    recent_invoices = invoices.exclude(status="DRAFT").order_by("-date_issued", "-id")[:5]
+    # Get draft invoices separately (exclude quotes) and recent posted invoices
+    draft_invoices = invoices.filter(status="DRAFT", is_quote=False).order_by("-date_issued", "-id")[:3]
+    recent_invoices = invoices.exclude(status="DRAFT").exclude(is_quote=True).order_by("-date_issued", "-id")[:5]
+    
+    # Get paid invoices total
+    paid_invoices = invoices.filter(status="PAID").order_by("-date_issued", "-id")[:5]
+    total_paid_invoices = Payment.objects.filter(invoice__user=request.user).aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0.00"))
+    )["total"]
 
     context = {
         "queued_items_value": queued_items["total_value"] or Decimal("0.00"),
+        "queued_items_count": queued_items_count,
         "unbilled_wip_value": (unbilled_ts["total_value"] or Decimal("0.00"))
         + (unbilled_items["total_value"] or Decimal("0.00")),
+        "unbilled_ts_count": unbilled_ts_count,
+        "unbilled_items_count": unbilled_items_count,
         "total_billed": Invoice.objects.get_active_billed_total(request.user),
+        "total_billed_invoices": total_billed_invoices,
         "total_quotes": quote_total,
+        "pending_quotes_count": pending_quotes_count,
         "total_outstanding": total_outstanding,
+        "outstanding_invoices_count": outstanding_invoices_count,
         "tax_summary": Invoice.objects.get_tax_summary(request.user),
         "draft_invoices": draft_invoices,
         "recent_invoices": recent_invoices,
+        "paid_invoices": paid_invoices,
+        "total_paid_invoices": total_paid_invoices,
         "flagged_count": flagged_count,
+        "recent_vat_payments": TaxPayment.objects.filter(user=request.user, tax_type="VAT").order_by("-payment_date")[:5],
     }
 
     return render(request, "invoices/dashboard.html", context)
@@ -320,8 +350,20 @@ def invoice_list(request):
 
     invoice_queryset = invoice_queryset.order_by(sort_param, "-id")
 
-    paginator = Paginator(invoice_queryset, 5)
-    page_obj = paginator.get_page(request.GET.get("page"))
+    # Check if user wants to see all invoices or use pagination
+    show_all = request.GET.get("show_all") == "true"
+    total_count = invoice_queryset.count()
+    
+    if show_all:
+        # Show all invoices without pagination
+        page_obj = invoice_queryset
+        displayed_count = total_count
+    else:
+        # Use pagination (5 per page)
+        paginator = Paginator(invoice_queryset, 5)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        displayed_count = len(page_obj)
+    
     # Attach latest delivery status to each invoice for display
     for invoice in page_obj:
         invoice.latest_delivery_status = invoice.get_latest_delivery_status()
@@ -346,6 +388,9 @@ def invoice_list(request):
             "overdue_filter": overdue_filter,
             "current_sort": sort_param,
             "toggle_sort": toggle_sort,
+            "total_count": total_count,
+            "displayed_count": displayed_count,
+            "show_all": show_all,
         },
     )
 
@@ -491,7 +536,6 @@ def duplicate_invoice(request, pk):
             user=request.user,
             client=original.client,
             status="DRAFT",
-            tax_mode=original.tax_mode,
             billing_type=original.billing_type,
             due_date=timezone.now().date() + timedelta(days=30),
         )
@@ -503,7 +547,6 @@ def duplicate_invoice(request, pk):
                 description=item.description,
                 quantity=item.quantity,
                 unit_price=item.unit_price,
-                is_taxable=item.is_taxable,
                 is_billed=False,
             )
         Invoice.objects.update_totals(new_invoice)
@@ -836,12 +879,236 @@ def record_vat_payment(request):
         if form.is_valid():
             payment = form.save(commit=False)
             payment.user = request.user
+            # Auto-generate reference if not provided
+            if not payment.reference:
+                from datetime import date
+                today = payment.payment_date or date.today()
+                month_abbr = today.strftime('%b').upper()
+                year = today.year % 100  # Last 2 digits of year
+                payment.reference = f"VAT{year:02d}{month_abbr}"
             payment.save()
-            messages.success(request, f"✓ VAT payment of {payment.amount} recorded successfully")
-            return redirect("invoices:dashboard")
-    return render(
-        request, "invoices/partials/vat_payment_form.html", {"form": VATPaymentForm(initial={"tax_type": "VAT"})}
-    )
+            # Return successful response with redirect header using reverse URL
+            response = HttpResponse(f"Payment of {payment.amount} recorded successfully", status=200)
+            response['HX-Redirect'] = reverse("invoices:dashboard")
+            return response
+        else:
+            # Return form with errors for HTMX to display (unprocessable entity)
+            return render(request, "invoices/partials/vat_payment_form.html", {"form": form}, status=422)
+    
+    form = VATPaymentForm(initial={"tax_type": "VAT"})
+    return render(request, "invoices/partials/vat_payment_form.html", {"form": form})
+
+
+@login_required
+def vat_payment_history_modal(request):
+    """Get full VAT payment history with summary and detailed timeline."""
+    from datetime import date
+    
+    # Get tax summary
+    tax_summary = Invoice.objects.get_tax_summary(request.user)
+    
+    # Get all invoices with VAT amounts (that are posted/paid, not drafts)
+    invoices_with_vat = Invoice.objects.filter(
+        user=request.user
+    ).exclude(
+        status="DRAFT"
+    ).filter(
+        tax_amount__gt=0
+    ).values("date_issued", "number", "tax_amount", "status").order_by("date_issued")
+    
+    # Get all VAT payments
+    vat_payments = TaxPayment.objects.filter(user=request.user, tax_type="VAT").order_by("payment_date")
+    
+    # Build timeline of events
+    events = []
+    
+    # Add invoice events - showing their current stage in VAT liability flow
+    for inv in invoices_with_vat:
+        # Determine the stage based on invoice status
+        if inv["status"] == "PAID":
+            # Liability has been COLLECTED from client
+            stage = "Liability COLLECTED"
+            event_type = "collected"
+        else:
+            # PENDING or OVERDUE = Liability only SET, not yet collected from client
+            stage = "Liability SET"
+            event_type = "accrued"
+        
+        events.append({
+            "date": inv["date_issued"],
+            "type": event_type,
+            "description": f"Invoice #{inv['number']} - {stage}",
+            "amount": inv["tax_amount"],
+            "status": inv["status"],
+        })
+    
+    # Add payment events
+    for payment in vat_payments:
+        events.append({
+            "date": payment.payment_date,
+            "type": "payment",
+            "description": f"Payment to SARS - {payment.reference or '[Auto-generated]'}",
+            "amount": payment.amount,
+            "status": "PAID",
+        })
+    
+    # Sort by date, then by type (accrued/collected before payment on same date)
+    events.sort(key=lambda x: (x["date"], x["type"] == "payment"))
+    
+    # Calculate running totals
+    accrued = Decimal("0.00")
+    collected = Decimal("0.00")
+    paid = Decimal("0.00")
+    for event in events:
+        if event["type"] == "accrued":
+            event["accrued_running"] = accrued + event["amount"]
+            event["collected_running"] = collected
+            event["paid_running"] = paid
+            accrued += event["amount"]
+        elif event["type"] == "collected":
+            # Collected invoices also contribute to accrued (they were accrued when issued)
+            event["accrued_running"] = accrued + event["amount"]
+            event["collected_running"] = collected + event["amount"]
+            event["paid_running"] = paid
+            accrued += event["amount"]
+            collected += event["amount"]
+        else:  # payment
+            event["accrued_running"] = accrued
+            event["collected_running"] = collected
+            event["paid_running"] = paid + event["amount"]
+            paid += event["amount"]
+        
+        event["outstanding_running"] = event["accrued_running"] - event["paid_running"]
+    
+    return render(request, "invoices/partials/vat_payment_history_modal.html", {
+        "tax_summary": tax_summary,
+        "events": events,
+        "vat_payments": vat_payments,
+        "total_vat_paid": vat_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
+    })
+
+
+@login_required
+def export_vat_payments_csv(request):
+    """Export VAT payment history with timeline as CSV."""
+    import csv
+    from io import StringIO
+    
+    # Get tax summary
+    tax_summary = Invoice.objects.get_tax_summary(request.user)
+    
+    # Get all invoices with VAT amounts (that are posted/paid, not drafts)
+    invoices_with_vat = Invoice.objects.filter(
+        user=request.user
+    ).exclude(
+        status="DRAFT"
+    ).filter(
+        tax_amount__gt=0
+    ).values("date_issued", "number", "tax_amount", "status").order_by("date_issued")
+    
+    # Get all VAT payments
+    vat_payments = TaxPayment.objects.filter(user=request.user, tax_type="VAT").order_by("payment_date")
+    
+    # Build timeline of events
+    events = []
+    
+    # Add invoice events - showing their current stage in VAT liability flow
+    for inv in invoices_with_vat:
+        # Determine the stage based on invoice status
+        if inv["status"] == "PAID":
+            # Liability has been COLLECTED from client
+            stage = "Liability COLLECTED"
+            event_type = "collected"
+        else:
+            # PENDING or OVERDUE = Liability only SET, not yet collected from client
+            stage = "Liability SET"
+            event_type = "accrued"
+        
+        events.append({
+            "date": inv["date_issued"],
+            "type": event_type,
+            "description": f"Invoice #{inv['number']} - {stage}",
+            "amount": inv["tax_amount"],
+            "status": inv["status"],
+        })
+    
+    # Add payment events
+    for payment in vat_payments:
+        events.append({
+            "date": payment.payment_date,
+            "type": "payment",
+            "description": f"Payment to SARS - {payment.reference or '[Auto-generated]'}",
+            "amount": payment.amount,
+            "status": "PAID",
+        })
+    
+    # Sort by date, then by type (accrued/collected before payment on same date)
+    events.sort(key=lambda x: (x["date"], x["type"] == "payment"))
+    
+    # Calculate running totals
+    accrued = Decimal("0.00")
+    collected = Decimal("0.00")
+    paid = Decimal("0.00")
+    for event in events:
+        if event["type"] == "accrued":
+            event["accrued_running"] = accrued + event["amount"]
+            event["collected_running"] = collected
+            event["paid_running"] = paid
+            accrued += event["amount"]
+        elif event["type"] == "collected":
+            # Collected invoices also contribute to accrued (they were accrued when issued)
+            event["accrued_running"] = accrued + event["amount"]
+            event["collected_running"] = collected + event["amount"]
+            event["paid_running"] = paid
+            accrued += event["amount"]
+            collected += event["amount"]
+        else:  # payment
+            event["accrued_running"] = accrued
+            event["collected_running"] = collected
+            event["paid_running"] = paid + event["amount"]
+            paid += event["amount"]
+        
+        event["outstanding_running"] = event["accrued_running"] - event["paid_running"]
+    
+    # Create CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    currency = request.user.profile.currency if hasattr(request.user, "profile") else "ZAR"
+    
+    # Write summary
+    writer.writerow(["VAT Payment History Export"])
+    writer.writerow(["Generated", timezone.now().strftime("%Y-%m-%d %H:%M:%S")])
+    writer.writerow([])
+    
+    writer.writerow(["SUMMARY"])
+    writer.writerow(["Liability Accrued", f"{tax_summary.get('accrued', 0):.2f}", currency])
+    writer.writerow(["Liability Collected", f"{tax_summary.get('collected', 0):.2f}", currency])
+    writer.writerow(["Paid to SARS", f"{tax_summary.get('paid', 0):.2f}", currency])
+    writer.writerow(["Outstanding Liability", f"{tax_summary.get('outstanding', 0):.2f}", currency])
+    writer.writerow([])
+    
+    # Write timeline
+    writer.writerow(["ACTIVITY TIMELINE"])
+    writer.writerow(["Date", "Event Type", "Description", "Amount", "Accrued", "Collected", "Paid", "Outstanding"])
+    
+    for event in events:
+        writer.writerow([
+            event["date"].strftime("%Y-%m-%d"),
+            event["type"].upper(),
+            event["description"],
+            f"{event['amount']:.2f}",
+            f"{event['accrued_running']:.2f}",
+            f"{event['collected_running']:.2f}",
+            f"{event['paid_running']:.2f}",
+            f"{event['outstanding_running']:.2f}",
+        ])
+    
+    # Return as downloadable file
+    output.seek(0)
+    response = HttpResponse(output.getvalue(), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="VAT_History_{timezone.now().strftime("%Y%m%d")}.csv"'
+    return response
 
 
 @login_required

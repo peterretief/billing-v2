@@ -33,7 +33,6 @@ class Item(TenantModel):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     date = models.DateField(default=timezone.now)
     is_billed = models.BooleanField(default=False)
-    is_taxable = models.BooleanField(default=False)
 
     invoice = models.ForeignKey(
         "invoices.Invoice", on_delete=models.SET_NULL, null=True, blank=True, related_name="billed_items"

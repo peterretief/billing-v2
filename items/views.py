@@ -142,13 +142,10 @@ def generate_invoice_from_items(request):
 
         flagged_count = 0
         for client, client_items in client_map.items():
-            initial_tax_mode = Invoice.TaxMode.FULL if profile.is_vat_registered else Invoice.TaxMode.NONE
-
             invoice = Invoice.objects.create(
                 user=request.user,
                 client=client,
                 due_date=timezone.now().date() + timedelta(days=client.payment_terms or 14),
-                tax_mode=initial_tax_mode,
                 status=Invoice.Status.DRAFT,
                 billing_type=Invoice.BillingType.PRODUCT,
             )

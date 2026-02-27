@@ -37,6 +37,8 @@ urlpatterns = [
     path("bulk-post/", views.bulk_post, name="bulk_post"),
     path("financial-assessment/", views.financial_assessment, name="financial_assessment"),
     path("record-vat-payment/", views.record_vat_payment, name="record_vat_payment"),
+    path("vat-payment-history/", views.vat_payment_history_modal, name="vat_payment_history"),
+    path("vat-payments/export-csv/", views.export_vat_payments_csv, name="export_vat_payments_csv"),
     path("audit-report/", views.billing_audit_report, name="billing_audit_report"),
     path("invoice/<int:pk>/payment-modal/", views.get_payment_modal, name="get_payment_modal"),
     # Reconciliation Statements

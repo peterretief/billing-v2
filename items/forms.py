@@ -16,7 +16,6 @@ class ItemForm(forms.ModelForm):
             "quantity",
             "unit_price",
             "date",
-            "is_taxable",
             "is_recurring",
             "billing_policy",
         ]

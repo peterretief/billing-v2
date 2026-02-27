@@ -290,10 +290,6 @@ def log_time(request):
             }
             entry.metadata = meta_data
 
-            # Handle attach_to_invoice boolean (store in metadata or custom logic)
-            attach_to_invoice = form.cleaned_data.get("attach_to_invoice", False)
-            entry.metadata["attach_to_invoice"] = attach_to_invoice
-
             entry.save()
 
             messages.success(request, f"Logged {entry.hours}h for {entry.client.name}.")
@@ -416,16 +412,11 @@ def generate_invoice_bulk(request):
 
         flagged_count = 0
         for client, client_entries in client_map.items():
-            # Determine Tax Mode based on Business Profile
-            # We use FULL if registered, otherwise NONE
-            initial_tax_mode = Invoice.TaxMode.FULL if profile.is_vat_registered else Invoice.TaxMode.NONE
-
-            # 2. Create the Invoice Header
+            # Create the Invoice Header
             invoice = Invoice.objects.create(
                 user=request.user,
                 client=client,
                 due_date=timezone.now().date() + timedelta(days=client.payment_terms or 14),
-                tax_mode=initial_tax_mode,
                 status=Invoice.Status.DRAFT,
             )
 

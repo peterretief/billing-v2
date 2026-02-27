@@ -13,17 +13,36 @@ class VATPaymentForm(forms.ModelForm):
         model = TaxPayment
         fields = ["payment_date", "amount", "reference", "tax_type"]
         widgets = {
-            "payment_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-            "amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
-            "reference": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. VAT201 Jan 2026"}),
+            "payment_date": forms.DateInput(
+                attrs={"type": "date", "class": "form-control", "required": "required"}
+            ),
+            "amount": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01", "required": "required", "placeholder": "0.00"}
+            ),
+            "reference": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": "Leave blank to auto-generate"}
+            ),
             "tax_type": forms.HiddenInput(),
         }
+    
+    def clean_reference(self):
+        reference = self.cleaned_data.get("reference")
+        # Reference is optional, user can provide their own or leave blank for auto-generation
+        if reference:
+            return reference.strip()
+        return None
+    
+    def clean_amount(self):
+        amount = self.cleaned_data.get("amount")
+        if amount is not None and amount <= 0:
+            raise forms.ValidationError("Amount must be greater than zero")
+        return amount
 
 
 class InvoiceForm(forms.ModelForm):
     class Meta:
         model = Invoice
-        fields = ["client", "number", "billing_type", "date_issued", "due_date", "status", "tax_mode"]
+        fields = ["client", "number", "billing_type", "date_issued", "due_date", "status"]
         widgets = {
             "date_issued": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "due_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),

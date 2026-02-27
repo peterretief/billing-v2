@@ -60,10 +60,6 @@
                         <label class="form-label fw-bold text-muted">Status</label>
                         {{ form.status }}
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold text-muted">Tax Setting</label>
-                        {{ form.tax_mode }}
-                    </div>
                 </div>
             </div>
             <div class="card shadow-sm border-0">
@@ -79,7 +75,6 @@
                                 <th style="width: 30%;">Description</th>
                                 <th style="width: 10%;">Qty/Hrs</th>
                                 <th style="width: 15%;">Rate/Price</th>
-                                <th style="width: 10%; text-align: center;" class="tax-column">Taxable?</th>
                                 <th style="width: 10%; text-align: center;">Remove</th>
                             </tr>
                         </thead>
@@ -91,7 +86,6 @@
                                     <td>{{ item_form.description }}</td>
                                     <td>{{ item_form.quantity }}</td>
                                     <td>{{ item_form.unit_price }}</td>
-                                    <td class="text-center tax-column">{{ item_form.is_taxable }}</td>
                                     <td class="text-center">
                                         {% if formset.can_delete %}{{ item_form.DELETE }}{% endif %}
                                     </td>
@@ -117,7 +111,6 @@
                 <td>{{ formset.empty_form.description }}</td>
                 <td>{{ formset.empty_form.quantity }}</td>
                 <td>{{ formset.empty_form.unit_price }}</td>
-                <td class="text-center tax-column">{{ formset.empty_form.is_taxable }}</td>
                 <td class="text-center">
                     <input type="checkbox"
                            name="items-__prefix__-DELETE"
@@ -128,64 +121,38 @@
         </tbody>
     </table>
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const addItemBtn = document.getElementById('add-item-button');
-        const totalForms = document.querySelector('[id$="-TOTAL_FORMS"]'); 
-        const taxModeSelect = document.getElementById('id_tax_mode');
+        document.addEventListener('DOMContentLoaded', function() {
+            const addItemBtn = document.getElementById('add-item-button');
+            const totalForms = document.querySelector('[id$="-TOTAL_FORMS"]');
 
-        // Logic to hide/show tax column based on Tax Setting
-        function toggleTaxColumn() {
-            const taxMode = taxModeSelect.value;
-            const taxColumns = document.querySelectorAll('.tax-column');
-            
-            // If Tax Mode is 'NONE' (Exempt), hide the column and uncheck all taxable boxes
-            if (taxMode === 'NONE') {
-                taxColumns.forEach(el => el.style.display = 'none');
-                document.querySelectorAll('input[name$="-is_taxable"]').forEach(cb => {
-                    cb.checked = false;
-                });
-            } else {
-                taxColumns.forEach(el => el.style.display = 'table-cell');
-            }
-        }
+            // Logic to Add a New Row
+            addItemBtn.addEventListener('click', function() {
+                const formIdx = parseInt(totalForms.value);
+                const tbody = document.getElementById('item-tbody');
+                const template = document.getElementById('empty-form-template').innerHTML;
 
-        // Run once on load
-        toggleTaxColumn();
+                const newRowHtml = template.replace(/__prefix__/g, formIdx);
 
-        // Run whenever tax mode changes
-        taxModeSelect.addEventListener('change', toggleTaxColumn);
+                const newRow = document.createElement('tr');
+                newRow.className = 'item-row';
+                newRow.innerHTML = newRowHtml;
 
-        // 1. Logic to Add a New Row
-        addItemBtn.addEventListener('click', function() {
-            const formIdx = parseInt(totalForms.value);
-            const tbody = document.getElementById('item-tbody');
-            const template = document.getElementById('empty-form-template').innerHTML;
+                tbody.appendChild(newRow);
+                totalForms.value = formIdx + 1;
+            });
 
-            const newRowHtml = template.replace(/__prefix__/g, formIdx);
-            
-            const newRow = document.createElement('tr');
-            newRow.className = 'item-row';
-            newRow.innerHTML = newRowHtml;
-            
-            tbody.appendChild(newRow);
-            totalForms.value = formIdx + 1;
+            // Quick Select Logic
+            document.addEventListener('change', function(e) {
+                if (e.target.name && e.target.name.includes('preset_description')) {
+                    const row = e.target.closest('.item-row');
+                    const descriptionField = row.querySelector('input[name*="description"]');
 
-            // Re-run toggle to ensure new row follows visibility rules
-            toggleTaxColumn();
-        });
-
-        // 2. Quick Select Logic
-        document.addEventListener('change', function(e) {
-            if (e.target.name && e.target.name.includes('preset_description')) {
-                const row = e.target.closest('.item-row');
-                const descriptionField = row.querySelector('input[name*="description"]');
-                
-                if (e.target.value) {
-                    const selectedText = e.target.options[e.target.selectedIndex].text;
-                    descriptionField.value = selectedText;
+                    if (e.target.value) {
+                        const selectedText = e.target.options[e.target.selectedIndex].text;
+                        descriptionField.value = selectedText;
+                    }
                 }
-            }
+            });
         });
-    });
     </script>
 {% endblock %}

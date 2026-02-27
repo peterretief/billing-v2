@@ -11,3 +11,7 @@ class ItemAdmin(admin.ModelAdmin):
     search_fields = ("description", "client__name")
     date_hierarchy = "date"
     ordering = ("-date",)
+    
+    def has_delete_permission(self, request):
+        """Prevent deletion of items to maintain invoice total_amount calculations."""
+        return False

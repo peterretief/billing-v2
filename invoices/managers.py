@@ -69,7 +69,7 @@ class InvoiceQuerySet(models.QuerySet):
         Key Calculation: Uses with_totals() to get annotated_paid, then aggregates
         both total_amount (billed) and annotated_paid (collected payments).
         
-        Exclusions: Excludes all Quotes (is_quote=False filter)
+        Exclusions: Excludes all Quotes (is_quote=False filter) and DRAFT invoices
         
         Returns: Dict with keys:
             - 'billed': Sum of total_amount (Decimal)
@@ -82,8 +82,8 @@ class InvoiceQuerySet(models.QuerySet):
             
         Note: This is what the Dashboard Cards use for overall metrics
         """
-        # This is what the Dashboard Cards use (exclude quotes)
-        return self.exclude(is_quote=True).with_totals().aggregate(
+        # This is what the Dashboard Cards use (exclude quotes and DRAFT)
+        return self.exclude(is_quote=True).exclude(status="DRAFT").with_totals().aggregate(
             billed=Coalesce(Sum("total_amount"), Decimal("0.00")),
             paid=Coalesce(Sum("annotated_paid"), Decimal("0.00")),
         )
@@ -161,19 +161,11 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         if hasattr(invoice, "custom_lines"):
             subtotal += sum((line.total for line in invoice.custom_lines.all()), Decimal("0.00"))
 
-        # Tax Calculation
+        # Tax Calculation - simple: if user is VAT registered, apply VAT to all items
         tax_amount = Decimal("0.00")
         if is_registered:
-            if invoice.tax_mode == "FULL":
-                rate = custom_vat_rate / Decimal("100.00")
-                tax_amount = subtotal * rate
-            elif invoice.tax_mode == "MIXED":
-                # Sum up totals only from taxable items
-                taxable_items_total = sum(
-                    (item.quantity * item.unit_price for item in items if item.is_taxable), Decimal("0.00")
-                )
-                rate = custom_vat_rate / Decimal("100.00")
-                tax_amount = taxable_items_total * rate
+            rate = custom_vat_rate / Decimal("100.00")
+            tax_amount = subtotal * rate
 
         # Quantize all values to 2 decimal places to match DecimalField requirements
         invoice.subtotal_amount = subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -188,7 +180,11 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
         balance = invoice.total_amount - total_paid
 
-        if invoice.status == "PENDING" and balance <= 0:
+        # Only auto-change to PAID if:
+        # 1. Invoice is PENDING
+        # 2. Invoice has a non-zero total (not just created empty)
+        # 3. Balance is fully paid (balance <= 0)
+        if invoice.status == "PENDING" and invoice.total_amount > 0 and balance <= 0:
             invoice.status = "PAID"
 
         invoice.save(update_fields=["subtotal_amount", "tax_amount", "total_amount", "status"])
@@ -266,22 +262,25 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
     def get_tax_summary(self, user):
         """
-        Calculates VAT liability summary for a user.
+        Calculates VAT liability summary tracking the complete VAT flow.
         
-        Comparison: Shows VAT from different invoice statuses vs VAT already paid to SARS.
+        VAT Flow for South African (SARS):
+        1. Invoice POSTED (PENDING/OVERDUE) → Liability is SET (accrued)
+        2. Invoice PAID by client → Liability is COLLECTED (cash received)
+        3. Tax Payment recorded → Paid to SARS (duty settled)
         
         Calculations:
-            - 'collected': VAT from PAID invoices only (money actually collected from clients)
-            - 'VAT_liability': Total VAT from all posted invoices (PENDING, PAID, OVERDUE) - represents VAT as a liability
-            - 'paid': Total VAT already remitted to SARS (from TaxPayment records)
-            - 'outstanding': VAT_liability - paid = Total VAT still owed to SARS
+            - 'accrued': Total VAT from all POSTED invoices (PENDING, PAID, OVERDUE) = Tax liability owed
+            - 'collected': VAT from PAID invoices only = Tax collected from clients (cash in)
+            - 'paid': Total VAT remitted to SARS (from TaxPayment records) = Tax duty settled
+            - 'outstanding': accrued - paid = Tax liability still owed to SARS
         
         Returns:
             {
-                'collected': Decimal - VAT actually received from clients (PAID invoices only)
-                'vat_liability': Decimal - Total VAT liability from posted invoices (becomes payable when invoice is sent)
-                'paid': Decimal - VAT remitted to tax authority
-                'outstanding': Decimal - Outstanding VAT liability to SARS
+                'accrued': Decimal - Total VAT liability SET when invoices posted
+                'collected': Decimal - VAT received from clients (PAID invoices)
+                'paid': Decimal - VAT remitted to SARS
+                'outstanding': Decimal - VAT liable but not yet paid to SARS
             }
         
         User Hierarchy: If user.is_ops, includes stats for all assigned users (multi-user ops)
@@ -295,8 +294,6 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         Data Sources:
             - Invoice.tax_amount from different statuses
             - TaxPayment.amount records where tax_type='VAT'
-        
-        Note: VAT becomes a liability when invoice is POSTED, not when paid
         """
         # Local import to prevent Circular Import error if TaxPayment is in models.py
         from .models import TaxPayment
@@ -305,26 +302,28 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         if user.is_ops:
             users_to_filter.extend(list(user.added_users.all()))
         
-        # 1. VAT actually collected (money received from clients) - PAID invoices only
+        # 1. Total VAT liability ACCRUED (invoices posted but may not be paid yet)
+        # This is VAT from all POSTED invoices: PENDING, PAID, OVERDUE
+        accrued = self.filter(user__in=users_to_filter, status__in=["PENDING", "PAID", "OVERDUE"], is_quote=False).aggregate(
+            res=Coalesce(Sum("tax_amount"), Decimal("0.00"))
+        )["res"]
+
+        # 2. VAT actually COLLECTED (money received from clients)
+        # This is VAT from PAID invoices only (client has paid)
         collected = self.filter(user__in=users_to_filter, status="PAID", is_quote=False).aggregate(
             res=Coalesce(Sum("tax_amount"), Decimal("0.00"))
         )["res"]
 
-        # 2. Total VAT liability (posted invoices: PENDING, PAID, OVERDUE - excludes DRAFT and CANCELLED)
-        vat_liability = self.filter(user__in=users_to_filter, status__in=["PENDING", "PAID", "OVERDUE"], is_quote=False).aggregate(
-            res=Coalesce(Sum("tax_amount"), Decimal("0.00"))
-        )["res"]
-
-        # 3. Total VAT already paid to SARS
+        # 3. Total VAT already PAID to SARS
         paid = TaxPayment.objects.filter(user__in=users_to_filter, tax_type="VAT").aggregate(
             res=Coalesce(Sum("amount"), Decimal("0.00"))
         )["res"]
 
         return {
+            "accrued": accrued,
             "collected": collected, 
-            "vat_liability": vat_liability,
             "paid": paid, 
-            "outstanding": vat_liability - paid
+            "outstanding": accrued - paid
         }
 
     def get_tax_year_dates(self):

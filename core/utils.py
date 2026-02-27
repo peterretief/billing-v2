@@ -123,11 +123,6 @@ def get_anomaly_status(user, invoice):
             if profile and not profile.vat_number:
                 is_anomaly = True
                 comments.append("VAT is charged but no VAT number registered")
-            
-            # Also check if VAT mode matches profile registration status
-            if profile and invoice.tax_mode == "FULL" and not profile.is_vat_registered:
-                is_anomaly = True
-                comments.append("VAT charged but profile not registered as VAT-liable")
 
     # 5. Business logic checks: Duplicate items
     if triggers.get("detect_duplicate_items", True):

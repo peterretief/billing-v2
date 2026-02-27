@@ -41,16 +41,30 @@ class InvoiceReportingConsistencyTest(TestCase):
             email="client@example.com"
         )
 
-    def create_invoice(self, amount=1000, status="PENDING", is_quote=False, is_billed=True):
+    def create_invoice(self, amount=1000, status="PENDING", is_quote=False):
         """Helper to create a test invoice"""
+        from datetime import timedelta
+        from django.utils import timezone
+        today = timezone.now().date()
         inv = Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
-            total_amount=Decimal(amount),
             status=status,
             is_quote=is_quote,
-            is_billed=is_billed,
+            date_issued=today,
+            due_date=today + timedelta(days=14),
         )
+        # Add item to set total_amount
+        from items.models import Item
+        Item.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            invoice=inv,
+            quantity=Decimal("1.0"),
+            unit_price=Decimal(str(amount)),
+        )
+        inv.sync_totals()
+        inv.save()
         return inv
 
     def test_draft_invoices_excluded_from_all_totals(self):

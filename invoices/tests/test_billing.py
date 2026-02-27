@@ -67,7 +67,6 @@ class BillingLogicTest(TestCase):
             status="DRAFT",
             date_issued=today,
             due_date=today + timedelta(days=14),
-            tax_mode=Invoice.TaxMode.FULL,
         )
 
         Item.objects.create(
@@ -77,7 +76,6 @@ class BillingLogicTest(TestCase):
             description="Consulting",
             quantity=Decimal("10.00"),
             unit_price=Decimal("200.00"),
-            is_taxable=True,
         )
 
         invoice.save()

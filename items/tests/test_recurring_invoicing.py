@@ -47,7 +47,6 @@ class RecurringInvoicingTests(TestCase):
             quantity=1,
             unit_price=Decimal("100.00"),
             is_recurring=True,
-            is_taxable=True,
             last_billed_date=past_date,  # Crucial Date
         )
 
