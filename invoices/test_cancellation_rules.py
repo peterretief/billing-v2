@@ -7,13 +7,16 @@ Tests that:
 3. Payments cannot be added to DRAFT or CANCELLED invoices
 """
 
+from datetime import timedelta
 from decimal import Decimal
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 from clients.models import Client
 from invoices.models import Invoice, Payment, CreditNote
+from items.models import Item
 
 User = get_user_model()
 
@@ -35,14 +38,43 @@ class InvoiceCancellationRulesTest(TestCase):
             email='client@example.com'
         )
 
-    def test_draft_invoice_cancellation_no_credit(self):
-        """DRAFT invoices should cancel without creating credit notes."""
+    def _create_invoice_with_amount(self, number, amount, status, due_date=None):
+        """Helper to create invoice with items that total to the specified amount."""
+        if due_date is None:
+            due_date = timezone.now().date() + timedelta(days=14)
+        
         invoice = Invoice.objects.create(
             user=self.user,
             client=self.client,
-            number='TEST-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.DRAFT
+            number=number,
+            due_date=due_date,
+            status=status
+        )
+        
+        # Create an item linked to invoice with quantity * unit_price = amount
+        # Use quantity=1 and unit_price=amount for simplicity
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
+            description=f"Test item for {number}",
+            quantity=Decimal('1'),
+            unit_price=amount,
+            invoice=invoice
+        )
+        
+        # Manually call update_totals to ensure invoice total_amount is calculated
+        Invoice.objects.update_totals(invoice)
+        
+        # Refresh invoice from DB to get updated total_amount
+        invoice.refresh_from_db()
+        return invoice
+
+    def test_draft_invoice_cancellation_no_credit(self):
+        """DRAFT invoices should cancel without creating credit notes."""
+        invoice = self._create_invoice_with_amount(
+            'TEST-001',
+            Decimal('1000.00'),
+            Invoice.Status.DRAFT
         )
         
         # Cancel the draft invoice
@@ -55,12 +87,10 @@ class InvoiceCancellationRulesTest(TestCase):
 
     def test_paid_invoice_cancellation_creates_credit(self):
         """PAID invoices should auto-create credit note when cancelled."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='TEST-002',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PAID
+        invoice = self._create_invoice_with_amount(
+            'TEST-002',
+            Decimal('1000.00'),
+            Invoice.Status.PAID
         )
         
         # Add a payment
@@ -93,12 +123,10 @@ class InvoiceCancellationRulesTest(TestCase):
 
     def test_partial_payment_cancellation_creates_partial_credit(self):
         """Cancelled PAID invoice with partial payment should create matching credit."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='TEST-003',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PAID
+        invoice = self._create_invoice_with_amount(
+            'TEST-003',
+            Decimal('1000.00'),
+            Invoice.Status.PAID
         )
         
         # Add partial payment
@@ -134,14 +162,43 @@ class PaymentOverpaymentPreventionTest(TestCase):
             email='client2@example.com'
         )
 
-    def test_prevent_payment_on_draft_invoice(self):
-        """Cannot add payment to DRAFT invoice."""
+    def _create_invoice_with_amount(self, number, amount, status, due_date=None):
+        """Helper to create invoice with items that total to the specified amount."""
+        if due_date is None:
+            due_date = timezone.now().date() + timedelta(days=14)
+        
         invoice = Invoice.objects.create(
             user=self.user,
             client=self.client,
-            number='DRAFT-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.DRAFT
+            number=number,
+            due_date=due_date,
+            status=status
+        )
+        
+        # Create an item linked to invoice with quantity * unit_price = amount
+        # Use quantity=1 and unit_price=amount for simplicity
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
+            description=f"Test item for {number}",
+            quantity=Decimal('1'),
+            unit_price=amount,
+            invoice=invoice
+        )
+        
+        # Manually call update_totals to ensure invoice total_amount is calculated
+        Invoice.objects.update_totals(invoice)
+        
+        # Refresh invoice from DB to get updated total_amount
+        invoice.refresh_from_db()
+        return invoice
+
+    def test_prevent_payment_on_draft_invoice(self):
+        """Cannot add payment to DRAFT invoice."""
+        invoice = self._create_invoice_with_amount(
+            'DRAFT-001',
+            Decimal('1000.00'),
+            Invoice.Status.DRAFT
         )
         
         payment = Payment(
@@ -157,12 +214,10 @@ class PaymentOverpaymentPreventionTest(TestCase):
 
     def test_prevent_payment_on_cancelled_invoice(self):
         """Cannot add payment to CANCELLED invoice."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='CANC-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.CANCELLED
+        invoice = self._create_invoice_with_amount(
+            'CANC-001',
+            Decimal('1000.00'),
+            Invoice.Status.CANCELLED
         )
         
         payment = Payment(
@@ -178,12 +233,10 @@ class PaymentOverpaymentPreventionTest(TestCase):
 
     def test_prevent_overpayment_single_payment(self):
         """Single payment cannot exceed invoice amount."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='OVR-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PENDING
+        invoice = self._create_invoice_with_amount(
+            'OVR-001',
+            Decimal('1000.00'),
+            Invoice.Status.PENDING
         )
         
         # Try to pay more than invoice amount
@@ -200,12 +253,10 @@ class PaymentOverpaymentPreventionTest(TestCase):
 
     def test_prevent_overpayment_cumulative(self):
         """Multiple payments cannot exceed invoice amount."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='MULT-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PENDING
+        invoice = self._create_invoice_with_amount(
+            'MULT-001',
+            Decimal('1000.00'),
+            Invoice.Status.PENDING
         )
         
         # Create first payment (valid)
@@ -229,12 +280,10 @@ class PaymentOverpaymentPreventionTest(TestCase):
 
     def test_allow_partial_payments(self):
         """Multiple partial payments should work up to invoice total."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='PART-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PENDING
+        invoice = self._create_invoice_with_amount(
+            'PART-001',
+            Decimal('1000.00'),
+            Invoice.Status.PENDING
         )
         
         # First payment
@@ -268,12 +317,10 @@ class PaymentOverpaymentPreventionTest(TestCase):
 
     def test_prevent_negative_payment(self):
         """Cannot create negative payment."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='NEG-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PENDING
+        invoice = self._create_invoice_with_amount(
+            'NEG-001',
+            Decimal('1000.00'),
+            Invoice.Status.PENDING
         )
         
         payment = Payment(
@@ -287,12 +334,10 @@ class PaymentOverpaymentPreventionTest(TestCase):
 
     def test_prevent_negative_credit_applied(self):
         """Cannot apply negative credit."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='NEGCRED-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PENDING
+        invoice = self._create_invoice_with_amount(
+            'NEGCRED-001',
+            Decimal('1000.00'),
+            Invoice.Status.PENDING
         )
         
         payment = Payment(
@@ -307,12 +352,10 @@ class PaymentOverpaymentPreventionTest(TestCase):
 
     def test_allow_zero_payment_with_credit(self):
         """Should allow $0 cash payment with credit applied."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='CREDITONLY-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PENDING
+        invoice = self._create_invoice_with_amount(
+            'CREDITONLY-001',
+            Decimal('1000.00'),
+            Invoice.Status.PENDING
         )
         
         # Credit-only payment (no cash, just credit applied)
@@ -347,14 +390,43 @@ class InvoiceDataIntegrityTest(TestCase):
             email='client3@example.com'
         )
 
-    def test_cancellation_reason_tracked(self):
-        """Cancellation reason should be tracked and appear in credit note."""
+    def _create_invoice_with_amount(self, number, amount, status, due_date=None):
+        """Helper to create invoice with items that total to the specified amount."""
+        if due_date is None:
+            due_date = timezone.now().date() + timedelta(days=14)
+        
         invoice = Invoice.objects.create(
             user=self.user,
             client=self.client,
-            number='TRACK-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PAID
+            number=number,
+            due_date=due_date,
+            status=status
+        )
+        
+        # Create an item linked to invoice with quantity * unit_price = amount
+        # Use quantity=1 and unit_price=amount for simplicity
+        Item.objects.create(
+            user=self.user,
+            client=self.client,
+            description=f"Test item for {number}",
+            quantity=Decimal('1'),
+            unit_price=amount,
+            invoice=invoice
+        )
+        
+        # Manually call update_totals to ensure invoice total_amount is calculated
+        Invoice.objects.update_totals(invoice)
+        
+        # Refresh invoice from DB to get updated total_amount
+        invoice.refresh_from_db()
+        return invoice
+
+    def test_cancellation_reason_tracked(self):
+        """Cancellation reason should be tracked and appear in credit note."""
+        invoice = self._create_invoice_with_amount(
+            'TRACK-001',
+            Decimal('1000.00'),
+            Invoice.Status.PAID
         )
         
         # Add payment
@@ -376,12 +448,10 @@ class InvoiceDataIntegrityTest(TestCase):
 
     def test_credit_note_reference_generated(self):
         """Credit note should have generated reference."""
-        invoice = Invoice.objects.create(
-            user=self.user,
-            client=self.client,
-            number='INV-2026-001',
-            total_amount=Decimal('1000.00'),
-            status=Invoice.Status.PAID
+        invoice = self._create_invoice_with_amount(
+            'INV-2026-001',
+            Decimal('1000.00'),
+            Invoice.Status.PAID
         )
         
         Payment.objects.create(
