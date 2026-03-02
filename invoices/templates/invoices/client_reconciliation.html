@@ -6,6 +6,10 @@
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
+                <a href="{% url 'invoices:all_clients_reconciliation' %}"
+                   class="btn btn-sm btn-outline-secondary mb-2">
+                    <i class="bi bi-arrow-left me-1"></i>Back to All Clients
+                </a>
                 <h1>Reconciliation Statement</h1>
                 <h4 class="text-muted">{{ client.name }}</h4>
             </div>
