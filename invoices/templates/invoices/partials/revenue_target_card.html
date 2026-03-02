@@ -6,7 +6,12 @@
             <h5 class="mb-0 fw-bold text-info">
                 <i class="bi bi-target me-2"></i>Annual Revenue Target
             </h5>
-            <small class="text-muted">{{ revenue_vs_target.percent_complete|floatformat:1 }}% Complete</small>
+            <div class="d-flex align-items-center gap-2">
+                <small class="text-muted">{{ revenue_vs_target.percent_complete|floatformat:1 }}% Complete</small>
+                <a href="{% url 'invoices:revenue_report' %}" class="btn btn-sm btn-outline-info" title="View detailed report">
+                    <i class="bi bi-graph-up me-1"></i>Report
+                </a>
+            </div>
         </div>
     </div>
     <div class="card-body">
