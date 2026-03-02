@@ -435,6 +435,119 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
             "message": f"Revenue of {profile.currency}{ytd:,.2f} exceeds VAT threshold of {profile.currency}{threshold:,.2f}" if has_crossed else None,
         }
 
+    def get_quarterly_report(self, user, year=None):
+        """
+        Generate quarterly revenue report for current or specified tax year.
+        
+        Returns list of dicts with quarterly revenue breakdown:
+        [
+            {'quarter': 'Q1', 'start_date': date, 'end_date': date, 'revenue': Decimal},
+            ...
+        ]
+        """
+        from dateutil.relativedelta import relativedelta
+        
+        if year is None:
+            year_start, year_end = self.get_tax_year_dates(user)
+        else:
+            # If specific year given, use it (assumes Jan 1 - Dec 31 for now)
+            year_start = date(year, 1, 1)
+            year_end = date(year, 12, 31)
+        
+        quarters = []
+        
+        # Define quarterly boundaries
+        q_starts = [
+            year_start,
+            year_start + relativedelta(months=3),
+            year_start + relativedelta(months=6),
+            year_start + relativedelta(months=9),
+        ]
+        
+        for i, q_start in enumerate(q_starts, 1):
+            q_end = min(q_start + relativedelta(months=3) - relativedelta(days=1), year_end)
+            
+            # Get all invoices (not filtering by status - show all for full picture)
+            q_invoices = self.filter(
+                user=user,
+                is_quote=False,
+                date_issued__gte=q_start,
+                date_issued__lte=q_end
+            ).exclude(status='CANCELLED')
+            
+            q_revenue = sum(
+                (inv.subtotal_amount + inv.tax_amount) for inv in q_invoices
+            )
+            
+            quarters.append({
+                'quarter': f'Q{i}',
+                'start_date': q_start,
+                'end_date': q_end,
+                'revenue': Decimal(str(q_revenue)),
+                'invoice_count': q_invoices.count(),
+            })
+        
+        return quarters
+
+    def get_yearly_summary(self, user, num_years=3):
+        """
+        Generate yearly revenue summary for last N tax years.
+        
+        Returns list of dicts with yearly breakdowns:
+        [
+            {
+                'tax_year': '2025-2026 (ZA)',
+                'start_date': date,
+                'end_date': date,
+                'revenue': Decimal,
+                'invoice_count': int,
+                'average_invoice': Decimal,
+                'vat_paid': Decimal,
+            },
+            ...
+        ]
+        """
+        from dateutil.relativedelta import relativedelta
+        
+        year_start, year_end = self.get_tax_year_dates(user)
+        summary = []
+        
+        for i in range(num_years):
+            # Go back i years
+            years_back = i
+            period_start = year_start - relativedelta(years=years_back)
+            period_end = year_end - relativedelta(years=years_back)
+            
+            # Get invoices for this year
+            year_invoices = self.filter(
+                user=user,
+                is_quote=False,
+                date_issued__gte=period_start,
+                date_issued__lte=period_end
+            ).exclude(status='CANCELLED')
+            
+            # Calculate metrics
+            total_subtotal = sum(inv.subtotal_amount for inv in year_invoices)
+            total_vat = sum(inv.tax_amount for inv in year_invoices)
+            total_revenue = total_subtotal + total_vat
+            count = year_invoices.count()
+            avg_invoice = total_revenue / count if count > 0 else Decimal('0.00')
+            
+            period_label = f"{period_start.strftime('%Y')}-{period_end.strftime('%Y')} ({user.profile.tax_year_type})"
+            
+            summary.append({
+                'tax_year': period_label,
+                'start_date': period_start,
+                'end_date': period_end,
+                'revenue': Decimal(str(total_revenue)),
+                'subtotal': Decimal(str(total_subtotal)),
+                'vat': Decimal(str(total_vat)),
+                'invoice_count': count,
+                'average_invoice': avg_invoice,
+            })
+        
+        return summary
+
     def get_client_stats(self, client):
         """Get outstanding, payments, and totals for a single client."""
         qs = self.filter(client=client, is_quote=False)

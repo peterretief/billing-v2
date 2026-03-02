@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Revenue Report - Quarterly & Yearly Breakdown{% endblock %}
+{% block content %}
+    <div class="container-fluid py-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <h1 class="h3 fw-bold text-dark">
+                    <i class="bi bi-graph-up me-2"></i>Revenue Report
+                </h1>
+                <p class="text-muted">Quarterly and yearly revenue breakdown</p>
+            </div>
+            <div class="col-auto">
+                <a href="{% url 'invoices:dashboard' %}"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+        <!-- Current Year Progress Card -->
+        <div class="card border-0 shadow-sm mb-4 border-start border-4 border-info">
+            <div class="card-header bg-info bg-opacity-10 py-3 border-0">
+                <h5 class="mb-0 fw-bold text-info">
+                    <i class="bi bi-target me-2"></i>Current Year Progress
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar {% if revenue_vs_target.on_track %}bg-success{% else %}bg-warning{% endif %}"
+                                 role="progressbar"
+                                 style="width: {{ revenue_vs_target.percent_complete }}%"
+                                 aria-valuenow="{{ revenue_vs_target.percent_complete }}"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                                <small class="fw-bold text-white d-flex align-items-center h-100 ps-2">
+                                    {% if revenue_vs_target.percent_complete > 5 %}R{{ revenue_vs_target.ytd_revenue|floatformat:2|intcomma }}{% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="alert {% if revenue_vs_target.on_track %}alert-success{% else %}alert-warning{% endif %} alert-sm mb-0">
+                            {% if revenue_vs_target.on_track %}
+                                <i class="bi bi-check-circle me-2"></i><small><strong>On Track</strong></small>
+                            {% else %}
+                                <i class="bi bi-exclamation-triangle me-2"></i><small><strong>Behind Pace</strong></small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3 text-center">
+                    <div class="col">
+                        <small class="text-muted d-block">YTD Revenue</small>
+                        <h5 class="text-success">R{{ revenue_vs_target.ytd_revenue|floatformat:2|intcomma }}</h5>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted d-block">Annual Target</small>
+                        <h5>R{{ revenue_vs_target.annual_target|floatformat:2|intcomma }}</h5>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted d-block">Remaining</small>
+                        <h5 class="text-info">R{{ revenue_vs_target.remaining|floatformat:2|intcomma }}</h5>
+                    </div>
+                    <div class="col">
+                        <small class="text-muted d-block">% Complete</small>
+                        <h5>{{ revenue_vs_target.percent_complete|floatformat:1 }}%</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Quarterly Breakdown -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light py-3 border-0">
+                <h5 class="mb-0 fw-bold">
+                    <i class="bi bi-calendar-quarter me-2"></i>Quarterly Breakdown ({{ current_tax_year }})
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Quarter</th>
+                                <th>Period</th>
+                                <th class="text-end">Invoices</th>
+                                <th class="text-end">Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for q in quarterly_data %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-info">{{ q.quarter }}</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ q.start_date|date:"M d" }} - {{ q.end_date|date:"M d, Y" }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="badge bg-secondary">{{ q.invoice_count }}</span>
+                                    </td>
+                                    <td class="text-end fw-bold text-success">R{{ q.revenue|floatformat:2|intcomma }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">No invoices in current tax year yet</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Yearly Summary -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light py-3 border-0">
+                <h5 class="mb-0 fw-bold">
+                    <i class="bi bi-bar-chart me-2"></i>Yearly Summary (Last 3 Years)
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tax Year</th>
+                                <th class="text-end">Invoices</th>
+                                <th class="text-end">Subtotal</th>
+                                <th class="text-end">VAT</th>
+                                <th class="text-end">Total Revenue</th>
+                                <th class="text-end">Avg Invoice</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for year in yearly_summary %}
+                                <tr>
+                                    <td>
+                                        <small class="fw-bold">{{ year.tax_year }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ year.start_date|date:"d M Y" }} - {{ year.end_date|date:"d M Y" }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="badge bg-secondary">{{ year.invoice_count }}</span>
+                                    </td>
+                                    <td class="text-end">R{{ year.subtotal|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">
+                                        <span class="text-info fw-bold">R{{ year.vat|floatformat:2|intcomma }}</span>
+                                    </td>
+                                    <td class="text-end fw-bold text-success">R{{ year.revenue|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">R{{ year.average_invoice|floatformat:2|intcomma }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        .alert-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+        }
+    </style>
+{% endblock %}

@@ -272,6 +272,29 @@ def dashboard(request):
 
 @login_required
 @setup_required
+def revenue_report(request):
+    """Revenue reporting view with quarterly and yearly breakdowns."""
+    # Get quarterly breakdown for current tax year
+    quarterly_data = Invoice.objects.get_quarterly_report(request.user)
+    
+    # Get yearly summary for last 3 years
+    yearly_summary = Invoice.objects.get_yearly_summary(request.user, num_years=3)
+    
+    # Get current year-to-date
+    revenue_vs_target = Invoice.objects.get_revenue_vs_target(request.user)
+    
+    context = {
+        'quarterly_data': quarterly_data,
+        'yearly_summary': yearly_summary,
+        'revenue_vs_target': revenue_vs_target,
+        'current_tax_year': request.user.profile.tax_year_type,
+    }
+    
+    return render(request, 'invoices/revenue_report.html', context)
+
+
+@login_required
+@setup_required
 def invoice_list(request):
     today = timezone.now().date()
 

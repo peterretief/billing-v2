@@ -16,6 +16,7 @@ urlpatterns = [
     path("<int:pk>/pdf/", views.generate_invoice_pdf_view, name="generate_invoice_pdf_view"),
     path("<int:pk>/pay/", views.mark_invoice_paid, name="mark_as_paid"),
     path("", views.dashboard, name="dashboard"),
+    path("reports/revenue/", views.revenue_report, name="revenue_report"),
     path("list/", views.invoice_list, name="invoice_list"),
     # Detail & Edit (Manual creation removed, use Timesheets to generate)
     path("<int:pk>/", views.invoice_detail, name="invoice_detail"),
