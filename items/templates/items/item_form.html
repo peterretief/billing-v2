@@ -9,7 +9,7 @@
                         <h5 class="mb-0 fw-bold">{{ title }}</h5>
                     </div>
                     <div class="card-body">
-                        <form method="post">
+                        <form method="post" id="item-form">
                             {% csrf_token %}
                             {{ form|crispy }}
                             <div class="d-flex justify-content-between mt-4">
@@ -22,4 +22,40 @@
             </div>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const recurringCheckbox = document.getElementById('id_is_recurring');
+            const billingPolicyField = document.getElementById('id_billing_policy');
+
+            if (!recurringCheckbox || !billingPolicyField) {
+                return; // Exit if elements not found
+            }
+
+            // Get the parent wrapper (crispy forms wraps fields in divs)
+            const billingPolicyWrapper = billingPolicyField.closest('.mb-3, .form-group');
+
+            // Function to update visibility
+            function toggleBillingPolicyVisibility() {
+                if (recurringCheckbox.checked) {
+                    // Show billing policy when recurring is checked
+                    if (billingPolicyWrapper) {
+                        billingPolicyWrapper.style.display = 'block';
+                    }
+                    billingPolicyField.style.display = 'block';
+                } else {
+                    // Hide billing policy when recurring is unchecked
+                    if (billingPolicyWrapper) {
+                        billingPolicyWrapper.style.display = 'none';
+                    }
+                    billingPolicyField.style.display = 'none';
+                }
+            }
+
+            // Set initial state
+            toggleBillingPolicyVisibility();
+
+            // Listen for checkbox changes
+            recurringCheckbox.addEventListener('change', toggleBillingPolicyVisibility);
+        });
+    </script>
 {% endblock %}
