@@ -90,8 +90,8 @@
     \midrule
     \multicolumn{3}{r}{Subtotal} & {{ currency }} {{ subtotal }} \\
     
-    {% if vat_total > 0 %}
-    \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & {{ currency }} {{ vat_total }} \\
+    {% if is_vat_registered %}
+    \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & {{ currency }} {{ calculated_vat }} \\
     {% else %}
     \multicolumn{3}{r}{\lightheader{VAT (Exempt)}} & \lightheader{ {{ currency }} 0.00 } \\
     {% endif %}

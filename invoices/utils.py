@@ -101,7 +101,9 @@ def generate_invoice_pdf(invoice, template_name="invoice_template.tex"):
     # Financials
     context["subtotal"] = f"{invoice.subtotal_amount:,.2f}"
     context["vat_total"] = f"{invoice.tax_amount:,.2f}"
+    context["calculated_vat"] = f"{invoice.calculated_vat:,.2f}"
     context["grand_total"] = f"{invoice.total_amount:,.2f}"
+    context["is_vat_registered"] = getattr(profile, "is_vat_registered", False)
 
     raw_vat_rate = getattr(profile, "vat_rate", Decimal("15.00")) or Decimal("15.00")
     context["tax_rate"] = f"{raw_vat_rate:.0f}"

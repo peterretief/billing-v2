@@ -166,18 +166,6 @@ class Invoice(TenantModel):
     def calculated_total(self):
         return self.calculated_subtotal + self.calculated_vat
 
-    # --- Payment Logic ---
-
-    #    @property
-    #    def total_paid(self):
-    #       return sum(payment.amount for payment in self.payments.all()) or Decimal('0.00')
-    #    @property
-    #    def total_paid(self):
-    # This hits the DB for the current truth, avoiding the cache trap
-    #        return self.payments.aggregate(
-    #            total=Coalesce(Sum('amount'), Decimal('0.00'))
-    #         )['total']
-
     @property
     def total_paid(self):
         from django.db.models import Sum
@@ -188,19 +176,6 @@ class Invoice(TenantModel):
         )
         return result["cash"] + result["credits"]
 
-    # invoices/models.py
-
-    # CHANGE THIS:
-    # total=Coalesce(sum('amount'), Decimal('0.00'))
-
-    # TO THIS (Ensure Sum is imported from django.db.models):
-
-    #    @property
-    #    def balance_due(self):
-    #        # If this uses self.payments.aggregate, it's usually fine.
-    #        # But if it relies on a manager method, ensure it's not being filtered by .active()
-    #        paid = self.payments.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-    #        return self.total_amount - paid
 
     @property
     def balance_due(self):
