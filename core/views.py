@@ -312,8 +312,9 @@ def is_staff_or_admin(user):
 @login_required
 @user_passes_test(is_staff_or_admin)
 def tenant_report_detail(request, tenant_id):
-    tenant_profile = get_object_or_404(UserProfile, id=tenant_id, user__added_by=request.user)
-    invoices = tenant_profile.user.invoice_related.all().order_by("-created_at")
+    tenant_user = get_object_or_404(User, id=tenant_id, added_by=request.user)
+    tenant_profile = tenant_user.profile
+    invoices = tenant_user.invoice_related.all().order_by("-created_at")
     total_invoiced = sum(inv.total_amount for inv in invoices)
     total_paid = sum(inv.total_paid for inv in invoices)
     total_outstanding = total_invoiced - total_paid
