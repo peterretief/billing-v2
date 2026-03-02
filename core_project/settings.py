@@ -4,12 +4,8 @@ from pathlib import Path
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
-CELERY_BEAT_SCHEDULE = {
-    "daily-billing-automation": {
-        "task": "tasks.run_automated_billing_cycle",
-        "schedule": crontab(hour=0, minute=1),  # Runs at 12:01 AM every day
-    },
-}
+# Celery Beat schedule is defined in core_project/celery.py
+CELERY_BEAT_SCHEDULE = {}
 
 
 TIME_ZONE = "Africa/Johannesburg"

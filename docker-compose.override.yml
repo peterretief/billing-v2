@@ -1,0 +1,34 @@
+# Override file for development
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+# This file is automatically used if it exists (takes precedence over docker-compose.yml)
+
+version: '3.9'
+
+services:
+  web:
+    environment:
+      DEBUG: "True"
+      DJANGO_SETTINGS_MODULE: core_project.settings
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./:/app:cached
+      - /app/venv
+      - /app/node_modules
+    ports:
+      - "8000:8000"
+
+  celery_worker:
+    environment:
+      DEBUG: "True"
+    command: celery -A core_project worker --loglevel=debug --concurrency=2 -l debug
+    volumes:
+      - ./:/app:cached
+
+  celery_beat:
+    environment:
+      DEBUG: "True"
+    volumes:
+      - ./:/app:cached

@@ -40,9 +40,15 @@ def import_recurring_to_invoices(user):
     # Filter templates that are:
     # 1. Recurring
     # 2. Linked to a policy that is due TODAY
-    # 3. Haven't been billed yet today
+    # 3. Haven't been billed THIS MONTH (prevent duplicate invoices in same month)
+    current_month_start = today.date().replace(day=1)
+    if today.month == 12:
+        current_month_end = today.date().replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+    else:
+        current_month_end = today.date().replace(month=today.month + 1, day=1) - timedelta(days=1)
+    
     templates = Item.objects.filter(user=user, is_recurring=True, billing_policy__in=due_policies).exclude(
-        last_billed_date=today.date()
+        last_billed_date__range=[current_month_start, current_month_end]
     )
 
     if not templates.exists():

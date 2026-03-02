@@ -9,12 +9,12 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core_project.settings")
 app = Celery("core_project")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
-# ADD THIS LINE to force discovery of the items tasks
-app.autodiscover_tasks(["items"])
+# Discover tasks from billing_schedule and items apps
+app.autodiscover_tasks(["billing_schedule", "items"])
 
 app.conf.beat_schedule = {
-    "daily-automated-billing-cycle": {
-        "task": "run_automated_billing_cycle",  # Use the explicit name here
-        "schedule": crontab(minute=1, hour=0),
+    "daily-billing-policy-queue": {
+        "task": "billing_schedule.tasks.process_daily_billing_queue",
+        "schedule": crontab(minute=1, hour=0),  # Runs at 00:01 daily (Africa/Johannesburg)
     },
 }
