@@ -33,6 +33,7 @@ urlpatterns = [
     path("email-status/rows/", views.email_status_rows, name="email_status_rows"),  # PARTIAL
     path("email-status/sync/<int:invoice_id>/", views.sync_invoice_status, name="sync_invoice_status"),
     path("api/invoice-delivery-statuses/", views.api_invoice_delivery_statuses, name="api_invoice_delivery_statuses"),
+    path("recurring-invoices-report/", views.recurring_invoices_report, name="recurring_invoices_report"),
     # Audit Settings
     path("audit-settings/", views.audit_settings, name="audit_settings"),
     path("audit-history/", views.audit_history, name="audit_history"),

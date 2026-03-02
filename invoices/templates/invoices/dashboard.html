@@ -309,6 +309,10 @@
                                class="btn btn-white border text-start">
                                 <i class="bi bi-box-seam me-2"></i> Items
                             </a>
+                            <a href="{% url 'core:recurring_invoices_report' %}"
+                               class="btn btn-white border text-start">
+                                <i class="bi bi-arrow-repeat me-2 text-info"></i> Recurring Invoice Log
+                            </a>
                             {% if not is_manager_view %}
                                 <a href="{% url 'core:email_status' %}"
                                    class="btn btn-white border text-start">
@@ -349,7 +353,8 @@
                             <div class="mb-3">
                                 <span class="d-block small text-muted">Outstanding Liability</span>
                                 <span class="h4 fw-bold"
-                                      style="color: {% if tax_summary.outstanding > 0 %}#8b0000{% else %}#006600{% endif %} !important; text-shadow: 0 0 2px rgba(0,0,0,0.3);">
+                                      style="color: {% if tax_summary.outstanding > 0 %}#8b0000{% else %}#006600{% endif %} !important;
+                                             text-shadow: 0 0 2px rgba(0,0,0,0.3)">
                                     {{ GLOBAL_CURRENCY }}{{ tax_summary.outstanding|default:"0.00"|floatformat:2 }}
                                 </span>
                             </div>

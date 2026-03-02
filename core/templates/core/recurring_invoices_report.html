@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Recurring Invoice Report{% endblock %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2>
+                    <i class="bi bi-arrow-repeat me-2 text-info"></i>Recurring Invoice Report
+                </h2>
+                <p class="text-muted small mb-0">Log of invoices automatically generated from recurring billing policies</p>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary"
+                    onclick="window.location.reload()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+        {% if enriched_logs %}
+            <div class="card shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Invoice</th>
+                                <th>Client</th>
+                                <th>Amount</th>
+                                <th>Generated</th>
+                                <th>Email Status</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in enriched_logs %}
+                                <tr>
+                                    <td class="ps-4">
+                                        <span class="fw-bold">#{{ item.invoice.number }}</span>
+                                        <div class="small text-muted">{{ item.invoice.date_issued|date:"d M Y" }}</div>
+                                    </td>
+                                    <td>{{ item.invoice.client.name }}</td>
+                                    <td class="fw-bold">
+                                        {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ item.invoice.total_amount|floatformat:2|intcomma }}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ item.billing_log.created_at|date:"d M Y H:i" }}</small>
+                                        <br>
+                                        <small class="text-muted">{{ item.billing_log.created_at|timesince }} ago</small>
+                                    </td>
+                                    <td>
+                                        {% if item.delivery_status %}
+                                            <span class="badge {% if item.delivery_status == 'DELIVERED' %}bg-success {% elif item.delivery_status == 'SENT' %}bg-info {% elif item.delivery_status == 'REQUEST' %}bg-warning text-dark {% else %}bg-secondary{% endif %}">
+                                                {{ item.delivery_status }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">Not Sent</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'invoices:invoice_detail' item.invoice.pk %}"
+                                               class="btn btn-outline-secondary"
+                                               title="View Invoice">
+                                                <i class="bi bi-eye"></i> View
+                                            </a>
+                                            {% if item.invoice.status != 'PAID' and not is_manager_view %}
+                                                <button class="btn btn-outline-primary"
+                                                        hx-get="{% url 'invoices:get_payment_modal' item.invoice.pk %}"
+                                                        hx-target="#paymentModalContent"
+                                                        hx-trigger="click"
+                                                        hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
+                                                        title="Record Payment">
+                                                    <i class="bi bi-cash-stack"></i> Pay
+                                                </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center py-5">
+                <i class="bi bi-inbox fs-1 mb-3 d-block"></i>
+                <h5>No Recurring Invoices Found</h5>
+                <p class="text-muted mb-0">Invoices generated from recurring billing policies will appear here.</p>
+            </div>
+        {% endif %}
+    </div>
+    <!-- Payment Modal (for recording payments) -->
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" id="paymentModalContent"></div>
+    </div>
+{% endblock %}

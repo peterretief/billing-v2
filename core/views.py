@@ -194,6 +194,35 @@ def email_status_rows(request):
     )
 
 
+@login_required
+def recurring_invoices_report(request):
+    """View for displaying logs of recurring invoices that have been sent."""
+    from core.models import BillingAuditLog
+    from invoices.models import InvoiceEmailStatusLog
+    
+    # Get all auto-generated invoices (recurring billing actions)
+    billing_logs = BillingAuditLog.objects.filter(
+        user=request.user, 
+        action_type="AUTO_GENERATE"
+    ).select_related("invoice__client").order_by("-created_at")
+    
+    # Enrich each billing log with email delivery status
+    enriched_logs = []
+    for log in billing_logs:
+        if log.invoice:
+            delivery_status = log.invoice.get_latest_delivery_status()
+            enriched_logs.append({
+                "billing_log": log,
+                "invoice": log.invoice,
+                "delivery_status": delivery_status,
+            })
+    
+    return render(request, "core/recurring_invoices_report.html", {
+        "enriched_logs": enriched_logs,
+        "page_title": "Recurring Invoice Report"
+    })
+
+
 @csrf_exempt
 def brevo_webhook(request):
     """
