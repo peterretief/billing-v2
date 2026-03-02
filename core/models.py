@@ -16,7 +16,6 @@ class User(AbstractUser):
     email = models.EmailField(
         unique=True, blank=False, error_messages={"unique": "A user with that email already exists."}
     )
-    is_ops = models.BooleanField(default=False)
     added_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="added_users")
 
     REQUIRED_FIELDS = ["email"]
@@ -25,52 +24,7 @@ class User(AbstractUser):
         return self.username
 
     def save(self, *args, **kwargs):
-        # The Bridge: If is_ops is true, they MUST be staff
-        # to access the portfolio and admin features.
-        if self.is_ops:
-            self.is_staff = True
-
         super().save(*args, **kwargs)
-
-
-class OpsManager(User):
-    class Meta:
-        proxy = True
-
-    def get_portfolio(self):
-        """Returns all profiles assigned to this manager's profile."""
-        # We look for UserProfiles where the user was added by THIS manager
-        return UserProfile.objects.filter(user__added_by=self)
-
-    def get_portfolio_stats(self):
-        from collections import defaultdict
-        from decimal import Decimal
-
-        from invoices.models import Invoice
-
-        managed_user_ids = self.added_users.values_list("id", flat=True)
-
-        # Eagerly load related data to prevent N+1 query problems in the loop
-        portfolio_invoices = (
-            Invoice.objects.filter(user_id__in=managed_user_ids)
-            .select_related("user__profile")
-            .prefetch_related("payments")
-        )
-
-        stats_by_currency = defaultdict(lambda: {"revenue": Decimal("0.00"), "outstanding": Decimal("0.00")})
-
-        for invoice in portfolio_invoices:
-            # Fallback to a default currency if not set on the user's profile
-            currency = invoice.user.profile.currency or "N/A"
-
-            # The invoice.total_paid property will use the prefetched payments
-            balance_due = invoice.balance_due
-
-            stats_by_currency[currency]["revenue"] += invoice.total_amount
-            stats_by_currency[currency]["outstanding"] += balance_due
-
-        # Return a sorted list of tuples (currency, stats_dict) for predictable order
-        return sorted(stats_by_currency.items())
 
 
 class TenantModel(models.Model):

@@ -283,8 +283,6 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
                 'outstanding': Decimal - VAT liable but not yet paid to SARS
             }
         
-        User Hierarchy: If user.is_ops, includes stats for all assigned users (multi-user ops)
-        
         Used By:
             - Tax dashboard/reporting
             - VAT reconciliation
@@ -299,8 +297,6 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         from .models import TaxPayment
 
         users_to_filter = [user]
-        if user.is_ops:
-            users_to_filter.extend(list(user.added_users.all()))
         
         # 1. Total VAT liability ACCRUED (invoices posted but may not be paid yet)
         # This is VAT from all POSTED invoices: PENDING, PAID, OVERDUE
@@ -342,8 +338,6 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         """Calculates total net revenue for the current income tax year (excluding quotes)."""
         start, end = self.get_tax_year_dates()
         users_to_filter = [user]
-        if user.is_ops:
-            users_to_filter.extend(list(user.added_users.all()))
         res = self.filter(user__in=users_to_filter, date_issued__range=[start, end], is_quote=False).aggregate(
             net_revenue=Sum("subtotal_amount"), total_vat=Sum("tax_amount")
         )

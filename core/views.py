@@ -29,7 +29,6 @@ from .forms import (
 )
 from .models import (
     GroupMember,
-    OpsManager,
     UserGroup,
     UserProfile,
 )
@@ -327,18 +326,19 @@ def portfolio_summary(request):
     if not request.user.is_staff:
         return redirect("invoices:dashboard")
 
-    manager = OpsManager.objects.get(pk=request.user.pk)
-    tenants = manager.get_portfolio().select_related("user")
+    # Get users added by this staff member (their "tenants")
+    from clients.models import Client
+    tenants = request.user.added_users.all().select_related("profile")
     currency_groups = {}
 
     for t in tenants:
-        tenant_invoices = t.user.invoice_related.all()
+        tenant_invoices = t.invoice_related.all()
         rev = sum(inv.total_amount for inv in tenant_invoices)
         out = sum(inv.balance_due for inv in tenant_invoices)
         t.total_revenue = rev
         t.total_outstanding = out
 
-        curr = t.currency
+        curr = t.profile.currency if t.profile else "ZAR"
         if curr not in currency_groups:
             currency_groups[curr] = {"revenue": 0, "outstanding": 0}
         currency_groups[curr]["revenue"] += rev

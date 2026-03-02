@@ -203,51 +203,26 @@ def get_send_modal(request, pk):
 @setup_required
 def dashboard(request):
     """Main overview for the business owner."""
-    if request.user.is_ops:
-        users_to_show = list(request.user.added_users.all()) + [request.user]
-        invoices = Invoice.objects.filter(user__in=users_to_show).select_related("client")
-        unbilled_ts = TimesheetEntry.objects.filter(user__in=users_to_show, is_billed=False).aggregate(
-            total_value=Sum(F("hours") * F("hourly_rate")),
-        )
-        unbilled_items = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=False, invoice__isnull=True).aggregate(
-            total_value=Sum(F("quantity") * F("unit_price"))
-        )
-        queued_items = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=True).aggregate(
-            total_value=Sum(F("quantity") * F("unit_price"))
-        )
-        flagged_count = (
-            BillingAuditLog.objects.filter(user__in=users_to_show, is_anomaly=True)
-            .exclude(invoice__status="PAID")
-            .count()
-        )
-        # Get counts for dashboard cards
-        queued_items_count = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=True).count()
-        unbilled_ts_count = TimesheetEntry.objects.filter(user__in=users_to_show, is_billed=False).count()
-        unbilled_items_count = Item.objects.filter(user__in=users_to_show, is_billed=False, is_recurring=False, invoice__isnull=True).count()
-        total_billed_invoices = invoices.exclude(status__in=["DRAFT", "DISCARDED", "CANCELLED"]).count()
-        outstanding_invoices_count = invoices.exclude(status__in=["DRAFT", "PAID", "DISCARDED", "CANCELLED"]).count()
-        pending_quotes_count = invoices.filter(is_quote=True).count()
-    else:
-        invoices = Invoice.objects.filter(user=request.user).select_related("client")
-        unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
-            total_value=Sum(F("hours") * F("hourly_rate")),
-        )
-        unbilled_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).aggregate(
-            total_value=Sum(F("quantity") * F("unit_price"))
-        )
-        queued_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).aggregate(
-            total_value=Sum(F("quantity") * F("unit_price"))
-        )
-        flagged_count = (
-            BillingAuditLog.objects.filter(user=request.user, is_anomaly=True).exclude(invoice__status="PAID").count()
-        )
-        # Get counts for dashboard cards
-        queued_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).count()
-        unbilled_ts_count = TimesheetEntry.objects.filter(user=request.user, is_billed=False).count()
-        unbilled_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).count()
-        total_billed_invoices = invoices.exclude(status__in=["DRAFT", "DISCARDED", "CANCELLED"]).count()
-        outstanding_invoices_count = invoices.exclude(status__in=["DRAFT", "PAID", "DISCARDED", "CANCELLED"]).count()
-        pending_quotes_count = invoices.filter(is_quote=True).count()
+    invoices = Invoice.objects.filter(user=request.user).select_related("client")
+    unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
+        total_value=Sum(F("hours") * F("hourly_rate")),
+    )
+    unbilled_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).aggregate(
+        total_value=Sum(F("quantity") * F("unit_price"))
+    )
+    queued_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).aggregate(
+        total_value=Sum(F("quantity") * F("unit_price"))
+    )
+    flagged_count = (
+        BillingAuditLog.objects.filter(user=request.user, is_anomaly=True).exclude(invoice__status="PAID").count()
+    )
+    # Get counts for dashboard cards
+    queued_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).count()
+    unbilled_ts_count = TimesheetEntry.objects.filter(user=request.user, is_billed=False).count()
+    unbilled_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).count()
+    total_billed_invoices = invoices.exclude(status__in=["DRAFT", "DISCARDED", "CANCELLED"]).count()
+    outstanding_invoices_count = invoices.exclude(status__in=["DRAFT", "PAID", "DISCARDED", "CANCELLED"]).count()
+    pending_quotes_count = invoices.filter(is_quote=True).count()
 
     # Use manager methods for stats - centralized calculations
     user_stats = Invoice.objects.get_user_stats(request.user)
