@@ -18,7 +18,7 @@ load_dotenv(BASE_DIR / ".env")
 
 # --- CORE SETTINGS ---
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-b9=kayw#kvdwn!5mo=7#tsyxph)6j2&gu$nswyx(20deuyt5wl")
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
 
 ALLOWED_HOSTS = [
