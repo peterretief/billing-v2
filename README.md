@@ -172,49 +172,126 @@ billing_v2/
 ├── requirements.txt         # Python dependencies
 └── manage.py                # Django management
 ```
+## 📊 Billing Approaches
 
+This system supports **two primary billing workflows** to fit your business needs:
+
+### Option 1: Recurring Invoicing (Set & Forget)
+**Perfect for:** Fixed monthly services, subscriptions, retainers
+
+**How it works:**
+1. Create recurring items once (e.g., "Monthly hosting", "Support retainer")
+2. Set a billing policy (e.g., "Bill on the 1st of each month")
+3. The system **automatically invoices your clients every month** — no further action needed
+4. Invoices are generated at the scheduled time and emailed to clients
+
+**Example:**
+```
+March 1: Customer A invoiced $1,000 for hosting
+April 1: Customer A automatically invoiced again $1,000
+May 1: Customer A automatically invoiced again $1,000
+... continues every month
+```
+
+### Option 2: Accumulate & Invoice (Timesheets + Ad-Hoc Items)
+**Perfect for:** Project work, hourly billing, variable services
+
+**How it works:**
+1. **All month long:** Log timesheet entries OR add ad-hoc items as work is completed
+   - Log time spent on projects (e.g., 8 hours Dev work = $2,000)
+   - Add miscellaneous items (e.g., "Server upgrade" = $500)
+   - Items and timesheets for each client accumulate in the system
+2. **End of month:** Trigger bulk invoicing (automatically or manually)
+   - All accumulated timesheets and items are collated into correct invoices per client
+   - One invoice per client containing all their work for the month
+   - Invoices are emailed to clients automatically
+
+**Example:**
+```
+March 5:  Log 4 hours Dev work for Client A = $1,000
+March 10: Log 2 hours QA work for Client A = $500
+March 12: Add miscellaneous item to Client B = $800
+March 15: Log meeting time for Client A = $300
+March 20: Log 6 hours Dev work for Client B = $1,500
+
+March 31 at 00:01 (or manual trigger):
+  → Client A invoice created: Dev (4h) + QA (2h) + Meeting (1h) = $1,800
+  → Client B invoice created: Dev (6h) + Misc item = $2,300
+  → Invoices emailed to both clients
+```
+
+---
 ## 🔄 Billing Workflow
 
-### 1. Create Billing Policy
+### Recurring Invoices (Automatic)
+
+#### 1. Create Billing Policy
 - Navigate to `/scheduler/policies/`
 - Define:
   - **Name:** e.g., "Monthly Service"
   - **Run Day:** Day of month (1-31) or "First Working Day"
   - **Status:** Active/Inactive
 
-### 2. Link Items to Policy
-- Create recurring items in `/items/`
+#### 2. Link Items to Policy
+- Create recurring items in `/items/` (e.g., "Hosting", "Support retainer")
 - Select billing policy
 - Mark as recurring
 - Set initial `last_billed_date`
 
-### 3. Automatic Processing
-- **Daily at 00:01 (UTC+2):** Celery Beat triggers scheduler
+#### 3. Automatic Daily Processing
+- **When:** Daily at 00:01 (UTC+2) via Celery Beat
 - **Process:** `billing_schedule.tasks.process_daily_billing_queue`
-- **Checks:** Which policies are due today
-- **Action:** Creates invoices for matching items
+- **Check:** Which policies are due today
+- **Action:** Creates invoices for all matching recurring items
 - **Safety:** Prevents duplicates within same month
 
-### 4. Email Delivery
-- Invoices emailed via Brevo API
+#### 4. Email Delivery
+- Invoices automatically emailed via Brevo API
 - Status marked as "PENDING"
 - `emailed_at` timestamp recorded
 
-### 5. Payment Tracking
+#### 5. Payment Tracking
 - Record payments manually or via webhook
 - System updates invoice status to "PAID"
 - Reconciliation verifies amounts
 
+---
+
+### Accumulate & Invoice (Timesheets + Items)
+
+#### 1. Throughout the Month
+- **Log Timesheets:** Visit `/timesheets/log-time/` and record work (hours, rate, category)
+- **Add Items:** Create ad-hoc items in `/items/` for one-time charges
+- **Accumulate:** All entries accumulate in the system — nothing is invoiced yet
+
+#### 2. Smart Collation
+When invoicing is triggered, the system automatically:
+- Groups all timesheets and items by client
+- Consolidates multiple entries into single invoices per client
+- Prevents double-invoicing of the same work
+
+#### 3. Generate Invoices
+- **Option A (Automatic):** At scheduled policy date, system generates invoices from all accumulated timesheets + items
+- **Option B (Manual):** Visit `/invoices/` and click "Generate from Timesheets" for specific entries
+- Result: One professional invoice per client with all their work itemized
+
+#### 4. Email & Payment Tracking
+- Invoices emailed to clients via Brevo
+- Status marked as "PENDING"
+- Record payments as they arrive
+- System marks invoice as "PAID"
+
 ## ⏱️ Timesheet Management
 
-Track billable hours, generate invoices from timesheets, and manage work categories.
+Track billable hours all month, then automatically generate properly collated invoices for all clients.
 
 ### Features
-- **Time Entry Logging** — Log hours with date, category, and hourly rate
+- **Time Entry Logging** — Log hours with date, category, and hourly rate as work is completed
 - **Custom Categories** — Create work categories (Development, Meetings, Support, etc.)
 - **Metadata Tracking** — Add custom fields to entries (Attendees, Location, etc.)
-- **Unbilled Hours Report** — View all time entries waiting to be invoiced
-- **Bulk Invoice Generation** — Convert multiple timesheet entries into a single invoice
+- **Unbilled Hours Report** — View all time entries waiting to be invoiced (sorted by client)
+- **Smart Bulk Invoicing** — Convert multiple timesheet entries into correctly collated invoices per client
+- **Automatic Grouping** — System intelligently groups and consolidates items for each client into single invoices
 - **Time Report PDF** — Generate detailed timesheet reports with metadata
 - **Audit Trail** — Track which timesheets are billed and linked to invoices
 
@@ -225,33 +302,37 @@ Track billable hours, generate invoices from timesheets, and manage work categor
 - Define categories: Development, Meetings, Support, etc.
 - Optionally add metadata fields (Attendees, Location, etc.)
 
-#### 2. Log Time Entries
-- Visit `/timesheets/log-time/`
+#### 2. Log Time Throughout the Month
+- Visit `/timesheets/log-time/` and start logging as you work
 - Select client and category
 - Enter date, hours, and hourly rate
-- Add optional metadata
-- Submit
+- Add optional metadata (attendees, notes, etc.)
+- Submit — entries accumulate in the system, nothing invoiced yet
+- **Repeat all month** — log different clients, projects, work types
 
-#### 3. View Unbilled Hours
-- `/timesheets/` shows all logged time
-- Filter by client or date range
-- See total value of unbilled hours
-- Preview before invoice creation
+#### 3. View Accumulated Unbilled Hours
+- Navigate to `/timesheets/` — see all logged time organized by client
+- Filter by client or date range to review before invoicing
+- See total monetary value of unbilled hours per client
+- Preview exactly what each client will be invoiced for
 
-#### 4. Generate Invoice from Timesheets
-- Select timesheet entries
-- Click "Generate Invoice"
-- System creates invoice with line items
-- Each timesheet becomes a line item with description, hours, and rate
-- Invoice ready to send
+#### 4. Generate Invoice from Timesheets (Smart Collation)
+- Click "Generate Invoice" for unbilled entries
+- System automatically groups timesheets and items by client
+- **Smart collation:** Multiple entries from the same client → single professional invoice
+  - Client A: Dev time + Meetings + Misc items = ONE invoice
+  - Client B: Support time + Dev time = ONE invoice
+- Each work entry becomes a line item (description, hours, rate, subtotal)
+- Invoice ready to send to client
 
 #### 5. Generate Time Report PDF
-- From invoice detail page: `/invoices/<id>/time-report/`
-- Generates PDF with:
-  - All timesheet entries included
+- From generated invoice: `/invoices/<id>/time-report/`
+- PDF includes:
+  - All timesheet entries with descriptions
   - Formatted metadata (Attendees, Location, etc.)
-  - Hours, rates, and totals
-  - Can attach to invoice email
+  - Hours worked, hourly rates, and totals
+  - Professional formatting for client delivery
+  - Can be emailed with invoice
 
 ### API Endpoints
 
