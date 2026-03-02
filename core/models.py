@@ -93,6 +93,20 @@ class UserProfile(models.Model):
         default="ZA",
         help_text="Your financial/tax year start date",
     )
+    
+    # Revenue Thresholds & Targets
+    vat_threshold = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Revenue threshold for VAT/GST registration (e.g., 30000). Auto-set based on tax_year_type."
+    )
+    threshold_crossed = models.BooleanField(
+        default=False,
+        help_text="Flag set when annual revenue exceeds VAT/GST threshold"
+    )
+    annual_revenue_target = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Your annual revenue goal (optional). If blank, uses monthly_target × 12"
+    )
 
     # Banking
     bank_name = models.CharField(max_length=100, blank=True)
@@ -142,6 +156,36 @@ class UserProfile(models.Model):
     def quarterly_revenue_forecast(self):
         """Calculates the 3-month forecast."""
         return self.monthly_target * 3
+
+    def get_vat_thresholds(self):
+        """
+        Returns VAT/GST registration thresholds by country.
+        User can override via vat_threshold field.
+        """
+        thresholds = {
+            "ZA": Decimal("50000.00"),    # South Africa VAT threshold
+            "US": Decimal("0.00"),         # No federal GST in US (state-based)
+            "CA": Decimal("30000.00"),     # Canadian GST threshold (CAD)
+            "UK": Decimal("85000.00"),     # UK VAT threshold (GBP)
+            "AU": Decimal("75000.00"),     # Australian GST threshold (AUD)
+            "NZ": Decimal("60000.00"),     # NZ GST threshold (NZD)
+        }
+        
+        # If user set custom threshold, use that
+        if self.vat_threshold:
+            return self.vat_threshold
+        
+        # Otherwise use country default
+        return thresholds.get(self.tax_year_type, Decimal("50000.00"))
+
+    def get_annual_revenue_target(self):
+        """
+        Returns annual revenue target.
+        Uses annual_revenue_target if set, otherwise monthly_target × 12.
+        """
+        if self.annual_revenue_target:
+            return self.annual_revenue_target
+        return self.monthly_target * 12
 
     def __str__(self):
         return f"Profile: {self.user.username}"

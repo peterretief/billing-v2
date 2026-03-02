@@ -239,6 +239,10 @@ def dashboard(request):
         total=Coalesce(Sum("amount"), Decimal("0.00"))
     )["total"]
 
+    # Get revenue targets and threshold tracking
+    revenue_vs_target = Invoice.objects.get_revenue_vs_target(request.user)
+    vat_threshold_check = Invoice.objects.check_vat_threshold(request.user)
+
     context = {
         "queued_items_value": queued_items["total_value"] or Decimal("0.00"),
         "queued_items_count": queued_items_count,
@@ -259,6 +263,8 @@ def dashboard(request):
         "total_paid_invoices": total_paid_invoices,
         "flagged_count": flagged_count,
         "recent_vat_payments": TaxPayment.objects.filter(user=request.user, tax_type="VAT").order_by("-payment_date")[:5],
+        "revenue_vs_target": revenue_vs_target,
+        "vat_threshold_check": vat_threshold_check,
     }
 
     return render(request, "invoices/dashboard.html", context)

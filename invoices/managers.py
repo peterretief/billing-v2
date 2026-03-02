@@ -375,6 +375,66 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
             "total_vat": res["total_vat"] or Decimal("0.00"),
         }
 
+    def get_ytd_revenue(self, user):
+        """
+        Get year-to-date revenue for the current tax year.
+        Returns total amount billed (excluding quotes and cancelled invoices).
+        """
+        report = self.get_tax_year_report(user)
+        # Net revenue is subtotal; add VAT if registered to get full billed amount
+        return report["net_revenue"] + report["total_vat"]
+
+    def get_revenue_vs_target(self, user):
+        """
+        Compare YTD revenue against annual target.
+        Returns dict with YTD revenue, target, remaining, and percentage complete.
+        """
+        ytd = self.get_ytd_revenue(user)
+        profile = user.profile
+        annual_target = profile.get_annual_revenue_target()
+        
+        # Calculate progress
+        remaining = annual_target - ytd
+        percent_complete = (ytd / annual_target * 100) if annual_target > 0 else 0
+        
+        # Pro-rata check: have we earned the expected amount for this day of the year?
+        today = timezone.now().date()
+        day_of_year = Decimal(str(today.timetuple().tm_yday))
+        expected_by_today = annual_target * (day_of_year / Decimal("365.25"))
+        on_track = ytd >= expected_by_today
+        
+        return {
+            "ytd_revenue": ytd,
+            "annual_target": annual_target,
+            "remaining": remaining,
+            "percent_complete": min(percent_complete, 100),  # Cap at 100%
+            "on_track": on_track,
+        }
+
+    def check_vat_threshold(self, user):
+        """
+        Check if YTD revenue has crossed the VAT/GST registration threshold.
+        Returns dict with threshold_crossed flag and details.
+        """
+        ytd = self.get_ytd_revenue(user)
+        profile = user.profile
+        threshold = profile.get_vat_thresholds()
+        
+        has_crossed = ytd >= threshold
+        
+        # Update profile flag
+        if has_crossed and not profile.threshold_crossed:
+            profile.threshold_crossed = True
+            profile.save(update_fields=['threshold_crossed'])
+        
+        return {
+            "threshold": threshold,
+            "ytd_revenue": ytd,
+            "crossed": has_crossed,
+            "amount_over": max(0, ytd - threshold),
+            "message": f"Revenue of {profile.currency}{ytd:,.2f} exceeds VAT threshold of {profile.currency}{threshold:,.2f}" if has_crossed else None,
+        }
+
     def get_client_stats(self, client):
         """Get outstanding, payments, and totals for a single client."""
         qs = self.filter(client=client, is_quote=False)
