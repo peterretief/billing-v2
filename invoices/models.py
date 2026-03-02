@@ -261,9 +261,13 @@ class Invoice(TenantModel):
                 if original.status == self.Status.PAID and self.status == self.Status.CANCELLED:
                     # Validate: payment should never exceed invoice amount
                     if self.total_paid > self.total_amount:
+                        try:
+                            currency = getattr(self.user.profile, 'currency', 'ZAR')
+                        except (AttributeError, Exception):
+                            currency = 'ZAR'
                         raise ValidationError(
-                            f"Cannot cancel invoice: Payment ({self.user.profile.currency} {self.total_paid}) "
-                            f"exceeds invoice amount ({self.user.profile.currency} {self.total_amount}). "
+                            f"Cannot cancel invoice: Payment ({currency} {self.total_paid}) "
+                            f"exceeds invoice amount ({currency} {self.total_amount}). "
                             f"This is a data integrity error."
                         )
             except Invoice.DoesNotExist:
@@ -356,15 +360,18 @@ class Payment(TenantModel):
             raise ValidationError("Cannot add a payment to a 'Cancelled' invoice.")
 
         # RULE 2: Payment + existing payments must not exceed total invoice amount
-        # This is the hardest rule - payment should never exceed (invoice total - other payments)
-        existing_paid = sum(
-            Decimal(str(p.amount + p.credit_applied)) 
-            for p in self.invoice.payments.exclude(pk=self.pk)
-        )
+        # BUGFIX: Exclude self.pk properly - for new payments, pk=None so exclude(pk=None) doesn't exclude anything
+        existing_paid = Decimal("0.00")
+        for p in self.invoice.payments.all():
+            if p.pk != self.pk:  # Properly exclude current payment, handles both new (pk=None) and edit (pk=value)
+                existing_paid += Decimal(str(p.amount + p.credit_applied))
         total_would_be = existing_paid + self.amount + self.credit_applied
         
         if total_would_be > self.invoice.total_amount:
-            currency = self.user.profile.currency
+            try:
+                currency = getattr(self.user.profile, 'currency', 'ZAR')
+            except (AttributeError, Exception):
+                currency = 'ZAR'
             raise ValidationError(
                 f"Payment would cause total paid ({currency} {total_would_be}) to exceed "
                 f"invoice amount ({currency} {self.invoice.total_amount}). "
@@ -374,7 +381,10 @@ class Payment(TenantModel):
 
         # RULE 3: Check individual cash payment doesn't exceed balance
         if self.amount > self.invoice.balance_due:
-            currency = self.user.profile.currency
+            try:
+                currency = getattr(self.user.profile, 'currency', 'ZAR')
+            except (AttributeError, Exception):
+                currency = 'ZAR'
             raise ValidationError(
                 f"Cash payment amount ({currency} {self.amount}) cannot exceed the "
                 f"balance due ({currency} {self.invoice.balance_due})"
@@ -402,7 +412,11 @@ class Payment(TenantModel):
         Invoice.objects.update_totals(self.invoice)
 
     def __str__(self):
-        return f"{self.user.profile.currency} {self.amount} for {self.invoice.number}"
+        try:
+            currency = getattr(self.user.profile, 'currency', 'ZAR')
+            return f"{self.user.profile.currency} {self.amount} for {self.invoice.number}"
+        except (AttributeError, Exception):
+            return f"{self.amount} for {self.invoice.number}"
 
 
 class CreditNote(TenantModel):
@@ -454,7 +468,11 @@ class CreditNote(TenantModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"CN - {self.client.name} - {self.user.profile.currency} {self.amount} ({self.issued_date})"
+        try:
+            currency = getattr(self.user.profile, 'currency', 'ZAR')
+            return f"CN - {self.client.name} - {currency} {self.amount} ({self.issued_date})"
+        except (AttributeError, Exception):
+            return f"CN - {self.client.name} - {self.amount} ({self.issued_date})"
 
 
 class Coupon(TenantModel):
@@ -554,4 +572,8 @@ class TaxPayment(TenantModel):
     tax_type = models.CharField(max_length=20, default="VAT", choices=[("VAT", "VAT"), ("INCOME_TAX", "Income Tax")])
 
     def __str__(self):
-        return f"{self.tax_type} Payment - {self.user.profile.currency} {self.amount} ({self.payment_date})"  # noqa: E501
+        try:
+            currency = getattr(self.user.profile, 'currency', 'ZAR')
+            return f"{self.tax_type} Payment - {currency} {self.amount} ({self.payment_date})"
+        except (AttributeError, Exception):
+            return f"{self.tax_type} Payment - {self.amount} ({self.payment_date})"

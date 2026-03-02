@@ -437,7 +437,7 @@ def invoice_create(request):
                         invoice=invoice,
                         is_anomaly=is_anomaly,
                         ai_comment=comment,
-                        details={"total": float(invoice.total_amount), "source": "manual_create"},
+                        details={"total": str(invoice.total_amount), "source": "manual_create"},
                     )
                     
                     # Create audit history record for learning
@@ -504,7 +504,7 @@ def invoice_edit(request, pk):
                         invoice=invoice,
                         is_anomaly=is_anomaly,
                         ai_comment=comment,
-                        details={"total": float(invoice.total_amount), "source": "manual_edit"},
+                        details={"total": str(invoice.total_amount), "source": "manual_edit"},
                     )
                     
                     # Update audit history record
