@@ -1,0 +1,24 @@
+{# Reusable payment button for invoices. Encapsulates payment recording rules. #}
+{# Usage: {% include "invoices/partials/payment_button.html" with invoice=invoice %} #}
+{% if invoice.status == 'PAID' %}
+    <button class="btn btn-sm btn-success" disabled title="Invoice paid">
+        <i class="bi bi-check-circle"></i>
+        <span class="d-none d-md-inline">Paid</span>
+    </button>
+{% elif invoice.status == 'CANCELLED' or invoice.status == 'DRAFT' %}
+    <button class="btn btn-sm btn-outline-secondary"
+            disabled
+            title="{% if invoice.status == 'CANCELLED' %}Invoice cancelled{% else %}Not yet sent{% endif %}">
+        <i class="bi bi-{% if invoice.status == 'CANCELLED' %}x-circle{% else %}lock{% endif %}"></i>
+    </button>
+{% elif not is_manager_view and invoice.can_record_payment %}
+    <button class="btn btn-sm btn-success"
+            hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
+            hx-target="#paymentModalContent"
+            hx-trigger="click"
+            hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
+            title="Record Payment">
+        <i class="bi bi-cash-stack"></i>
+        <span class="d-none d-md-inline">Pay</span>
+    </button>
+{% endif %}

@@ -200,28 +200,7 @@
                                                    class="btn btn-outline-secondary">
                                                     <i class="bi bi-eye"></i> View
                                                 </a>
-                                                {% if inv.status == 'PAID' %}
-                                                    <button class="btn btn-sm btn-success" disabled title="Invoice paid">
-                                                        <i class="bi bi-check-circle"></i>
-                                                        <span class="d-none d-md-inline">Paid</span>
-                                                    </button>
-                                                {% elif inv.status == 'CANCELLED' or inv.status == 'DRAFT' %}
-                                                    <button class="btn btn-sm btn-outline-secondary"
-                                                            disabled
-                                                            title="{% if inv.status == 'CANCELLED' %}Invoice cancelled{% else %}Not yet sent{% endif %}">
-                                                        <i class="bi bi-{% if inv.status == 'CANCELLED' %}x-circle{% else %}lock{% endif %}"></i>
-                                                    </button>
-                                                {% elif not is_manager_view %}
-                                                    <button class="btn btn-sm btn-success"
-                                                            hx-get="{% url 'invoices:get_payment_modal' inv.pk %}"
-                                                            hx-target="#paymentModalContent"
-                                                            hx-trigger="click"
-                                                            hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
-                                                            title="Record Payment">
-                                                        <i class="bi bi-cash-stack"></i>
-                                                        <span class="d-none d-md-inline">Pay</span>
-                                                    </button>
-                                                {% endif %}
+                                                {% include "invoices/partials/payment_button.html" with invoice=inv %}
                                             </div>
                                         </td>
                                     </tr>

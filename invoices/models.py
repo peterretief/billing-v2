@@ -46,6 +46,13 @@ class Invoice(TenantModel):
         logs.sort(key=lambda l: (priority.get(l.status.upper(), 0), l.created_at), reverse=True)
         return logs[0].status
 
+    def can_record_payment(self):
+        """
+        Determine if payment can be recorded on this invoice.
+        Payment is allowed unless invoice is: PAID, DRAFT, or CANCELLED.
+        """
+        return self.status not in [self.Status.PAID, self.Status.DRAFT, self.Status.CANCELLED]
+
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
         PENDING = "PENDING", "Pending / Sent"

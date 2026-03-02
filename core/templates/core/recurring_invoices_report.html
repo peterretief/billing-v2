@@ -61,16 +61,7 @@
                                                title="View Invoice">
                                                 <i class="bi bi-eye"></i> View
                                             </a>
-                                            {% if item.invoice.status != 'PAID' and not is_manager_view %}
-                                                <button class="btn btn-outline-primary"
-                                                        hx-get="{% url 'invoices:get_payment_modal' item.invoice.pk %}"
-                                                        hx-target="#paymentModalContent"
-                                                        hx-trigger="click"
-                                                        hx-on::after-request="new bootstrap.Modal(document.getElementById('paymentModal')).show();"
-                                                        title="Record Payment">
-                                                    <i class="bi bi-cash-stack"></i> Pay
-                                                </button>
-                                            {% endif %}
+                                            {% include "invoices/partials/payment_button.html" with invoice=item.invoice %}
                                         </div>
                                     </td>
                                 </tr>
