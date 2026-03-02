@@ -117,12 +117,12 @@ TEMPLATES = [
 # --- DATABASE ---
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "billing_v2_db",
-        "USER": "peter",
-        "PASSWORD": "220961",
-        "HOST": "127.0.0.1",
-        "PORT": "5432",
+        "ENGINE": os.environ.get("DB_ENGINE", "django.db.backends.postgresql"),
+        "NAME": os.environ.get("DB_NAME", "billing_v2_db"),
+        "USER": os.environ.get("DB_USER", "billing_user"),
+        "PASSWORD": os.environ.get("DB_PASSWORD", ""),  # Empty in Docker (uses .env), set manually for local dev
+        "HOST": os.environ.get("DB_HOST", "127.0.0.1"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
 
@@ -142,9 +142,12 @@ BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
 
 
 # --- REDIS & CELERY ---
-REDIS_PASSWORD = {"REDIS_PASSWORD": os.environ.get("REDIS_PASSWORD")}
-CELERY_BROKER_URL = "redis://:220961@localhost:6379/0"
-CELERY_RESULT_BACKEND = "redis://:220961@localhost:6379/0"
+REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "")
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+REDIS_PORT = os.environ.get("REDIS_PORT", "6379")
+REDIS_DB = os.environ.get("REDIS_DB", "0")
+CELERY_BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}" if REDIS_PASSWORD else f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+CELERY_RESULT_BACKEND = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}" if REDIS_PASSWORD else f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 CELERY_TASK_ALWAYS_EAGER = False  # Set to False to actually use Redis
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"

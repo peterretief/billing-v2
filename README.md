@@ -15,6 +15,7 @@ A comprehensive, production-ready billing platform built with Django, Celery, an
 ### Advanced Features
 - 🤖 **AI Insights** — Anomaly detection using Google GenAI
 - 📧 **Email Integration** — Automated invoice delivery via Brevo
+- ⏱️ **Timesheet Management** — Log hours, track by category, generate invoices
 - 📊 **Reconciliation** — Data integrity checks and dual verification
 - 📈 **Analytics Dashboard** — Real-time financial metrics
 - 🔔 **Notifications** — Client alerts and system notifications
@@ -204,6 +205,109 @@ billing_v2/
 - System updates invoice status to "PAID"
 - Reconciliation verifies amounts
 
+## ⏱️ Timesheet Management
+
+Track billable hours, generate invoices from timesheets, and manage work categories.
+
+### Features
+- **Time Entry Logging** — Log hours with date, category, and hourly rate
+- **Custom Categories** — Create work categories (Development, Meetings, Support, etc.)
+- **Metadata Tracking** — Add custom fields to entries (Attendees, Location, etc.)
+- **Unbilled Hours Report** — View all time entries waiting to be invoiced
+- **Bulk Invoice Generation** — Convert multiple timesheet entries into a single invoice
+- **Time Report PDF** — Generate detailed timesheet reports with metadata
+- **Audit Trail** — Track which timesheets are billed and linked to invoices
+
+### Workflow
+
+#### 1. Create Work Categories
+- Navigate to `/timesheets/manage-categories/`
+- Define categories: Development, Meetings, Support, etc.
+- Optionally add metadata fields (Attendees, Location, etc.)
+
+#### 2. Log Time Entries
+- Visit `/timesheets/log-time/`
+- Select client and category
+- Enter date, hours, and hourly rate
+- Add optional metadata
+- Submit
+
+#### 3. View Unbilled Hours
+- `/timesheets/` shows all logged time
+- Filter by client or date range
+- See total value of unbilled hours
+- Preview before invoice creation
+
+#### 4. Generate Invoice from Timesheets
+- Select timesheet entries
+- Click "Generate Invoice"
+- System creates invoice with line items
+- Each timesheet becomes a line item with description, hours, and rate
+- Invoice ready to send
+
+#### 5. Generate Time Report PDF
+- From invoice detail page: `/invoices/<id>/time-report/`
+- Generates PDF with:
+  - All timesheet entries included
+  - Formatted metadata (Attendees, Location, etc.)
+  - Hours, rates, and totals
+  - Can attach to invoice email
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/timesheets/` | GET | List all timesheet entries (current user) |
+| `/timesheets/log-time/` | POST | Create new timesheet entry |
+| `/timesheets/<id>/edit/` | POST | Update existing entry |
+| `/timesheets/<id>/delete/` | POST | Delete entry |
+| `/timesheets/manage-categories/` | GET/POST | Manage work categories |
+| `/invoices/<id>/time-report/` | GET | Generate PDF report |
+| `/timesheets/invoice-bulk/` | POST | Convert timesheets to invoice |
+
+### Database Models
+
+**TimesheetEntry**
+- `user` — Owner
+- `client` — Client to bill
+- `category` — Work type
+- `date` — Date of work
+- `hours` — Hours worked (decimal)
+- `hourly_rate` — Rate per hour
+- `is_billed` — Whether converted to invoice
+- `invoice` — Link to generated invoice
+- `metadata` — Custom fields (JSON)
+
+**WorkCategory**
+- `user` — Owner
+- `name` — Category name
+- `metadata_schema` — List of custom field names
+
+### Example: Track Development Work
+```
+Date: 2026-03-02
+Client: Acme Corp
+Category: Development
+Hours: 4.5
+Hourly Rate: $75
+Metadata: {
+  "Task": "Build API endpoint",
+  "Ticket": "#1234"
+}
+```
+
+Then later:
+```bash
+# Select this entry + others for same client
+# Click "Generate Invoice"
+# Creates invoice line: "2026-03-02: Development - Build API endpoint (4.5 hrs × $75)"
+```
+
+### Example Reports
+- **Client Unbilled Hours:** How many hours waiting to be billed?
+- **Timesheet Report:** PDF with all hours, rates, and metadata for client
+- **Category Usage:** How many hours in each category this month?
+
 ## 🧪 Testing
 
 ### Run All Tests
@@ -251,6 +355,15 @@ python manage.py test invoices.tests.test_new_data_integrity -v 2
 ### Scheduler
 - `GET /scheduler/policies/` — List billing policies
 - `POST /scheduler/policies/create/` — Create policy
+
+### Timesheets
+- `GET /timesheets/` — List timesheet entries
+- `POST /timesheets/log-time/` — Create new entry
+- `POST /timesheets/<id>/edit/` — Update entry
+- `POST /timesheets/<id>/delete/` — Delete entry
+- `GET /timesheets/manage-categories/` — Manage work categories
+- `GET /invoices/<id>/time-report/` — Generate timesheet report PDF
+- `POST /timesheets/invoice-bulk/` — Convert timesheets to invoice
 
 See [MANAGER_METHODS_DOCUMENTATION.md](MANAGER_METHODS_DOCUMENTATION.md) for complete API reference.
 
