@@ -17,7 +17,7 @@ class Command(BaseCommand):
         year = last_month_date.year
 
         # 2. Query the data (Only for VAT registered invoices)
-        invoices = Invoice.objects.filter(date_issued__month=month, date_issued__year=year, tax_mode="FULL")
+        invoices = Invoice.objects.filter(date_issued__month=month, date_issued__year=year)
 
         # 3. Render the LaTeX (or Text) content
         context = {

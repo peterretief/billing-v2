@@ -44,7 +44,6 @@ class CancelledInvoiceTotalsTest(TestCase):
             status="DRAFT",  # Start as DRAFT to avoid auto-conversion
             date_issued=self.today,
             due_date=self.today + timedelta(days=14),
-            tax_mode="NONE",
             subtotal_amount=amount,
             tax_amount=Decimal("0.00"),
             total_amount=amount,

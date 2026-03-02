@@ -49,7 +49,6 @@ class InvoiceForm(forms.ModelForm):
             "client": forms.Select(attrs={"class": "form-select"}),
             "number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Auto-generated if blank"}),
             "status": forms.Select(attrs={"class": "form-select"}),
-            "tax_mode": forms.Select(attrs={"class": "form-select"}),
             "billing_type": forms.Select(attrs={"class": "form-select"}),
         }
 

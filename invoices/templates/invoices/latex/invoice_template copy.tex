@@ -92,7 +92,7 @@
     \midrule
     \multicolumn{3}{r}{Subtotal} & {{ currency }} {{ subtotal }} \\
     
-    {% if invoice.tax_mode != 'NONE' %}
+    {% if vat_total > 0 %}
     \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & {{ currency }} {{ vat_total }} \\
     {% else %}
     \multicolumn{3}{r}{\lightheader{VAT (Exempt)}} & \lightheader{{{ currency }} 0.00} \\
@@ -137,7 +137,7 @@
     \midrule
     \multicolumn{3}{r}{Subtotal} & {{ currency }} {{ subtotal }} \\
     
-    {% if invoice.tax_mode != 'NONE' %}
+    {% if vat_total > 0 %}
     \multicolumn{3}{r}{VAT ({{ tax_rate }}\%)} & {{ currency }} {{ vat_total }} \\
     {% else %}
     \multicolumn{3}{r}{\lightheader{VAT (Exempt)}} & \lightheader{{{ currency }} 0.00} \\

@@ -41,7 +41,6 @@ def seed_data():
         client=client,
         number="INV-2026-001",
         due_date=timezone.now().date() + timezone.timedelta(days=14),
-        tax_mode="FULL",
     )
 
     # 6. Add a Line Item
