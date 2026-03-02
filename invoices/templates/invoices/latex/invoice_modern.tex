@@ -19,6 +19,11 @@
 % --- HEADER ---
 \begin{minipage}[t]{0.5\textwidth}
     \vspace{0pt}
+    {% if logo_path %}
+        \includegraphics[width=4.5cm, height=2.5cm, keepaspectratio]{ {{ logo_path }} }
+        \\
+        \vspace{5pt}
+    {% endif %}
     {\Huge \textbf{ {{ company_name }} }} \\
     \vspace{2pt}
     {{ profile_address_safe }} \\
