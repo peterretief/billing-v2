@@ -124,12 +124,12 @@ class ClientReconciliation:
         running_balance = self.get_opening_balance()
 
         # Build invoice filter
-        invoice_filter = {"user": self.user, "client": self.client, "date_issued__lte": self.end_date}
+        invoice_filter = {"user": self.user, "client": self.client, "date_issued__lte": self.end_date, "is_quote": False}
         if self.start_date:
             invoice_filter["date_issued__gte"] = self.start_date
 
         # Get all invoices in period (excluding quotes and drafts)
-        invoices = Invoice.objects.filter(**invoice_filter).exclude(status="DRAFT", is_quote=True).order_by("date_issued")
+        invoices = Invoice.objects.filter(**invoice_filter).exclude(status="DRAFT").order_by("date_issued")
 
         for invoice in invoices:
             # Only show non-draft invoices in recon
