@@ -80,6 +80,19 @@ class UserProfile(models.Model):
     vat_number = models.CharField(max_length=50, blank=True, verbose_name="VAT Number")
     tax_number = models.CharField(max_length=50, blank=True, verbose_name="Income Tax Number")
     vendor_number = models.CharField(max_length=50, blank=True, verbose_name="Vendor Number")
+    tax_year_type = models.CharField(
+        max_length=2,
+        choices=[
+            ("ZA", "South Africa (Mar 1 - Feb 28)"),
+            ("US", "United States (Jan 1 - Dec 31)"),
+            ("UK", "United Kingdom (Apr 1 - Mar 31)"),
+            ("AU", "Australia (Jul 1 - Jun 30)"),
+            ("CA", "Canada (Jan 1 - Dec 31)"),
+            ("NZ", "New Zealand (Apr 1 - Mar 31)"),
+        ],
+        default="ZA",
+        help_text="Your financial/tax year start date",
+    )
 
     # Banking
     bank_name = models.CharField(max_length=100, blank=True)

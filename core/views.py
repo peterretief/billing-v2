@@ -415,11 +415,13 @@ def initial_setup(request):
         dropdown_val = request.POST.get("currency_dropdown")
         custom_val = request.POST.get("currency_custom")
         is_vat = request.POST.get("is_vat") == "on"
+        tax_year_type = request.POST.get("tax_year_type", "ZA")
         if dropdown_val == "OTHER" and custom_val:
             user_profile.currency = custom_val[:3]
         else:
             user_profile.currency = dropdown_val
         user_profile.is_vat_registered = is_vat
+        user_profile.tax_year_type = tax_year_type
         user_profile.initial_setup_complete = True
         user_profile.save()
         return redirect("invoices:dashboard")

@@ -322,21 +322,48 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
             "outstanding": accrued - paid
         }
 
-    def get_tax_year_dates(self):
-        """Returns the start and end dates of the current SA Tax Year."""
+    def get_tax_year_dates(self, user=None):
+        """
+        Returns the start and end dates of the current tax year.
+        Tax year depends on user's profile setting, defaults to South Africa (Mar 1 - Feb 28).
+        """
+        from dateutil.relativedelta import relativedelta
+        
         today = timezone.now().date()
-        # SA Tax year starts March 1st
-        if today.month >= 3:
-            start_date = date(today.year, 3, 1)
-            end_date = date(today.year + 1, 2, 28)
-        else:
-            start_date = date(today.year - 1, 3, 1)
-            end_date = date(today.year, 2, 28)
-        return start_date, end_date
+        
+        # Get tax year type from user profile if provided
+        tax_year_type = "ZA"  # default
+        if user and hasattr(user, 'profile'):
+            tax_year_type = getattr(user.profile, 'tax_year_type', 'ZA')
+        
+        # Tax year definitions by country (as month and day when tax year starts)
+        tax_year_map = {
+            "ZA": (3, 1),    # South Africa: March 1
+            "US": (1, 1),    # USA: January 1
+            "CA": (1, 1),    # Canada: January 1
+            "UK": (4, 1),    # UK: April 1
+            "AU": (7, 1),    # Australia: July 1
+            "NZ": (4, 1),    # New Zealand: April 1
+        }
+        
+        start_month, start_day = tax_year_map.get(tax_year_type, (3, 1))
+        
+        # Calculate start date of current tax year
+        tax_year_start = date(today.year, start_month, start_day)
+        
+        # If we haven't reached the tax year start yet this year, use last year's
+        if today < tax_year_start:
+            tax_year_start = date(today.year - 1, start_month, start_day)
+        
+        # End date is one day before next year's start
+        next_year_start = tax_year_start + relativedelta(years=1)
+        tax_year_end = next_year_start - relativedelta(days=1)
+        
+        return tax_year_start, tax_year_end
 
     def get_tax_year_report(self, user):
         """Calculates total net revenue for the current income tax year (excluding quotes)."""
-        start, end = self.get_tax_year_dates()
+        start, end = self.get_tax_year_dates(user)
         users_to_filter = [user]
         res = self.filter(user__in=users_to_filter, date_issued__range=[start, end], is_quote=False).aggregate(
             net_revenue=Sum("subtotal_amount"), total_vat=Sum("tax_amount")

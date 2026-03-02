@@ -67,6 +67,21 @@
                                     </p>
                                 </div>
                             </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Financial Year / Tax Year</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-light"><i class="bi bi-calendar-event"></i></span>
+                                    <select name="tax_year_type" class="form-select" required>
+                                        <option value="ZA" {% if profile.tax_year_type == 'ZA' %}selected{% endif %}>South Africa (Mar 1 - Feb 28)</option>
+                                        <option value="US" {% if profile.tax_year_type == 'US' %}selected{% endif %}>United States (Jan 1 - Dec 31)</option>
+                                        <option value="CA" {% if profile.tax_year_type == 'CA' %}selected{% endif %}>Canada (Jan 1 - Dec 31)</option>
+                                        <option value="UK" {% if profile.tax_year_type == 'UK' %}selected{% endif %}>United Kingdom (Apr 1 - Mar 31)</option>
+                                        <option value="AU" {% if profile.tax_year_type == 'AU' %}selected{% endif %}>Australia (Jul 1 - Jun 30)</option>
+                                        <option value="NZ" {% if profile.tax_year_type == 'NZ' %}selected{% endif %}>New Zealand (Apr 1 - Mar 31)</option>
+                                    </select>
+                                </div>
+                                <div class="form-text mt-2">Select your country to set the correct financial year for tax reporting.</div>
+                            </div>
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold shadow">Confirm & Initialize Dashboard</button>
                             </div>
@@ -82,40 +97,40 @@
         </div>
     </div>
     <script>
-function toggleCustomCurrency() {
-    const select = document.getElementById('currencySelect');
-    const wrapper = document.getElementById('customCurrencyWrapper');
-    const input = document.getElementById('customCurrency');
-    
-    if (select.value === 'OTHER') {
-        wrapper.style.display = 'block';
-        input.required = true;
-        input.focus();
-    } else {
-        wrapper.style.display = 'none';
-        input.required = false;
-        input.value = ''; // Clear custom input if they switch back
-    }
-    updatePreview();
-}
+        function toggleCustomCurrency() {
+            const select = document.getElementById('currencySelect');
+            const wrapper = document.getElementById('customCurrencyWrapper');
+            const input = document.getElementById('customCurrency');
 
-function updatePreview() {
-    const select = document.getElementById('currencySelect');
-    const customInput = document.getElementById('customCurrency');
-    const preview = document.getElementById('previewSymbol');
-    
-    if (select.value === 'OTHER' && customInput.value.trim() !== '') {
-        preview.innerText = customInput.value;
-    } else if (select.value !== 'OTHER') {
-        preview.innerText = select.value;
-    } else {
-        preview.innerText = '?';
-    }
-}
+            if (select.value === 'OTHER') {
+                wrapper.style.display = 'block';
+                input.required = true;
+                input.focus();
+            } else {
+                wrapper.style.display = 'none';
+                input.required = false;
+                input.value = ''; // Clear custom input if they switch back
+            }
+            updatePreview();
+        }
+
+        function updatePreview() {
+            const select = document.getElementById('currencySelect');
+            const customInput = document.getElementById('customCurrency');
+            const preview = document.getElementById('previewSymbol');
+
+            if (select.value === 'OTHER' && customInput.value.trim() !== '') {
+                preview.innerText = customInput.value;
+            } else if (select.value !== 'OTHER') {
+                preview.innerText = select.value;
+            } else {
+                preview.innerText = '?';
+            }
+        }
     </script>
     <style>
-    .border-dashed {
-        border: 2px dashed #dee2e6;
-    }
+        .border-dashed {
+            border: 2px dashed #dee2e6;
+        }
     </style>
 {% endblock %}
