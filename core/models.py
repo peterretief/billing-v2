@@ -64,7 +64,7 @@ class UserProfile(models.Model):
     # Business Details
     company_name = models.CharField(max_length=255, blank=True)
     contact_name = models.CharField(max_length=255, blank=True, help_text="Contact person for email preferences.")
-    business_email = models.EmailField(blank=True)
+    business_email = models.EmailField(blank=True, help_text="Reply-to email for invoice emails. Must be verified in Brevo to enable replies.")
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     logo = models.ImageField(upload_to="logos/", blank=True, null=True)
