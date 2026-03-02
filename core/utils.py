@@ -164,7 +164,7 @@ def get_isolated_queryset(user, model_class):
         return qs
 
     # 2. Staff/Managers: See data for groups they manage
-    if user.is_staff or getattr(user, "is_ops", False):
+    if user.is_staff:
         managed_groups = UserGroup.objects.filter(manager=user)
         return qs.filter(group__in=managed_groups)
 

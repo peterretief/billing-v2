@@ -28,10 +28,9 @@ class UserAdmin(DjangoUserAdmin):
         (None, {"fields": ("email", "password")}),
         (_("Personal info"), {"fields": ("first_name", "last_name", "added_by")}),
         (
-            _("Permissions (Ops Access)"),
+            _("Permissions"),
             {
-                # ADDED is_ops here so you can see the checkbox in the edit form
-                "fields": ("is_ops", "is_active", "is_staff", "is_superuser", "groups", "user_permissions"),
+                "fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions"),
             },
         ),
         (_("Important dates"), {"fields": ("last_login", "date_joined")}),
@@ -42,17 +41,11 @@ class UserAdmin(DjangoUserAdmin):
             None,
             {
                 "classes": ("wide",),
-                # ADDED is_ops here so you can set it when creating a new user
-                "fields": ("email", "password", "is_ops"),
+                "fields": ("email", "password"),
             },
         ),
     )
     search_fields = ("email",)
-
-    # Keeping this as a backup visual aid, but is_ops is now primary
-    @admin.display(boolean=True, description="Has Any Power")
-    def is_ops_visual(self, obj):
-        return obj.is_ops or obj.is_staff or obj.is_superuser
 
 
 # --- 3. User Group Inlines ---
@@ -109,8 +102,8 @@ class UserGroupAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        # Transition: Let anyone with is_ops or is_staff see all groups
-        if not (request.user.is_superuser or request.user.is_staff or request.user.is_ops):
+        # Allow superusers and staff to see all groups
+        if not (request.user.is_superuser or request.user.is_staff):
             qs = qs.filter(manager=request.user)
         return qs
 
@@ -119,8 +112,8 @@ class UserGroupAdmin(admin.ModelAdmin):
             if not request.user.is_superuser:
                 kwargs["queryset"] = User.objects.filter(id=request.user.id)
             else:
-                # Can select anyone with Ops status or Staff status
-                kwargs["queryset"] = User.objects.filter(Q(is_staff=True) | Q(is_ops=True))
+                # Can select anyone with staff status
+                kwargs["queryset"] = User.objects.filter(Q(is_staff=True) | Q(is_superuser=True))
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):
@@ -139,7 +132,7 @@ class GroupMemberAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        if not (request.user.is_superuser or request.user.is_staff or request.user.is_ops):
+        if not (request.user.is_superuser or request.user.is_staff):
             managed_group_ids = UserGroup.objects.filter(manager=request.user).values_list("id", flat=True)
             qs = qs.filter(group_id__in=managed_group_ids)
         return qs
