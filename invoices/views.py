@@ -403,6 +403,8 @@ def invoice_list(request):
 @setup_required
 def invoice_detail(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
+    # Auto-fix orphaned invoices (have delivery logs but wrong status)
+    invoice.sync_status_with_delivery()
     return render(request, "invoices/invoice_detail.html", {"invoice": invoice})
 
 

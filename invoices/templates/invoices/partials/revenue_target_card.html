@@ -8,7 +8,9 @@
             </h5>
             <div class="d-flex align-items-center gap-2">
                 <small class="text-muted">{{ revenue_vs_target.percent_complete|floatformat:1 }}% Complete</small>
-                <a href="{% url 'invoices:revenue_report' %}" class="btn btn-sm btn-outline-info" title="View detailed report">
+                <a href="{% url 'invoices:revenue_report' %}"
+                   class="btn btn-sm btn-outline-info"
+                   title="View detailed report">
                     <i class="bi bi-graph-up me-1"></i>Report
                 </a>
             </div>

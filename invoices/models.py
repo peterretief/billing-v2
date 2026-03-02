@@ -50,8 +50,49 @@ class Invoice(TenantModel):
         """
         Determine if payment can be recorded on this invoice.
         Payment is allowed unless invoice is: PAID, DRAFT, or CANCELLED.
+        
+        Special case: If invoice has delivery logs showing "delivered" or "sent" 
+        but is still in DRAFT status, allow payment (detect orphaned state).
         """
-        return self.status not in [self.Status.PAID, self.Status.DRAFT, self.Status.CANCELLED]
+        # Block payment on truly unpayable statuses
+        if self.status in [self.Status.PAID, self.Status.CANCELLED]:
+            return False
+        
+        # If DRAFT but has been emailed/sent, allow payment (orphaned state recovery)
+        if self.status == self.Status.DRAFT:
+            # Check if invoice has delivery logs indicating it was actually sent
+            # Note: delivery log status is lowercase (sent, delivered, request)
+            if self.delivery_logs.filter(status__in=["sent", "delivered"]).exists():
+                return True
+            # Otherwise, DRAFT invoices cannot have payments
+            return False
+        
+        # PENDING, OVERDUE, and others can have payments
+        return True
+
+    def sync_status_with_delivery(self):
+        """
+        Detect orphaned invoices (have delivery logs but wrong status) and fix them.
+        Returns True if status was corrected.
+        """
+        # If marked as emailed, status should be at least PENDING
+        if self.is_emailed and self.status == self.Status.DRAFT:
+            self.status = self.Status.PENDING
+            self.save(update_fields=['status'])
+            return True
+        
+        # If has successful delivery logs but still in DRAFT, fix it
+        if self.status == self.Status.DRAFT and self.delivery_logs.filter(status__in=["sent", "delivered"]).exists():
+            self.status = self.Status.PENDING
+            self.is_emailed = True
+            if not self.emailed_at:
+                from django.utils import timezone
+                self.emailed_at = timezone.now()
+            self.save(update_fields=['status', 'is_emailed', 'emailed_at'])
+            return True
+        
+        return False
+
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"

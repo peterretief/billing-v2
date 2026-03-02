@@ -53,7 +53,7 @@
                     <span class="d-none d-md-inline">Back</span>
                 </a>
                 <!-- Record Payment (if applicable) -->
-                {% if invoice.status != 'PAID' and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' and not invoice.is_quote %}
+                {% if invoice.can_record_payment and not invoice.is_quote %}
                     <button class="btn btn-success btn-sm"
                             hx-get="{% url 'invoices:get_payment_modal' invoice.pk %}"
                             hx-target="#paymentModalContent"
