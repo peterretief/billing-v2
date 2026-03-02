@@ -53,16 +53,16 @@
                         {% for tenant in tenants %}
                             <tr>
                                 <td>
-                                    <div class="fw-bold text-primary">{{ tenant.company_name|default:tenant.user.username }}</div>
+                                    <div class="fw-bold text-primary">{{ tenant.profile.company_name|default:tenant.username }}</div>
                                 </td>
                                 <td>
-                                    <small class="text-muted">{{ tenant.user.email }}</small>
+                                    <small class="text-muted">{{ tenant.email }}</small>
                                 </td>
                                 <td>
-                                    <span class="badge bg-dark">{{ tenant.currency }}</span>
+                                    <span class="badge bg-dark">{{ tenant.profile.currency }}</span>
                                 </td>
                                 <td>
-                                    {% if tenant.is_vat_registered %}
+                                    {% if tenant.profile.is_vat_registered %}
                                         <span class="badge bg-info">VAT Registered</span>
                                     {% else %}
                                         <span class="badge bg-secondary">Non-VAT</span>
