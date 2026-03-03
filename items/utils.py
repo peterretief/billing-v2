@@ -29,15 +29,21 @@ def is_first_working_day(date_to_check):
 
 def email_item_invoice_to_client(invoice):
     """
-    Sandbox version of the email utility.
-    - Removes .tex attachment for Brevo compatibility.
-    - Explicitly refreshes the invoice to catch cloned items.
+    Email utility with proper Brevo delivery tracking.
+    - Captures Anymail message ID for delivery tracking
+    - Creates InvoiceEmailStatusLog for audit trail
+    - Logs failures with full error context
     """
+    import logging
+    from invoices.models import InvoiceEmailStatusLog
+    
+    logger = logging.getLogger(__name__)
+    
     try:
         # 1. Sync the relationship so the PDF isn't empty
         invoice.refresh_from_db()
 
-        # 2. Generate PDF bytes using your existing xelatex logic
+        # 2. Generate PDF bytes 
         pdf_bytes = generate_invoice_pdf(invoice)
 
         profile = invoice.user.profile
@@ -51,20 +57,55 @@ def email_item_invoice_to_client(invoice):
         body = (
             f"Hi {invoice.client.name},\n\n"
             f"Please find attached invoice {invoice.number}.\n\n"
+            f"Total Due: {profile.currency} {invoice.total_amount:,.2f}\n"
+            f"Due Date: {invoice.due_date}\n\n"
             f"Regards,\n{signature_name}"
         )
 
         email = EmailMessage(subject, body, friendly_from, [invoice.client.email], reply_to=[reply_address])
 
-        # 3. ATTACH ONLY THE PDF (Brevo blocks .tex)
+        # Attach PDF
         email.attach(f"Invoice_{invoice.number}.pdf", pdf_bytes, "application/pdf")
 
-        email.send()
+        # Send via Brevo backend to get Anymail tracking
+        try:
+            sent_messages = email.send()
+            logger.info(f"Email sent for recurring invoice {invoice.id}: {sent_messages} messages")
+        except Exception as e:
+            logger.error(f"Failed to send email for recurring invoice {invoice.id}: {e}")
+            raise
 
+        # Capture Anymail delivery tracking
+        anymail_status = getattr(email, "anymail_status", None)
+        message_id = anymail_status.message_id if anymail_status else None
+
+        if not message_id:
+            logger.error(
+                f"WARNING: No message_id captured from Anymail for recurring invoice {invoice.id}! "
+                f"Delivery tracking will not be available."
+            )
+            # Don't mark as sent if we can't track it
+            raise Exception("Failed to capture message ID from email service - delivery cannot be tracked")
+
+        # Create the tracking record
+        log = InvoiceEmailStatusLog.objects.create(
+            user=invoice.user, 
+            invoice=invoice, 
+            brevo_message_id=message_id, 
+            status="sent"
+        )
+        logger.info(f"Created delivery log {log.id} with message_id={log.brevo_message_id}")
+
+        # Update invoice status
         invoice.last_generated = now()
         invoice.status = "PENDING"
-        invoice.save(update_fields=["last_generated", "status"])
+        invoice.is_emailed = True
+        invoice.emailed_at = now()
+        invoice.save(update_fields=["last_generated", "status", "is_emailed", "emailed_at"])
         return True
+        
     except Exception as e:
-        print(f"Sandbox Email Error: {e}")
+        logger.error(f"Failed to email recurring invoice {invoice.id}: {e}", exc_info=True)
+        invoice.last_email_error = str(e)
+        invoice.save(update_fields=["last_email_error"])
         return False

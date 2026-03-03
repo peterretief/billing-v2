@@ -27,32 +27,22 @@ def process_daily_billing_queue():
     total_invoices_created = 0
 
     for user in active_users:
-        # Check if this user has any policies due today
-        due_policies = BillingPolicy.objects.filter(user=user).due_today()
-
-        if not due_policies.exists():
-            logger.info(f"No billing policies due today for user {user.username}")
-            continue
-
-        logger.info(f"Processing {due_policies.count()} policy/policies for user {user.username}")
-
         try:
-            # Call the service to process all recurring items linked to due policies for this user
+            # Call the service to process all recurring items
+            # This includes BOTH items from due policies AND items in the Master Recurring Queue
             created_invoices = import_recurring_to_invoices(user)
 
             if created_invoices:
                 total_invoices_created += len(created_invoices)
-                for policy in due_policies:
-                    logger.info(
-                        f"Policy '{policy.name}' for user {user.username} fired successfully. "
-                        f"Created {len(created_invoices)} invoice(s)."
-                    )
+                logger.info(
+                    f"User {user.username}: {len(created_invoices)} invoice(s) created and sent."
+                )
                 results.append(
-                    f"User {user.username}: {len(created_invoices)} invoices created from policies {[p.name for p in due_policies]}"
+                    f"User {user.username}: {len(created_invoices)} invoices created and sent"
                 )
             else:
-                logger.info(f"No items matched policies for user {user.username} - no invoices created")
-                results.append(f"User {user.username}: No invoices created (no matching items)")
+                logger.info(f"User {user.username}: No invoices created (no queued items or policies due)")
+                results.append(f"User {user.username}: No invoices created")
 
         except Exception as e:
             logger.error(f"Critical failure processing billing policies for {user.username}: {str(e)}", exc_info=True)

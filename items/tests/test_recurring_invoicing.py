@@ -57,18 +57,18 @@ class RecurringInvoicingTests(TestCase):
     @patch("items.services.email_item_invoice_to_client")
     @patch("invoices.utils.generate_invoice_pdf")
     def test_no_invoice_without_policy(self, mock_pdf, mock_email):
-        """Test that items without a policy don't get billed"""
+        """Test that items without a policy ARE billed from the Master Recurring Queue"""
         mock_email.return_value = True
         mock_pdf.return_value = b"%PDF-test"
 
         client = Client.objects.create(user=self.user, name="Client B", email="clientb@example.com", client_code="CLB")
 
-        # Create item WITHOUT a policy
+        # Create item WITHOUT a policy - this is now part of the Master Recurring Queue
         Item.objects.create(
             user=self.user,
             client=client,
-            billing_policy=None,  # No policy
-            description="Orphaned item",
+            billing_policy=None,  # No policy - in queue
+            description="Queued item",
             quantity=1,
             unit_price=Decimal("100.00"),
             is_recurring=True,
@@ -77,8 +77,8 @@ class RecurringInvoicingTests(TestCase):
 
         created_invoices = import_recurring_to_invoices(self.user)
 
-        self.assertEqual(len(created_invoices), 0, "Items without policies should not be billed")
-        self.assertFalse(mock_email.called)
+        self.assertEqual(len(created_invoices), 1, "Items without policies should be billed from the queue")
+        self.assertTrue(mock_email.called)
 
     @patch("items.services.email_item_invoice_to_client")
     @patch("invoices.utils.generate_invoice_pdf")
@@ -197,7 +197,7 @@ class RecurringInvoicingTests(TestCase):
     @patch("items.services.email_item_invoice_to_client")
     @patch("invoices.utils.generate_invoice_pdf")
     def test_inactive_policy_no_billing(self, mock_pdf, mock_email):
-        """Test that inactive policies don't trigger billing"""
+        """Test that items with inactive policies are still billed from the Master Recurring Queue"""
         mock_email.return_value = True
         mock_pdf.return_value = b"%PDF-test"
 
@@ -209,8 +209,8 @@ class RecurringInvoicingTests(TestCase):
         Item.objects.create(
             user=self.user,
             client=client,
-            billing_policy=policy,
-            description="Recurring service",
+            billing_policy=policy,  # Has inactive policy, but still in queue
+            description="Queued item",
             quantity=1,
             unit_price=Decimal("100.00"),
             is_recurring=True,
@@ -219,12 +219,13 @@ class RecurringInvoicingTests(TestCase):
 
         created_invoices = import_recurring_to_invoices(self.user)
 
-        self.assertEqual(len(created_invoices), 0, "Inactive policies should not trigger billing")
+        # Items are still billed if they're in the queue, regardless of policy status
+        self.assertEqual(len(created_invoices), 1, "Items in queue are billed even with inactive policies")
 
     @patch("items.services.email_item_invoice_to_client")
     @patch("invoices.utils.generate_invoice_pdf")
     def test_policy_not_due_today(self, mock_pdf, mock_email):
-        """Test that policies not due today don't trigger billing"""
+        """Test that items with policies not due today are still billed from the Master Recurring Queue"""
         mock_email.return_value = True
         mock_pdf.return_value = b"%PDF-test"
 
@@ -238,8 +239,8 @@ class RecurringInvoicingTests(TestCase):
         Item.objects.create(
             user=self.user,
             client=client,
-            billing_policy=policy,
-            description="Recurring service",
+            billing_policy=policy,  # Policy not due today, but item still in queue
+            description="Queued item",
             quantity=1,
             unit_price=Decimal("100.00"),
             is_recurring=True,
@@ -248,7 +249,8 @@ class RecurringInvoicingTests(TestCase):
 
         created_invoices = import_recurring_to_invoices(self.user)
 
-        self.assertEqual(len(created_invoices), 0, "Policies not due today should not trigger billing")
+        # Items are still billed if they're in the queue, regardless of policy schedule
+        self.assertEqual(len(created_invoices), 1, "Items in queue are billed even if policy not due today")
 
     @patch("items.services.email_item_invoice_to_client")
     @patch("invoices.utils.generate_invoice_pdf")

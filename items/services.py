@@ -20,40 +20,52 @@ logger = logging.getLogger(__name__)
 
 def import_recurring_to_invoices(user):
     today = timezone.now()
-    # ... your logic ...
-    items_to_bill = Item.objects.filter(user=user, is_recurring=True)
-    print(f"DEBUG: Found {items_to_bill.count()} recurring items for {user.username}")
-
-    # --- STEP 1: IDENTIFY DUE POLICIES ---
-    # We use the 'due_today' manager we built to find which schedules trigger today
-    due_policies = BillingPolicy.objects.filter(user=user).due_today()
-
-    if not due_policies.exists():
-        logger.info(f"No billing policies are scheduled to run today for user {user.username}.")
-        return []
-
-    # --- STEP 2: EMERGENCY RESET ---
+    
+    # --- STEP 1: EMERGENCY RESET ---
     # Unlink any recurring items currently stuck to DRAFTS
     Item.objects.filter(user=user, is_recurring=True, invoice__status="DRAFT").update(invoice=None)
 
-    # --- STEP 3: SELECTION (The Bridge) ---
-    # Filter templates that are:
-    # 1. Recurring
-    # 2. Linked to a policy that is due TODAY
-    # 3. Haven't been billed THIS MONTH (prevent duplicate invoices in same month)
+    # --- STEP 2: Define month range for duplicate prevention ---
     current_month_start = today.date().replace(day=1)
     if today.month == 12:
         current_month_end = today.date().replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
     else:
         current_month_end = today.date().replace(month=today.month + 1, day=1) - timedelta(days=1)
+
+    # --- STEP 3: IDENTIFY TEMPLATES TO BILL ---
+    # Include items from TWO sources:
+    # A) Items linked to billing policies that are due TODAY
+    # B) Items in the Master Recurring Queue (is_recurring=True, invoice=NULL)
     
-    templates = Item.objects.filter(user=user, is_recurring=True, billing_policy__in=due_policies).exclude(
+    due_policies = BillingPolicy.objects.filter(user=user).due_today()
+    
+    # Items linked to due policies
+    policy_items = Item.objects.filter(
+        user=user, 
+        is_recurring=True, 
+        billing_policy__in=due_policies
+    ).exclude(last_billed_date__range=[current_month_start, current_month_end])
+    
+    # Items in the Master Recurring Queue (queued for invoicing, not yet billed)
+    queued_items = Item.objects.filter(
+        user=user,
+        is_recurring=True,
+        invoice__isnull=True,  # Not linked to any invoice yet
+    ).exclude(
         last_billed_date__range=[current_month_start, current_month_end]
     )
-
-    if not templates.exists():
-        logger.info("No items match the current scheduled policies for today.")
+    
+    # Combine both sources, removing duplicates
+    template_ids = set(policy_items.values_list('id', flat=True)) | set(queued_items.values_list('id', flat=True))
+    
+    if not template_ids:
+        if due_policies.exists():
+            logger.info(f"No queued items found for user {user.username} from due policies.")
+        else:
+            logger.info(f"No billing policies due today and no queued items for user {user.username}.")
         return []
+    
+    templates = Item.objects.filter(id__in=template_ids)
 
     new_invoices = []
     client_ids = templates.values_list("client", flat=True).distinct()

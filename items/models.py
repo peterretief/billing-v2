@@ -17,6 +17,7 @@ class ServiceItem(TenantModel):
         null=True,
         blank=True,
         related_name="service_items",  # Unique name
+        help_text="(OPTIONAL) Choose a policy for fixed billing dates. Leave BLANK for once per month (default).",
     )
 
     is_recurring = models.BooleanField(default=False)
@@ -45,7 +46,7 @@ class Item(TenantModel):
         null=True,
         blank=True,
         related_name="scheduled_items",  # Unique name
-        help_text="Choose the schedule this item follows.",
+        help_text="(OPTIONAL) Choose a policy for fixed billing dates (1st, 15th, first working day, etc). Leave BLANK for default: bills once per month on the same day each month.",
     )
 
     is_recurring = models.BooleanField(
