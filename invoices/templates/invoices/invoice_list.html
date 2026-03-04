@@ -27,6 +27,7 @@
         {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
         {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
         {% if overdue_filter %}<input type="hidden" name="overdue" value="true">{% endif %}
+        {% if type_filter and type_filter != 'clear' %}<input type="hidden" name="type" value="{{ type_filter }}">{% endif %}
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
@@ -39,6 +40,14 @@
                         <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}overdue={% if overdue_filter %}false{% else %}true{% endif %}"
                            class="btn btn-sm {% if overdue_filter %}btn-warning{% else %}btn-outline-warning{% endif %}">
                             <i class="bi bi-exclamation-triangle me-1"></i>Overdue
+                        </a>
+                        <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if overdue_filter %}overdue=true&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}type={% if type_filter == 'PRODUCT' %}clear{% else %}PRODUCT{% endif %}"
+                           class="btn btn-sm {% if type_filter == 'PRODUCT' %}btn-success{% else %}btn-outline-success{% endif %}">
+                            <i class="bi bi-list-check me-1"></i>Items
+                        </a>
+                        <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if overdue_filter %}overdue=true&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}type={% if type_filter == 'TIMESHEET' %}clear{% else %}TIMESHEET{% endif %}"
+                           class="btn btn-sm {% if type_filter == 'TIMESHEET' %}btn-info{% else %}btn-outline-info{% endif %}">
+                            <i class="bi bi-clock-history me-1"></i>Timesheet
                         </a>
                     </div>
                     <div>
@@ -110,7 +119,17 @@
                                 {% endif %}
                             </a>
                         </th>
-                        <th scope="col">Type</th>
+                        <th scope="col">
+                            <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'billing_type' %}-billing_type{% else %}billing_type{% endif %}"
+                               class="text-decoration-none text-dark">
+                                Type
+                                {% if current_sort == 'billing_type' %}
+                                    <i class="bi bi-arrow-up ms-1"></i>
+                                {% elif current_sort == '-billing_type' %}
+                                    <i class="bi bi-arrow-down ms-1"></i>
+                                {% endif %}
+                            </a>
+                        </th>
                         <th scope="col">
                             <a href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}sort={% if current_sort == 'status' %}-status{% else %}status{% endif %}"
                                class="text-decoration-none text-dark">

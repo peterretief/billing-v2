@@ -332,6 +332,12 @@ def invoice_list(request):
     if overdue_filter:
         invoice_queryset = invoice_queryset.filter(is_overdue=True)
 
+    type_filter = request.GET.get("type")
+    if type_filter == "TIMESHEET":
+        invoice_queryset = invoice_queryset.filter(billed_timesheets__isnull=False).distinct()
+    elif type_filter == "PRODUCT":
+        invoice_queryset = invoice_queryset.filter(billed_items__isnull=False).distinct()
+
     search_query = request.GET.get("q", "").strip()
     if search_query:
         invoice_queryset = invoice_queryset.filter(
@@ -353,6 +359,8 @@ def invoice_list(request):
         "-date_issued": "-date_issued",
         "status": "status",
         "-status": "-status",
+        "billing_type": "billing_type",
+        "-billing_type": "-billing_type",
     }
     if sort_param not in allowed_sorts:
         sort_param = "-date_issued"
@@ -396,6 +404,7 @@ def invoice_list(request):
                 "invoices": page_obj,
                 "search_query": search_query,
                 "status_filter": status_filter,
+                "type_filter": type_filter,
                 "overdue_filter": overdue_filter,
                 "current_sort": sort_param,
                 "toggle_sort": toggle_sort,
@@ -412,6 +421,7 @@ def invoice_list(request):
             "invoices": page_obj,
             "search_query": search_query,
             "status_filter": status_filter,
+            "type_filter": type_filter,
             "overdue_filter": overdue_filter,
             "current_sort": sort_param,
             "toggle_sort": toggle_sort,
