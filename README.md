@@ -20,6 +20,8 @@ A comprehensive, production-ready billing platform built with Django, Celery, an
 - 📈 **Analytics Dashboard** — Real-time financial metrics
 - 🔔 **Notifications** — Client alerts and system notifications
 - ⏰ **Flexible Scheduling** — First working day, specific dates, or custom rules
+- 🏷️ **Invoice Type Filtering** — Filter & sort invoices by Items vs Timesheet
+- 🚨 **Automated Monitoring** — Error detection with email alerts every 10 minutes
 
 ### Technical
 - 🐳 **Docker & Docker Compose** — Full containerization
@@ -145,6 +147,7 @@ redis-server
 
 | Document | Purpose |
 |----------|---------|
+| [LOG_MONITORING_README.md](LOG_MONITORING_README.md) | Automated error detection & alert system |
 | [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md) | Complete Docker guide, scaling, troubleshooting |
 | [RECONCILIATION_GUIDE.md](RECONCILIATION_GUIDE.md) | Data integrity & verification workflows |
 | [INVOICE_CANCELLATION_RULES.md](INVOICE_CANCELLATION_RULES.md) | Cancellation policies & rules |
