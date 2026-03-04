@@ -163,6 +163,60 @@
                         </div>
                     </div>
                 {% endif %}
+                {% if aged_drafts %}
+                    <div class="card border-0 shadow-sm mb-3 border-start border-4 border-danger">
+                        <div class="card-header bg-danger bg-opacity-10 py-3 border-0">
+                            <h5 class="mb-0 fw-bold text-danger">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i> Special Cases - Aged Drafts ({{ aged_drafts|length }})
+                            </h5>
+                            <small class="text-muted d-block mt-2">These invoices are still DRAFT but past their due date. Review and decide if they should be sent, deleted, or rescheduled.</small>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table align-middle table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3">Invoice</th>
+                                        <th>Client</th>
+                                        <th>Amount</th>
+                                        <th>Created</th>
+                                        <th>Due Date</th>
+                                        <th class="text-end pe-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for inv in aged_drafts %}
+                                        <tr class="table-danger table-danger-hover">
+                                            <td class="ps-3">
+                                                <span class="fw-bold">#{{ inv.number|default:"[DRAFT]" }}</span>
+                                                <div class="small text-muted">{{ inv.date_issued|date:"d M Y" }}</div>
+                                            </td>
+                                            <td>{{ inv.client.name }}</td>
+                                            <td class="fw-bold">{{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ inv.total_amount|intcomma }}</td>
+                                            <td class="small">{{ inv.date_issued|date:"d M Y" }}</td>
+                                            <td class="small">
+                                                <span class="badge bg-danger">{{ inv.due_date|date:"d M Y" }}</span>
+                                            </td>
+                                            <td class="text-end pe-3">
+                                                <div class="btn-group btn-group-sm shadow-sm">
+                                                    <a href="{% url 'invoices:invoice_detail' inv.pk %}"
+                                                       class="btn btn-outline-primary"
+                                                       title="Review & edit">
+                                                        <i class="bi bi-eye"></i> Review
+                                                    </a>
+                                                    <a href="{% url 'invoices:delete_invoice' inv.pk %}"
+                                                       class="btn btn-outline-danger"
+                                                       title="Delete this invoice">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% endif %}
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white py-3 border-0">
                         <h5 class="mb-0 fw-bold">Recent Invoices</h5>

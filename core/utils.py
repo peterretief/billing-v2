@@ -6,22 +6,21 @@ from .models import UserGroup
 
 def get_anomaly_status(user, invoice):
     """
-    Detects anomalies relative to the user's own billing history.
-    Uses mean and standard deviation to adapt to currency variance.
-
-    For weaker currencies (ZAR, INR, etc), higher variance is expected.
-    For stronger currencies (EUR, GBP, etc), lower variance is expected.
-
-    Flags invoices that are statistical outliers (>2 std devs from mean).
-    Adapts thresholds based on coefficient of variation.
+    Audits invoices for real data errors WITHOUT blocking operations.
+    Logs problematic invoices to dashboard for manual review.
     
-    Respects user's audit settings (enabled/disabled, sensitivity, triggers).
+    Checks:
+    1. Math validation: Does total_amount match sum of line items?
+    2. Structural: No items? No total? Duplicate items?
+    3. Statistical: Invoice amount unusual relative to history?
     
-    Returns tuple: (is_anomaly, comment, audit_context)
-    - audit_context: Dict with comparison stats and history info for tracking
+    Returns tuple: (is_flagged, comment, audit_context)
+    - is_flagged: True if issues detected (but never blocks)
+    - comment: Human-readable description of issues
+    - audit_context: Dict with comparison stats for audit dashboard
     """
     comments = []
-    is_anomaly = False
+    is_flagged = False
     audit_context = {
         "checks_run": [],
         "comparison_invoices_count": 0,
@@ -42,23 +41,37 @@ def get_anomaly_status(user, invoice):
     # Get user's currency
     currency = profile.currency if hasattr(user, "profile") else "R"
 
-    # 1. Zero or no items — always a problem regardless of currency
+    # 1. MATH VALIDATION: Does total match sum of line items? *** CATCHES CORRUPTION ***
+    if triggers.get("detect_math_error", True):
+        audit_context["checks_run"].append("detect_math_error")
+        from decimal import Decimal
+        line_items = invoice.billed_items.all()
+        if line_items.exists():
+            calculated_sum = sum(Decimal(str(item.total)) for item in line_items)
+            invoice_total = Decimal(str(invoice.total_amount))
+            if calculated_sum != invoice_total:
+                is_flagged = True
+                diff = invoice_total - calculated_sum
+                comments.append(f"❌ MATH ERROR: Line items sum to {calculated_sum} but total is {invoice_total} (diff: {diff})")
+
+    # 2. STRUCTURAL: Zero or no items — always a problem
     if triggers.get("detect_no_items", True):
         audit_context["checks_run"].append("detect_no_items")
-        has_no_items = not invoice.billed_items.exists()
+        # Timesheets are items too - check both billed_items AND billed_timesheets
+        has_no_items = not invoice.billed_items.exists() and not invoice.billed_timesheets.exists()
         if has_no_items:
-            is_anomaly = True
-            comments.append("No line items on invoice")
+            is_flagged = True
+            comments.append("❌ STRUCTURE: No line items on invoice")
 
     if triggers.get("detect_zero_total", True):
         audit_context["checks_run"].append("detect_zero_total")
         zero_total = float(invoice.total_amount) == 0
         if zero_total:
-            is_anomaly = True
-            comments.append("Invoice total is zero")
+            is_flagged = True
+            comments.append("❌ STRUCTURE: Invoice total is zero")
 
-    # 2. Statistical anomaly using standard deviation (accounts for currency variance)
-    if triggers.get("detect_statistical_outliers", True):
+    # 3. STATISTICAL: Unusual amounts relative to user's history (FOR INFORMATION ONLY)
+    if triggers.get("detect_statistical_outliers", False):  # Default False - informational only
         audit_context["checks_run"].append("detect_statistical_outliers")
         recent_invoices = Invoice.objects.filter(user=user, status__in=["PENDING", "PAID"]).values_list(
             "total_amount", flat=True
@@ -80,40 +93,53 @@ def get_anomaly_status(user, invoice):
                 audit_context["comparison_stddev"] = std_dev
 
                 # Coefficient of variation (CV) measures relative variance
-                # CV > 0.8 means high variance (weaker currencies often have this)
-                # CV < 0.2 means low variance (stable invoice patterns)
                 cv = std_dev / mean if mean > 0 else 0
                 audit_context["comparison_cv"] = cv
 
                 current_amount = float(invoice.total_amount)
 
-                # Very loose threshold: only flag if 1000x the average
-                threshold_upper = mean * 1000
-                threshold_lower = mean * 0.001  # Also very loose for low end
+                # INFO ONLY: Note unusual amounts but don't flag them
+                threshold_upper = mean * 10  # 10x average
+                threshold_lower = mean * 0.1  # 10% of average
 
-                # Flag high outliers (only if 1000x+ the average)
                 if current_amount > threshold_upper:
                     ratio = current_amount / mean
-                    is_anomaly = True
-                    comments.append(f"Invoice is {ratio:.1f}x above your average (extreme outlier)")
+                    comments.append(f"ℹ️ WARNING: Invoice is {ratio:.1f}x the average (review if unexpected)")
 
-                # Flag low outliers (only if 0.1% of average or less)
                 if 0 < current_amount < threshold_lower:
                     ratio = current_amount / mean if mean > 0 else 0
-                    is_anomaly = True
-                    comments.append(f"Invoice is {ratio * 100:.1f}% of average (extremely low)")
+                    comments.append(f"ℹ️ WARNING: Invoice is {ratio * 100:.1f}% of average (unusually low)")
         else:
-            comments.append("Building history (insufficient invoices for comparison)")
+            audit_context["checks_run"].append("insufficient_history")
 
-    # 3. No client email — will fail to send (disabled for lenient mode)
-    if triggers.get("detect_missing_email", False):  # Default False for more lenient behavior
+    # 4. DELIVERY: Check for email delivery failures (bounces, deferred, spam, etc.)
+    if triggers.get("detect_email_delivery_failure", False):
+        audit_context["checks_run"].append("detect_email_delivery_failure")
+        delivery_logs = invoice.delivery_logs.all().values_list('status', flat=True)
+        
+        if delivery_logs:
+            latest_email = invoice.delivery_logs.order_by("-created_at").first()
+            # Hard bounce, soft bounce, deferred, spam complaint, unsubscribed
+            failed_statuses = ["soft_bounce", "hard_bounce", "bounced", "deferred", "spam", "complaint", "unsubscribed"]
+            
+            if latest_email.status in failed_statuses:
+                is_flagged = True
+                # Show if multiple delivery attempts failed
+                failure_count = len([s for s in delivery_logs if s in failed_statuses])
+                if failure_count > 1:
+                    comments.append(f"❌ EMAIL DELIVERY: HARD BOUNCE - Invalid email address")
+                else:
+                    comments.append(f"⚠️ EMAIL DELIVERY: {latest_email.status.upper().replace('_', ' ')}")
+    
+    # 5. DELIVERY: Client email required to send (flag only, won't block creation)
+    if triggers.get("detect_missing_email", False):  # Default False
         audit_context["checks_run"].append("detect_missing_email")
         if not invoice.client.email:
-            is_anomaly = True
-            comments.append("Client has no email address")
+            is_flagged = True
+            comments.append("⚠️ DELIVERY: Client has no email address (cannot send)")
 
-    # 4. Business logic checks: VAT configuration (disabled for lenient mode)
-    if triggers.get("detect_vat_mismatch", False):  # Default False for more lenient behavior
+    # 6. COMPLIANCE: VAT configuration (flag only)
+    if triggers.get("detect_vat_mismatch", False):  # Default False
         audit_context["checks_run"].append("detect_vat_mismatch")
         profile = user.profile if hasattr(user, "profile") else None
         
@@ -121,10 +147,10 @@ def get_anomaly_status(user, invoice):
         if invoice.tax_amount and float(invoice.tax_amount) > 0:
             # VAT is being charged, so there should be a VAT number
             if profile and not profile.vat_number:
-                is_anomaly = True
-                comments.append("VAT is charged but no VAT number registered")
+                is_flagged = True
+                comments.append("⚠️ COMPLIANCE: VAT is charged but no VAT number registered")
 
-    # 5. Business logic checks: Duplicate items
+    # 6. QUALITY: Duplicate items (flag only)
     if triggers.get("detect_duplicate_items", True):
         audit_context["checks_run"].append("detect_duplicate_items")
         items = invoice.billed_items.all()
@@ -143,12 +169,12 @@ def get_anomaly_status(user, invoice):
                     item_signatures.append(sig)
             
             if duplicates:
-                is_anomaly = True
+                is_flagged = True
                 dup_list = ", ".join(set(duplicates))
-                comments.append(f"Duplicate items detected: {dup_list}")
+                comments.append(f"⚠️ QUALITY: Possible duplicate items: {dup_list}")
 
-    comment = " | ".join(comments) if comments else "OK"
-    return is_anomaly, comment, audit_context
+    comment = " | ".join(comments) if comments else "✓ OK"
+    return is_flagged, comment, audit_context
 
 
 def get_isolated_queryset(user, model_class):

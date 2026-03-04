@@ -120,7 +120,7 @@ def import_recurring_to_invoices(user):
                     user=user,
                     invoice=invoice,
                     checks_run=audit_context.get("checks_run", []),
-                    flags_raised=[c for c in comment.split(" | ") if c != "OK"],
+                    flags_raised=[c for c in comment.split(" | ") if c.startswith("❌") or c.startswith("⚠️")],
                     comparison_invoices_count=audit_context.get("comparison_invoices_count", 0),
                     is_flagged=is_anomaly,
                     comparison_mean=audit_context.get("comparison_mean"),
@@ -128,8 +128,9 @@ def import_recurring_to_invoices(user):
                     comparison_cv=audit_context.get("comparison_cv"),
                 )
 
-                if not is_anomaly:
-                    new_invoices.append(invoice)
+                # NEVER BLOCK - always add to processing regardless of audit flags
+                # Flagged invoices will appear in dashboard for manual review
+                new_invoices.append(invoice)
             except Exception as e:
                 logger.error(f"Failed to audit invoice {invoice.id}: {e}")
                 # Still add to new_invoices even if audit fails

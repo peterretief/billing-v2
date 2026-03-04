@@ -270,21 +270,12 @@ def email_invoice_to_client(invoice, force_send=False):
 
     Args:
         invoice: Invoice object to email
-        force_send: If True, bypass anomaly flag check (used when explicitly cleared from audit)
+        force_send: Unused (kept for backwards compatibility)
     """
-    # Block sending only if CURRENTLY flagged (check latest audit log)
-    # UNLESS force_send is True (e.g., user explicitly cleared from audit report)
-    # ALSO: Only check audit if auditing is enabled for the user
-    from core.models import BillingAuditLog
-
+    # NOTE: Audit blocking removed - invoices always send regardless of audit state
+    # Audit logs for visibility only, never blocks operations
+    
     from .models import Invoice, InvoiceEmailStatusLog
-
-    # Check if auditing is enabled for this user, and if not, bypass audit checks
-    if not force_send and invoice.user.profile.audit_enabled:
-        # Check only the LATEST audit log, not all historical ones
-        latest_log = BillingAuditLog.objects.filter(invoice=invoice).order_by("-created_at").first()
-        if latest_log and latest_log.is_anomaly:
-            return False
 
     try:
         latex_source = render_invoice_tex(invoice)

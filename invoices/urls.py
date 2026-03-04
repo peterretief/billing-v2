@@ -18,6 +18,8 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("reports/revenue/", views.revenue_report, name="revenue_report"),
     path("list/", views.invoice_list, name="invoice_list"),
+    # Client Statements (Year-end or custom period)
+    path("client/<int:client_id>/statement/", views.client_statement, name="client_statement"),
     # Detail & Edit (Manual creation removed, use Timesheets to generate)
     path("<int:pk>/", views.invoice_detail, name="invoice_detail"),
     path("<int:pk>/edit/", views.invoice_edit, name="invoice_edit"),

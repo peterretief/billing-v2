@@ -43,12 +43,15 @@ def create_invoice_from_timesheets(user, client, timesheet_ids):
         try:
             from core.models import AuditHistory
             is_anomaly, comment, audit_context = get_anomaly_status(user, invoice)
-            BillingAuditLog.objects.create(
+            # Prevent duplicate audit logs for same invoice (use get_or_create)
+            BillingAuditLog.objects.get_or_create(
                 user=user,
                 invoice=invoice,
-                is_anomaly=is_anomaly,
-                ai_comment=comment,
-                details={"total": float(invoice.total_amount), "source": "timesheet_billing"},
+                defaults={
+                    "is_anomaly": is_anomaly,
+                    "ai_comment": comment,
+                    "details": {"total": float(invoice.total_amount), "source": "timesheet_billing"},
+                }
             )
             
             # Create audit history record for learning

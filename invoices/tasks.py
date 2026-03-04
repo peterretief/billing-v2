@@ -48,3 +48,62 @@ def generate_ai_insights_task(user_id):
         return f"Insights updated for {user.username}"
     except User.DoesNotExist:
         return "User not found"
+
+
+@shared_task(name="invoices.tasks.send_invoice_async")
+def send_invoice_async(invoice_id):
+    """
+    Async task to send an invoice to client.
+    Handles status updates, last_billed_date tracking, and email delivery.
+    
+    Args:
+        invoice_id: Invoice object ID to send
+    
+    Returns:
+        dict: Result with status and message
+    """
+    from django.db import transaction
+    from invoices.utils import email_invoice_to_client
+    from items.models import Item
+    
+    try:
+        invoice = Invoice.objects.get(pk=invoice_id)
+        
+        with transaction.atomic():
+            invoice.status = "PENDING"
+            invoice.save()
+            invoice.billed_items.all().update(is_billed=True)
+            
+            # Update last_billed_date for recurring items
+            item_desc = invoice.billed_items.values_list("description", flat=True)
+            Item.objects.filter(
+                user=invoice.user, 
+                client=invoice.client, 
+                is_recurring=True, 
+                description__in=item_desc
+            ).update(last_billed_date=timezone.now().date())
+            
+            # Send the invoice
+            if email_invoice_to_client(invoice):
+                logger.info(f"Invoice {invoice.id} sent successfully to {invoice.client.email}")
+                return {"status": "success", "invoice_id": invoice_id, "email": invoice.client.email}
+            else:
+                # Revert status to DRAFT on email failure
+                invoice.status = "DRAFT"
+                invoice.save()
+                logger.error(f"Failed to send invoice {invoice.id}")
+                return {"status": "failed", "invoice_id": invoice_id, "reason": "email_send_failed"}
+                
+    except Invoice.DoesNotExist:
+        logger.error(f"Invoice {invoice_id} not found")
+        return {"status": "failed", "invoice_id": invoice_id, "reason": "invoice_not_found"}
+    except Exception as e:
+        logger.error(f"Error sending invoice {invoice_id}: {str(e)}", exc_info=True)
+        # Try to revert status
+        try:
+            invoice = Invoice.objects.get(pk=invoice_id)
+            invoice.status = "DRAFT"
+            invoice.save()
+        except:
+            pass
+        return {"status": "failed", "invoice_id": invoice_id, "reason": str(e)}

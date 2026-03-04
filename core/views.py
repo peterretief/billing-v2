@@ -627,6 +627,7 @@ def audit_settings(request):
         form["detect_zero_total"],
         form["detect_no_items"],
         form["detect_statistical_outliers"],
+        form["detect_email_delivery_failure"],
         form["detect_missing_email"],
         form["detect_vat_mismatch"],
         form["detect_duplicate_items"],

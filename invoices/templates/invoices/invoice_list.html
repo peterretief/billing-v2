@@ -65,7 +65,12 @@
                 </div>
             </div>
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive"
+             id="invoice-table"
+             hx-get="{{ request.path }}?{{ request.GET.urlencode }}"
+             hx-trigger="every 5s"
+             hx-swap="innerHTML"
+             hx-on="htmx:afterSwap: initializeCheckboxes()">
             <table class="table table-hover">
                 <thead>
                     <tr>
@@ -295,13 +300,22 @@
     </div>
 </div>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    let isSelectAllMode = false;
+    let selectedInvoiceIds = new Set(); // Track selected invoices
+
+    function initializeCheckboxes() {
         const selectAll = document.getElementById('selectAll');
         const selectAllModeInput = document.getElementById('selectAllMode');
         const postBtn = document.getElementById('postBtn');
         const countDisplay = document.getElementById('selectedCount');
         const checkboxes = document.querySelectorAll('.invoice-checkbox');
-        let isSelectAllMode = false;
+
+        // Restore previously checked state
+        checkboxes.forEach(cb => {
+            if (selectedInvoiceIds.has(cb.value)) {
+                cb.checked = true;
+            }
+        });
 
         function updateCounter() {
             const count = Array.from(checkboxes).filter(cb => cb.checked).length;
@@ -317,8 +331,13 @@
             isSelectAllMode = false;
             selectAllModeInput.value = 'false';
             checkboxes.forEach(cb => {
-                if (!cb.disabled) { // Skip disabled checkboxes (quotes)
+                if (!cb.disabled) {
                     cb.checked = selectAll.checked;
+                    if (cb.checked) {
+                        selectedInvoiceIds.add(cb.value);
+                    } else {
+                        selectedInvoiceIds.delete(cb.value);
+                    }
                 }
             });
             updateCounter();
@@ -328,7 +347,6 @@
         if (postAllDraftsBtn) {
             postAllDraftsBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                // Count draft invoices and calculate total
                 const draftRows = Array.from(document.querySelectorAll('tbody tr')).filter(row => {
                     const checkbox = row.querySelector('.invoice-checkbox');
                     return checkbox && !checkbox.disabled;
@@ -341,7 +359,6 @@
                     if (!isNaN(amount)) totalAmount += amount;
                 });
 
-                // Show modal with details
                 document.getElementById('confirmCount').textContent = draftRows.length;
                 document.getElementById('confirmTotal').textContent = totalAmount.toLocaleString('en-ZA', {
                     style: 'currency',
@@ -352,7 +369,6 @@
                 const modal = new bootstrap.Modal(document.getElementById('postAllDraftsModal'));
                 modal.show();
 
-                // Set up confirm button
                 document.getElementById('confirmPostAllBtn').onclick = function() {
                     modal.hide();
                     isSelectAllMode = true;
@@ -368,17 +384,28 @@
             checkbox.addEventListener('change', function() {
                 isSelectAllMode = false;
                 selectAllModeInput.value = 'false';
+                if (this.checked) {
+                    selectedInvoiceIds.add(this.value);
+                } else {
+                    selectedInvoiceIds.delete(this.value);
+                }
                 updateCounter();
             });
         });
 
-        // Handle form submission - ensure the flag is set properly
         postBtn.addEventListener('click', function(e) {
             selectAllModeInput.value = isSelectAllMode ? 'true' : 'false';
+            // Clear selections after submit
+            if (!isSelectAllMode) {
+                selectedInvoiceIds.clear();
+            }
         });
 
-        // Initial update
         updateCounter();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeCheckboxes();
     });
 </script>
 {% endblock content %}

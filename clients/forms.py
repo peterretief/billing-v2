@@ -37,6 +37,25 @@ class ClientForm(forms.ModelForm):
             Submit("submit", "Save Client", css_class="btn-primary mt-3"),
         )
 
+    def clean_email(self):
+        """Validate email - warn about test/fake emails."""
+        email = self.cleaned_data.get("email", "").strip().lower()
+        
+        # Warn about obvious test/fake emails
+        test_patterns = [
+            "test@", "@test.", "fake@", "cancel@", "nope@", "no-reply@",
+            "dev@", "demo@", "example@", "sample@", "temp@", "dummy@"
+        ]
+        
+        for pattern in test_patterns:
+            if pattern in email:
+                raise ValidationError(
+                    f"⚠️ This looks like a test email: '{email}'. "
+                    f"Invoices sent to test addresses will bounce. Is this correct?"
+                )
+        
+        return email
+
     def clean_client_code(self):
         """Validate that client_code is unique per user."""
         client_code = self.cleaned_data.get("client_code")

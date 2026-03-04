@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="container-fluid mt-4">
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="{% url 'clients:client_detail' client.id %}"
+                       class="btn btn-sm btn-link">
+                        <i class="bi bi-arrow-left"></i>
+                    </a>
+                    <h2 class="mb-0">{{ client.name }} - Recurring Invoices {{ year }}</h2>
+                    <span class="badge bg-info ms-2">Master Queue</span>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                    <i class="bi bi-printer me-1"></i> Print
+                </button>
+                <a href="#"
+                   class="btn btn-outline-primary btn-sm"
+                   onclick="exportCSV(); return false;">
+                    <i class="bi bi-download me-1"></i> Export CSV
+                </a>
+            </div>
+        </div>
+        <!-- Date Range Selector -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <form method="get" class="row g-2 align-items-end">
+                    <div class="col-auto">
+                        <label class="form-label small fw-bold">Select Year</label>
+                        <select name="year"
+                                class="form-select form-select-sm"
+                                onchange="this.form.submit()">
+                            {% for y in 2024|add:5|range %}
+                                {% if y <= year %}
+                                    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 bg-light">
+                    <div class="card-body text-center">
+                        <p class="text-muted small mb-1">Total Invoiced</p>
+                        <h4 class="text-primary fw-bold">{{ currency }}{{ total_invoiced|floatformat:2 }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 bg-light">
+                    <div class="card-body text-center">
+                        <p class="text-muted small mb-1">Total Paid</p>
+                        <h4 class="text-success fw-bold">{{ currency }}{{ total_paid|floatformat:2 }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 {% if outstanding_balance > 0 %}bg-danger-subtle{% else %}bg-success-subtle{% endif %}">
+                    <div class="card-body text-center">
+                        <p class="text-muted small mb-1">Outstanding Balance</p>
+                        <h4 class="{% if outstanding_balance > 0 %}text-danger{% else %}text-success{% endif %} fw-bold">
+                            {{ currency }}{{ outstanding_balance|floatformat:2 }}
+                        </h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 bg-light">
+                    <div class="card-body text-center">
+                        <p class="text-muted small mb-1">Invoice Count</p>
+                        <h4 class="text-info fw-bold">{{ invoices|length }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Recurring Items (Queue) Section -->
+        {% if queued_items %}
+            <div class="card shadow-sm border-0 border-start border-info border-4 mb-4">
+                <div class="card-header bg-light border-bottom">
+                    <h6 class="mb-0">
+                        <i class="bi bi-repeat me-2 text-info"></i> <strong>Recurring Items (Master Queue)</strong>
+                        <small class="text-muted">These items bill automatically each month</small>
+                    </h6>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light small">
+                            <tr>
+                                <th class="ps-4">Item Description</th>
+                                <th>Rate</th>
+                                <th>Billing Schedule</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in queued_items %}
+                                <tr>
+                                    <td class="ps-4">{{ item.description }}</td>
+                                    <td class="fw-bold">{{ currency }}{{ item.unit_price|floatformat:2 }}</td>
+                                    <td>
+                                        {% if item.billing_policy %}
+                                            {% if item.billing_policy.special_rule == 'WORK' %}
+                                                <span class="badge bg-info-subtle text-info">1st Work Day</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-primary">Day {{ item.billing_policy.run_day }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-warning-subtle text-warning">Default (Monthly)</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+        <!-- Invoices Section -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0">
+                    <i class="bi bi-receipt me-2"></i> Invoices ({{ start_date|date:"Y-m-d" }} to {{ end_date|date:"Y-m-d" }})
+                </h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Date</th>
+                            <th>Invoice #</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invoice in invoices %}
+                            <tr>
+                                <td class="ps-4 text-muted small">{{ invoice.invoice_date|date:"Y-m-d" }}</td>
+                                <td class="fw-bold">
+                                    <a href="{% url 'invoices:invoice_detail' invoice.id %}"
+                                       class="text-decoration-none">{{ invoice.number }}</a>
+                                </td>
+                                <td class="text-muted small">
+                                    {{ invoice.billed_items.all|length }} line item{{ invoice.billed_items.all|length|pluralize }}
+                                </td>
+                                <td class="fw-bold">{{ currency }}{{ invoice.total_amount|floatformat:2 }}</td>
+                                <td>
+                                    {% if invoice.status == 'PAID' %}
+                                        <span class="badge bg-success">Paid</span>
+                                    {% elif invoice.status == 'PENDING' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% elif invoice.status == 'OVERDUE' %}
+                                        <span class="badge bg-danger">Overdue</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ invoice.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <a href="{% url 'invoices:generate_invoice_pdf_view' invoice.id %}"
+                                       class="btn btn-sm btn-outline-primary"
+                                       title="Download PDF">
+                                        <i class="bi bi-file-pdf"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">No invoices for this period.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- Payments Section -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0">
+                    <i class="bi bi-credit-card me-2"></i> Payments ({{ start_date|date:"Y-m-d" }} to {{ end_date|date:"Y-m-d" }})
+                </h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Date</th>
+                            <th>Invoice #</th>
+                            <th>Payment Method</th>
+                            <th>Amount</th>
+                            <th class="text-end pe-4">Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments %}
+                            <tr>
+                                <td class="ps-4 text-muted small">{{ payment.created_at|date:"Y-m-d" }}</td>
+                                <td class="fw-bold">
+                                    {% if payment.invoice %}
+                                        <a href="{% url 'invoices:invoice_detail' payment.invoice.id %}"
+                                           class="text-decoration-none">{{ payment.invoice.number }}</a>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ payment.payment_method|default:"Not specified" }}</td>
+                                <td class="fw-bold text-success">{{ currency }}{{ payment.amount|floatformat:2 }}</td>
+                                <td class="text-end pe-4 text-muted small">{{ payment.transaction_ref|default:"—" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">No payments for this period.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div class="row">
+            <div class="col-md-6">
+                <p class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Statement generated: {{ now|date:"Y-m-d H:i" }}
+                </p>
+            </div>
+        </div>
+    </div>
+    <style>
+        @media print {
+
+            .btn,
+            .btn-group,
+            .form-select {
+                display: none !important;
+            }
+
+            body {
+                background: white;
+            }
+
+            .card {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+    <script>
+        function exportCSV() {
+            const year = new URLSearchParams(window.location.search).get('year') || new Date().getFullYear();
+            const clientName = "{{ client.name }}".replace(/"/g, '""');
+
+            let csv = `"Client Statement - ${clientName} - Year ${year}"\n\n`;
+            csv += `"Total Invoiced","{{ total_invoiced }}"\n`;
+            csv += `"Total Paid","{{ total_paid }}"\n`;
+            csv += `"Outstanding Balance","{{ outstanding_balance }}"\n\n`;
+
+            csv += `"Invoices"\n`;
+            csv += `"Date","Invoice #","Items","Amount","Status"\n`;
+            {
+                %
+                for invoice in invoices %
+            }
+            csv += `"{{ invoice.invoice_date|date:"Y-m-d" }}","{{ invoice.number }}","{{ invoice.billed_items.all|length }}","{{ invoice.total_amount }}","{{ invoice.status }}"\n`;
+            {
+                %
+                endfor %
+            }
+
+            csv += `\n"Payments"\n`;
+            csv += `"Date","Invoice #","Method","Amount","Reference"\n`;
+            {
+                %
+                for payment in payments %
+            }
+            csv += `"{{ payment.created_at|date:"Y-m-d" }}","{% if payment.invoice %}{{ payment.invoice.number }}{% endif %}","{{ payment.payment_method|default:"" }}","{{ payment.amount }}","{{ payment.transaction_ref|default:"" }}"\n`;
+            {
+                %
+                endfor %
+            }
+
+            const blob = new Blob([csv], {
+                type: 'text/csv'
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `{{ client.name }}_statement_{{ year }}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+{% endblock %}

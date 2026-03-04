@@ -82,6 +82,17 @@
                         </span>
                     </button>
                 {% endif %}
+                <!-- Resend Invoice (always available for non-draft invoices) -->
+                {% if not invoice.is_quote and invoice.status != 'DRAFT' and invoice.status != 'CANCELLED' %}
+                    <button class="btn btn-warning btn-sm"
+                            hx-post="{% url 'invoices:resend_invoice' invoice.pk %}"
+                            hx-confirm="Resend this invoice to {{ invoice.client.email }}?"
+                            hx-target="body"
+                            title="Send invoice to client">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span class="d-none d-md-inline">Send Invoice</span>
+                    </button>
+                {% endif %}
                 <!-- Accept Quote & Convert to Invoice -->
                 {% if invoice.is_quote and invoice.status == 'PENDING' %}
                     <form method="post"
@@ -261,8 +272,16 @@
                         <thead class="table-light">
                             <tr>
                                 <th class="ps-4 py-3">Description</th>
-                                <th class="text-end py-3">Qty / Hours</th>
-                                <th class="text-end py-3">Unit Price</th>
+                                {% if invoice.billed_items.exists and not invoice.billed_timesheets.exists %}
+                                    <th class="text-end py-3">Quantity</th>
+                                    <th class="text-end py-3">Unit Price</th>
+                                {% elif invoice.billed_timesheets.exists and not invoice.billed_items.exists %}
+                                    <th class="text-end py-3">Hours</th>
+                                    <th class="text-end py-3">Rate/Hour</th>
+                                {% else %}
+                                    <th class="text-end py-3">Qty/Hours</th>
+                                    <th class="text-end py-3">Price</th>
+                                {% endif %}
                                 <th class="text-end pe-4 py-3">Total</th>
                             </tr>
                         </thead>

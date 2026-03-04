@@ -134,14 +134,19 @@ class UserProfile(models.Model):
     )
 
     def get_audit_triggers(self):
-        """Returns audit trigger configuration with sensible defaults."""
+        """Audit configuration - checks for math errors and email delivery failures."""
         defaults = {
-            "detect_zero_total": True,
-            "detect_no_items": True,
-            "detect_statistical_outliers": True,
-            "detect_missing_email": True,
-            "detect_vat_mismatch": True,
-            "detect_duplicate_items": True,
+            # ACTIVE CHECKS: Math errors and delivery failures
+            "detect_math_error": True,
+            "detect_email_delivery_failure": True,  # NEW: Check for bounced/failed emails
+            
+            # DISABLED: Too many false positives
+            "detect_zero_total": False,
+            "detect_no_items": False,
+            "detect_statistical_outliers": False,
+            "detect_missing_email": False,
+            "detect_vat_mismatch": False,
+            "detect_duplicate_items": False,
         }
         if not self.audit_triggers:
             return defaults

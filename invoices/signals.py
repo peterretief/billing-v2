@@ -142,3 +142,69 @@ def recalculate_invoice_on_item_delete(sender, instance, **kwargs):
             InvoiceModel.objects.update_totals(invoice)
     except Exception as e:
         print(f"Error recalculating invoice on item delete: {e}")
+
+
+# --- 5. Email Delivery Failure Detection ---
+
+@receiver(post_save, sender='invoices.InvoiceEmailStatusLog')
+def re_audit_on_delivery_status_change(sender, instance, created, **kwargs):
+    """
+    When a delivery status update is received (bounce, delivered, etc.),
+    re-audit the invoice to catch delivery failures immediately.
+    """
+    if not created:
+        return  # Only on new delivery logs
+    
+    try:
+        from core.models import BillingAuditLog
+        from core.utils import get_anomaly_status
+        
+        invoice = instance.invoice
+        
+        # Re-run audit with latest delivery status
+        is_anomaly, comment, audit_context = get_anomaly_status(invoice.user, invoice)
+        
+        # Update the most recent audit log for this invoice
+        latest_log = BillingAuditLog.objects.filter(invoice=invoice).order_by('-created_at').first()
+        if latest_log and latest_log.details.get('source') != 'manual_review':
+            # Update existing audit log with new findings
+            latest_log.is_anomaly = is_anomaly
+            latest_log.ai_comment = comment
+            latest_log.save()
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to re-audit invoice on delivery status change: {e}")
+        # Don't fail - just log and continue
+
+
+@receiver(post_delete, sender='invoices.Invoice')
+def reset_items_on_invoice_delete(sender, instance, **kwargs):
+    """
+    When an invoice is deleted, delete the items and timesheets associated with it.
+    
+    Rationale: Once items/timesheets have been invoiced, they've been "processed".
+    If the invoice is deleted, those items should be removed rather than orphaned.
+    If the user needs to bill them again, they should create new items.
+    
+    This prevents confusion from orphaned, already-billed items appearing in the list.
+    """
+    try:
+        from items.models import Item
+        from timesheets.models import TimesheetEntry
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Delete all items linked to this invoice
+        deleted_items, _ = Item.objects.filter(invoice=instance).delete()
+        
+        # Delete all timesheets linked to this invoice
+        deleted_timesheets, _ = TimesheetEntry.objects.filter(invoice=instance).delete()
+        
+        logger.info(f"Deleted {deleted_items} items and {deleted_timesheets} timesheets for invoice {instance.id}")
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to delete items/timesheets on invoice delete: {e}")
+        # Don't fail - just log and continue

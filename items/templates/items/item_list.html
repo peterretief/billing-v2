@@ -4,7 +4,9 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
                 <h2 class="fw-bold text-dark mb-0">Ad-hoc Unbilled Items</h2>
-                <p class="text-muted small">One-off items waiting to be manually invoiced.</p>
+                <p class="text-muted small">
+                    Optional one-off items. Select and collate into invoices manually, or delete if no longer needed.
+                </p>
             </div>
             <a href="{% url 'items:item_create' %}"
                class="btn btn-primary btn-lg fw-bold shadow-sm">
@@ -75,7 +77,10 @@
         <hr class="my-5 opacity-25">
         <div class="mb-3">
             <h2 class="fw-bold text-info">Master Recurring Queue</h2>
-            <p class="text-muted">Persistent templates that generate invoices automatically based on their assigned schedule.</p>
+            <p class="text-muted">
+                Persistent templates that generate invoices automatically based on their assigned schedule.
+                If no policies are set it will generate once a month.
+            </p>
         </div>
         <div class="card shadow-sm border-0 border-top border-info border-4">
             <div class="table-responsive">
@@ -154,32 +159,43 @@
         </div>
     </div>
     <style>
-    /* Modern UI Adjustments */
-    .bg-info-subtle { background-color: #e1f6ff !important; }
-    .bg-success-subtle { background-color: #e1f6eb !important; }
-    .bg-warning-subtle { background-color: #fff8e1 !important; }
-    .table-hover tbody tr:hover { background-color: #fbfcfe; }
+        /* Modern UI Adjustments */
+        .bg-info-subtle {
+            background-color: #e1f6ff !important;
+        }
+
+        .bg-success-subtle {
+            background-color: #e1f6eb !important;
+        }
+
+        .bg-warning-subtle {
+            background-color: #fff8e1 !important;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: #fbfcfe;
+        }
     </style>
     <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.item-checkbox');
-    const selectionActions = document.getElementById('selectionActions');
-    const selectedCountSpan = document.getElementById('selectedCount');
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            const selectionActions = document.getElementById('selectionActions');
+            const selectedCountSpan = document.getElementById('selectedCount');
 
-    function updateSelection() {
-        const count = document.querySelectorAll('.item-checkbox:checked').length;
-        if (selectionActions) selectionActions.style.display = count > 0 ? 'block' : 'none';
-        if (selectedCountSpan) selectedCountSpan.innerText = count;
-    }
+            function updateSelection() {
+                const count = document.querySelectorAll('.item-checkbox:checked').length;
+                if (selectionActions) selectionActions.style.display = count > 0 ? 'block' : 'none';
+                if (selectedCountSpan) selectedCountSpan.innerText = count;
+            }
 
-    if (selectAll) {
-        selectAll.addEventListener('change', function() {
-            checkboxes.forEach(cb => cb.checked = selectAll.checked);
-            updateSelection();
+            if (selectAll) {
+                selectAll.addEventListener('change', function() {
+                    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+                    updateSelection();
+                });
+            }
+            checkboxes.forEach(cb => cb.addEventListener('change', updateSelection));
         });
-    }
-    checkboxes.forEach(cb => cb.addEventListener('change', updateSelection));
-});
     </script>
 {% endblock %}

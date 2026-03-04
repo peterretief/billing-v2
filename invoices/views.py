@@ -231,6 +231,10 @@ def dashboard(request):
 
     # Get draft invoices separately (exclude quotes) and recent posted invoices
     draft_invoices = invoices.filter(status="DRAFT", is_quote=False).order_by("-date_issued", "-id")[:3]
+    
+    # Get aged drafts (DRAFT invoices past their due date) - require review
+    aged_drafts = invoices.filter(status="DRAFT", is_quote=False, due_date__lt=timezone.now().date()).order_by("due_date")
+    
     recent_invoices = invoices.exclude(status="DRAFT").exclude(is_quote=True).order_by("-date_issued", "-id")[:5]
     
     # Get paid invoices total
@@ -258,6 +262,7 @@ def dashboard(request):
         "outstanding_invoices_count": outstanding_invoices_count,
         "tax_summary": Invoice.objects.get_tax_summary(request.user),
         "draft_invoices": draft_invoices,
+        "aged_drafts": aged_drafts,
         "recent_invoices": recent_invoices,
         "paid_invoices": paid_invoices,
         "total_paid_invoices": total_paid_invoices,
@@ -382,6 +387,24 @@ def invoice_list(request):
         else:
             return "-" + field
 
+    # If this is an HTMX refresh request, return only the table fragment
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "invoices/invoice_list_fragment.html",
+            {
+                "invoices": page_obj,
+                "search_query": search_query,
+                "status_filter": status_filter,
+                "overdue_filter": overdue_filter,
+                "current_sort": sort_param,
+                "toggle_sort": toggle_sort,
+                "total_count": total_count,
+                "displayed_count": displayed_count,
+                "show_all": show_all,
+            },
+        )
+
     return render(
         request,
         "invoices/invoice_list.html",
@@ -432,12 +455,15 @@ def invoice_create(request):
                 try:
                     from core.models import AuditHistory
                     is_anomaly, comment, audit_context = get_anomaly_status(request.user, invoice)
-                    BillingAuditLog.objects.create(
+                    # Prevent duplicate audit logs for same invoice (use get_or_create)
+                    BillingAuditLog.objects.get_or_create(
                         user=request.user,
                         invoice=invoice,
-                        is_anomaly=is_anomaly,
-                        ai_comment=comment,
-                        details={"total": str(invoice.total_amount), "source": "manual_create"},
+                        defaults={
+                            "is_anomaly": is_anomaly,
+                            "ai_comment": comment,
+                            "details": {"total": str(invoice.total_amount), "source": "manual_create"},
+                        }
                     )
                     
                     # Create audit history record for learning
@@ -612,6 +638,7 @@ def bulk_post(request):
         invoices = Invoice.objects.filter(id__in=invoice_ids, user=request.user, status="DRAFT", is_quote=False)
         count = 0
         flagged_count = 0
+        
         for inv in invoices:
             try:
                 from core.models import AuditHistory
@@ -639,7 +666,8 @@ def bulk_post(request):
                 )
                 if is_anomaly:
                     flagged_count += 1
-                    continue  # Skip posting/emailing flagged invoices
+                    # NOTE: Do NOT block - just log the audit flag
+                    # Continue processing the invoice normally
             except Exception as e:
                 import logging
 
@@ -647,33 +675,17 @@ def bulk_post(request):
                 logger.error(f"Failed to audit invoice {inv.id} in bulk_post: {e}")
                 # Continue anyway even if audit fails
 
-            # Only send if NOT flagged
-            with transaction.atomic():
-                inv.status = "PENDING"
-                inv.save()
-                inv.billed_items.all().update(is_billed=True)
-                item_desc = inv.billed_items.values_list("description", flat=True)
-                Item.objects.filter(
-                    user=request.user, client=inv.client, is_recurring=True, description__in=item_desc
-                ).update(last_billed_date=timezone.now().date())
+            # Queue invoice for async sending via Celery
+            try:
+                from invoices.tasks import send_invoice_async
+                send_invoice_async.delay(inv.id)
+                count += 1
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to queue invoice {inv.id} for sending: {e}")
 
-                try:
-                    if email_invoice_to_client(inv):
-                        count += 1
-                    else:
-                        # If email failed, revert status to DRAFT
-                        inv.status = "DRAFT"
-                        inv.save()
-                except Exception as e:
-                    # If email failed, revert status to DRAFT
-                    inv.status = "DRAFT"
-                    inv.save()
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Failed to email invoice {inv.id}: {e}")
-
-        message = f"Sent {count} invoice(s)"
+        message = f"Queued {count} invoice(s) for sending"
         if flagged_count > 0:
             message += f" ({flagged_count} flagged - review in audit)"
         messages.success(request, message)
@@ -1275,3 +1287,77 @@ def send_invoice(request, pk):
         messages.error(request, f"Failed to send invoice. Check email settings.")
     
     return redirect("invoices:dashboard")
+
+
+@login_required
+@setup_required
+def client_statement(request, client_id):
+    """
+    Generate a year-end or custom date range statement for a client.
+    Shows all recurring (queued) invoices and their payments with totals.
+    """
+    from datetime import datetime
+    
+    client = get_object_or_404(Client, id=client_id, user=request.user)
+    
+    # Get date range from query params (default to current year)
+    year = int(request.GET.get('year', timezone.now().year))
+    
+    start_date = date(year, 1, 1)
+    end_date = date(year, 12, 31)
+    
+    # Get all RECURRING invoices for this client in the period
+    # (invoices created from queued items with is_recurring=True)
+    invoices = Invoice.objects.filter(
+        user=request.user,
+        client=client,
+        invoice_date__range=[start_date, end_date],
+        is_quote=False,
+        # Link to items to find recurring ones
+        billed_items__is_recurring=True
+    ).distinct().order_by('invoice_date')
+    
+    # Get all payments for these invoices
+    payments = Payment.objects.filter(
+        invoice__user=request.user,
+        invoice__client=client,
+        invoice__in=invoices,
+        created_at__date__range=[start_date, end_date]
+    ).order_by('created_at')
+    
+    # Calculate totals
+    total_invoiced = invoices.aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
+    total_paid = payments.aggregate(Sum('amount'))['amount__sum'] or Decimal('0.00')
+    
+    # Get outstanding balance on recurring invoices only
+    all_recurring_outstanding = Invoice.objects.filter(
+        user=request.user,
+        client=client,
+        is_quote=False,
+        status__in=['PENDING', 'OVERDUE'],
+        billed_items__is_recurring=True
+    ).distinct().aggregate(Sum('total_amount'))['total_amount__sum'] or Decimal('0.00')
+    
+    # Get the queued items for this client to show the recurring pattern
+    queued_items = Item.objects.filter(
+        user=request.user,
+        client=client,
+        is_recurring=True,
+        invoice__isnull=True
+    ).order_by('description')
+    
+    context = {
+        'client': client,
+        'year': year,
+        'start_date': start_date,
+        'end_date': end_date,
+        'invoices': invoices,
+        'payments': payments,
+        'queued_items': queued_items,
+        'total_invoiced': total_invoiced,
+        'total_paid': total_paid,
+        'outstanding_balance': all_recurring_outstanding,
+        'currency': request.user.profile.currency if hasattr(request.user, 'profile') else 'R',
+    }
+    
+    return render(request, 'invoices/client_statement.html', context)

@@ -225,9 +225,11 @@ class AuditSettingsForm(forms.ModelForm):
         }
 
     # Audit trigger checkboxes
+    detect_math_error = forms.BooleanField(required=False, label="🔍 Detect math errors (total ≠ sum of items) - CATCHES CORRUPTION")
     detect_zero_total = forms.BooleanField(required=False, label="Flag invoices with $0 total")
     detect_no_items = forms.BooleanField(required=False, label="Flag invoices with no line items")
-    detect_statistical_outliers = forms.BooleanField(required=False, label="Flag statistical outliers")
+    detect_statistical_outliers = forms.BooleanField(required=False, label="Flag statistical outliers (info only)")
+    detect_email_delivery_failure = forms.BooleanField(required=False, label="Flag email delivery failures (bounce, deferred, etc.)")
     detect_missing_email = forms.BooleanField(required=False, label="Flag missing client email")
     detect_vat_mismatch = forms.BooleanField(required=False, label="Flag VAT inconsistencies")
     detect_duplicate_items = forms.BooleanField(required=False, label="Flag duplicate line items")
@@ -242,18 +244,22 @@ class AuditSettingsForm(forms.ModelForm):
         # Initialize trigger checkboxes from audit_triggers
         if self.instance and self.instance.pk:
             triggers = self.instance.get_audit_triggers()
+            self.fields["detect_math_error"].initial = triggers.get("detect_math_error", True)
             self.fields["detect_zero_total"].initial = triggers.get("detect_zero_total", True)
             self.fields["detect_no_items"].initial = triggers.get("detect_no_items", True)
-            self.fields["detect_statistical_outliers"].initial = triggers.get("detect_statistical_outliers", True)
-            self.fields["detect_missing_email"].initial = triggers.get("detect_missing_email", True)
-            self.fields["detect_vat_mismatch"].initial = triggers.get("detect_vat_mismatch", True)
+            self.fields["detect_statistical_outliers"].initial = triggers.get("detect_statistical_outliers", False)
+            self.fields["detect_email_delivery_failure"].initial = triggers.get("detect_email_delivery_failure", False)
+            self.fields["detect_missing_email"].initial = triggers.get("detect_missing_email", False)
+            self.fields["detect_vat_mismatch"].initial = triggers.get("detect_vat_mismatch", False)
             self.fields["detect_duplicate_items"].initial = triggers.get("detect_duplicate_items", True)
 
         # Style all trigger checkboxes
         for field in [
+            "detect_math_error",
             "detect_zero_total",
             "detect_no_items",
             "detect_statistical_outliers",
+            "detect_email_delivery_failure",
             "detect_missing_email",
             "detect_vat_mismatch",
             "detect_duplicate_items",
@@ -265,11 +271,13 @@ class AuditSettingsForm(forms.ModelForm):
 
         # Save trigger configuration to JSON
         instance.audit_triggers = {
+            "detect_math_error": self.cleaned_data.get("detect_math_error", True),
             "detect_zero_total": self.cleaned_data.get("detect_zero_total", True),
             "detect_no_items": self.cleaned_data.get("detect_no_items", True),
-            "detect_statistical_outliers": self.cleaned_data.get("detect_statistical_outliers", True),
-            "detect_missing_email": self.cleaned_data.get("detect_missing_email", True),
-            "detect_vat_mismatch": self.cleaned_data.get("detect_vat_mismatch", True),
+            "detect_statistical_outliers": self.cleaned_data.get("detect_statistical_outliers", False),
+            "detect_email_delivery_failure": self.cleaned_data.get("detect_email_delivery_failure", False),
+            "detect_missing_email": self.cleaned_data.get("detect_missing_email", False),
+            "detect_vat_mismatch": self.cleaned_data.get("detect_vat_mismatch", False),
             "detect_duplicate_items": self.cleaned_data.get("detect_duplicate_items", True),
         }
 
