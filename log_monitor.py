@@ -24,14 +24,16 @@ from invoices.models import Invoice, InvoiceEmailStatusLog
 # Configuration
 LOG_FILE = '/opt/billing_v2/tmp/email_status.log'
 STATE_FILE = '/opt/billing_v2/tmp/.log_monitor_state.json'
+
+# Only alert on ACTUAL errors (ERROR/CRITICAL level logs)
+ERROR_LEVELS = ['ERROR', 'CRITICAL']
+# Additional patterns to catch specific error scenarios
 ERROR_PATTERNS = [
-    r'ERROR',
-    r'CRITICAL',
     r'Exception',
     r'Traceback',
-    r'Failed',
-    r'failed to',
     r'error sending',
+    r'Failed.*[Tt]ask',
+    r'FAILED',
 ]
 
 ALERT_EMAIL = os.environ.get('ALERT_EMAIL', 'admin@peterretief.org')
@@ -62,6 +64,7 @@ class LogMonitor:
             'last_check': None,
             'last_error_line': 0,
             'alerted_errors': {},
+            'last_daily_alert_sent': None,  # Track when last daily alert was sent
         }
 
     def save_state(self):
@@ -87,19 +90,34 @@ class LogMonitor:
         self.summary['total_checked'] = len(new_lines)
 
         for i, line in enumerate(new_lines, start=last_line):
-            for pattern in ERROR_PATTERNS:
-                if re.search(pattern, line, re.IGNORECASE):
-                    self.summary['errors_found'] += 1
-                    error_hash = hash(line)
+            is_error = False
+            
+            # Check for ERROR/CRITICAL log levels
+            for level in ERROR_LEVELS:
+                if level in line:
+                    is_error = True
+                    break
+            
+            # If not already flagged as error, check additional patterns
+            if not is_error:
+                for pattern in ERROR_PATTERNS:
+                    if re.search(pattern, line, re.IGNORECASE):
+                        is_error = True
+                        break
+            
+            # Skip INFO/WARNING/DEBUG messages unless they're actual errors
+            if is_error and not any(x in line for x in ['INFO', 'WARNING', 'DEBUG']):
+                self.summary['errors_found'] += 1
+                error_hash = hash(line)
 
-                    # Only alert if we haven't seen this exact error before
-                    if error_hash not in self.state['alerted_errors']:
-                        self.alerts.append({
-                            'line': i,
-                            'content': line.strip(),
-                            'timestamp': datetime.now().isoformat(),
-                        })
-                        self.state['alerted_errors'][error_hash] = datetime.now().isoformat()
+                # Only alert if we haven't seen this exact error before
+                if error_hash not in self.state['alerted_errors']:
+                    self.alerts.append({
+                        'line': i,
+                        'content': line.strip(),
+                        'timestamp': datetime.now().isoformat(),
+                    })
+                    self.state['alerted_errors'][error_hash] = datetime.now().isoformat()
 
         # Update state
         self.state['last_error_line'] = len(lines)
@@ -148,24 +166,32 @@ class LogMonitor:
             })
 
     def send_alert_email(self):
-        """Send immediate alert if critical errors found"""
+        """Send ONE alert email per day with accumulated errors"""
         if not self.alerts:
             return
 
-        subject = f"ALERT: {self.summary['errors_found']} errors found in billing logs"
+        # Check if we've already sent an alert today
+        today = datetime.now().date().isoformat()
+        last_alert_date = self.state.get('last_daily_alert_sent')
+        
+        if last_alert_date == today:
+            print(f"✓ Daily alert already sent today. Skipping. (Errors buffered: {self.summary['errors_found']})")
+            return
+
+        subject = f"DAILY ALERT: {self.summary['errors_found']} errors found in billing logs"
         
         alert_text = f"""
-        LOG MONITORING ALERT
-        ===================
+        LOG MONITORING - DAILY ALERT
+        ============================
         
-        Check Time: {datetime.now()}
-        Lines Checked: {self.summary['total_checked']}
-        Errors Found: {self.summary['errors_found']}
+        Report Date: {datetime.now().strftime('%B %d, %Y')}
+        Total Errors Found: {self.summary['errors_found']}
+        Lines Scanned: {self.summary['total_checked']}
         
-        ERRORS:
+        ERRORS DETECTED:
         """
 
-        for alert in self.alerts:
+        for alert in self.alerts[:20]:  # Show first 20 errors only
             if isinstance(alert.get('content'), str):
                 alert_text += f"\n  - {alert['content'][:100]}"
             else:
@@ -174,8 +200,12 @@ class LogMonitor:
                     for detail in alert['details'][:3]:
                         alert_text += f"\n    • {detail[:80]}"
 
+        if len(self.alerts) > 20:
+            alert_text += f"\n\n  ... and {len(self.alerts) - 20} more errors"
+
         alert_text += """
         
+        NOTE: This is ONE daily summary sent around this time each day.
         Check logs at: /opt/billing_v2/tmp/email_status.log
         Monitor Flower at: http://127.0.0.1:5555
         """
@@ -188,7 +218,8 @@ class LogMonitor:
                 [ADMIN_EMAIL],
                 fail_silently=False,
             )
-            print(f"✓ Alert email sent to {ADMIN_EMAIL}")
+            print(f"✓ Daily alert email sent to {ADMIN_EMAIL}")
+            self.state['last_daily_alert_sent'] = today
             return True
         except Exception as e:
             print(f"✗ Failed to send alert email: {e}")
