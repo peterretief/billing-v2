@@ -19,6 +19,11 @@
                        title="Import calendar events to create timesheets">
                         <i class="bi bi-calendar-download me-1"></i> Import Events
                     </a>
+                    <a href="{% url 'todos:sync_contacts_page' %}"
+                       class="btn btn-outline-secondary btn-sm me-2"
+                       title="Sync clients to Google Contacts">
+                        <i class="bi bi-person-check me-1"></i> Sync Contacts
+                    </a>
                 {% else %}
                     <a href="{% url 'todos:calendar_auth_start' %}"
                        class="btn btn-outline-info btn-sm me-2"

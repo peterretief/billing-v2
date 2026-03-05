@@ -14,8 +14,11 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = 'true'
 from .models import GoogleCalendarCredential, Todo
 
 
-# Google Calendar API scope
-SCOPES = ['https://www.googleapis.com/auth/calendar']
+# Google Calendar and Contacts API scopes
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/contacts'  # For address book sync
+]
 
 
 def get_google_calendar_service(user):
@@ -207,4 +210,151 @@ def sync_all_todos_to_calendar(user):
             logger.exception(f"Error syncing todo {todo.id}: {str(e)}")
     
     logger.info(f"Sync complete. Synced {synced_count} todos for {user.username}")
+    return synced_count
+
+
+def get_google_contacts_service(user):
+    """
+    Get an authorized Google Contacts (People) API service for the user.
+    Shares credentials with calendar service.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        creds_obj = GoogleCalendarCredential.objects.get(user=user)
+    except GoogleCalendarCredential.DoesNotExist:
+        logger.error(f"No Google credentials found for {user.username}")
+        return None
+    
+    # Create credentials from stored data
+    creds = Credentials(
+        token=creds_obj.access_token,
+        refresh_token=creds_obj.refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
+        client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
+        scopes=SCOPES
+    )
+    
+    # Check if token is expired and refresh if needed
+    if creds_obj.is_token_expired():
+        logger.warning(f"Token expired for {user.username}, attempting refresh")
+        if not creds_obj.refresh_token:
+            logger.error(f"No refresh token available for {user.username}")
+            return None
+        
+        try:
+            creds.refresh(Request())
+            # Update the stored credentials
+            creds_obj.access_token = creds.token
+            if creds.refresh_token:
+                creds_obj.refresh_token = creds.refresh_token
+            if creds.expiry:
+                creds_obj.token_expiry = creds.expiry.replace(tzinfo=timezone.utc)
+            creds_obj.save()
+            logger.info(f"Successfully refreshed token for {user.username}")
+        except Exception as e:
+            logger.exception(f"Error refreshing token for {user.username}: {e}")
+            return None
+    
+    return build('people', 'v1', credentials=creds)
+
+
+def sync_client_to_contacts(user, client, service=None):
+    """
+    Sync a single client to Google Contacts.
+    Creates or updates a contact.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not service:
+        service = get_google_contacts_service(user)
+    
+    if not service:
+        logger.error(f"No Google Contacts service available for {user.username}")
+        return None
+    
+    # Build contact data
+    names = [{'givenName': client.name.split()[0] if ' ' in client.name else client.name,
+              'familyName': ' '.join(client.name.split()[1:]) if ' ' in client.name else '',
+              'displayName': client.name}]
+    
+    contact = {
+        'names': names,
+    }
+    
+    # Add email
+    if client.email:
+        contact['emailAddresses'] = [{'value': client.email, 'type': 'work'}]
+    
+    # Add phone
+    if client.phone:
+        contact['phoneNumbers'] = [{'value': client.phone, 'type': 'work'}]
+    
+    # Add address
+    if client.address:
+        contact['addresses'] = [{
+            'formattedValue': client.address,
+            'type': 'work'
+        }]
+    
+    # Add note with VAT/Tax info
+    notes_parts = []
+    if client.contact_name:
+        notes_parts.append(f"Contact: {client.contact_name}")
+    if client.vat_number:
+        notes_parts.append(f"VAT: {client.vat_number}")
+    if client.tax_number:
+        notes_parts.append(f"TAX: {client.tax_number}")
+    if client.vendor_number:
+        notes_parts.append(f"Vendor: {client.vendor_number}")
+    
+    if notes_parts:
+        contact['biographies'] = [{'value': ' | '.join(notes_parts)}]
+    
+    try:
+        # Create contact (upsert - Google will handle duplicates)
+        created_contact = service.people().createContact(body=contact).execute()
+        contact_id = created_contact.get('resourceName')
+        logger.info(f"Created/updated contact for {client.name} (ID: {contact_id})")
+        return contact_id
+    except Exception as e:
+        logger.exception(f"Error syncing client {client.id} ({client.name}) to contacts: {str(e)}")
+        return None
+
+
+def sync_all_clients_to_contacts(user):
+    """
+    Sync all of a user's clients to Google Contacts.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    from clients.models import Client
+    
+    logger.info(f"Starting contacts sync for user {user.username}")
+    
+    service = get_google_contacts_service(user)
+    if not service:
+        logger.error(f"Could not get Google Contacts service for {user.username}")
+        return 0
+    
+    clients = Client.objects.filter(user=user)
+    logger.info(f"Found {clients.count()} clients to sync for {user.username}")
+    
+    synced_count = 0
+    
+    for client in clients:
+        try:
+            if sync_client_to_contacts(user, client, service):
+                synced_count += 1
+                logger.info(f"Synced client {client.id}: {client.name}")
+            else:
+                logger.warning(f"Failed to sync client {client.id}: {client.name}")
+        except Exception as e:
+            logger.exception(f"Error syncing client {client.id}: {str(e)}")
+    
+    logger.info(f"Contacts sync complete. Synced {synced_count} clients for {user.username}")
     return synced_count

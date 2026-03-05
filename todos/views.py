@@ -688,3 +688,55 @@ def create_timesheets_from_events(request):
             messages.warning(request, error)
     
     return redirect('timesheets:timesheet_list')
+
+@login_required
+def sync_contacts_page(request):
+    """Display contacts sync options."""
+    from .models import GoogleCalendarCredential
+    
+    # Check if user has Google Calendar connected
+    has_google_connected = GoogleCalendarCredential.objects.filter(user=request.user).exists()
+    
+    if not has_google_connected:
+        messages.error(request, "Please connect to Google Calendar first to enable contacts sync.")
+        return redirect('todos:calendar_auth_start')
+    
+    from django.apps import apps
+    Client = apps.get_model('clients', 'Client')
+    clients_count = Client.objects.filter(user=request.user).count()
+    
+    context = {
+        'has_google_connected': has_google_connected,
+        'clients_count': clients_count,
+    }
+    
+    return render(request, 'todos/sync_contacts.html', context)
+
+
+@login_required
+def sync_clients_to_contacts(request):
+    """Sync all clients to Google Contacts."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    from .calendar_utils import sync_all_clients_to_contacts
+    from .models import GoogleCalendarCredential
+    
+    # Check if user has Google Calendar connected
+    try:
+        GoogleCalendarCredential.objects.get(user=request.user)
+    except GoogleCalendarCredential.DoesNotExist:
+        messages.error(request, "Please connect to Google Calendar first.")
+        return redirect('todos:calendar_auth_start')
+    
+    logger.info(f"Starting contacts sync for user {request.user.username}")
+    
+    try:
+        synced_count = sync_all_clients_to_contacts(request.user)
+        messages.success(request, f"Successfully synced {synced_count} clients to Google Contacts!")
+        logger.info(f"Successfully synced {synced_count} clients for {request.user.username}")
+    except Exception as e:
+        logger.exception(f"Error syncing contacts for {request.user.username}: {e}")
+        messages.error(request, f"Error syncing contacts: {str(e)}")
+    
+    return redirect('todos:sync_contacts_page')

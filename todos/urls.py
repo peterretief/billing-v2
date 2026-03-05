@@ -23,4 +23,8 @@ urlpatterns = [
     path('calendar/sync/', views.sync_todos_to_calendar, name='calendar_sync'),
     path('calendar/import/', views.import_calendar_events, name='import_calendar_events'),
     path('calendar/import-create-timesheets/', views.create_timesheets_from_events, name='create_timesheets_from_events'),
+    
+    # Google Contacts integration
+    path('contacts/sync/', views.sync_contacts_page, name='sync_contacts_page'),
+    path('contacts/sync-now/', views.sync_clients_to_contacts, name='sync_clients_to_contacts'),
 ]
