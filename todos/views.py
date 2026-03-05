@@ -439,7 +439,14 @@ def import_calendar_events(request):
         messages.error(request, f"Error fetching calendar events: {str(e)}")
         events = []
     
-    # Parse event titles to extract suggested category and client
+    # Parse event titles and extract client/category suggestions
+    from timesheets.models import WorkCategory
+    from clients.models import Client
+    
+    # Get work categories and clients for the user
+    categories = WorkCategory.objects.filter(user=request.user).order_by('name')
+    clients = Client.objects.filter(user=request.user).order_by('name')
+    
     for event in events:
         title = event.get('summary', '')
         # Format: "[Synced] Category - Client" or just "Category - Client"
@@ -453,14 +460,42 @@ def import_calendar_events(request):
         else:
             event['suggested_category'] = ''
             event['suggested_client'] = ''
-    
-    # Get work categories and clients for the user
-    from timesheets.models import WorkCategory
-    from clients.models import Client
-    
-    categories = WorkCategory.objects.filter(user=request.user).order_by('name')
-    # Get all clients for the user (not just those with todos)
-    clients = Client.objects.filter(user=request.user).order_by('name')
+        
+        # Extract client details from description
+        description = event.get('description', '')
+        event['client_details'] = {}
+        
+        if '--- CLIENT DETAILS ---' in description:
+            # Parse client info from description
+            details_section = description.split('--- CLIENT DETAILS ---')[1]
+            for line in details_section.split('\n'):
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip()
+                    value = value.strip()
+                    event['client_details'][key] = value
+        
+        # Smart client matching: try to match by address or name
+        event['suggested_client_id'] = None
+        location = event.get('location', '')
+        
+        # First try: match by address (most accurate)
+        if location:
+            for client in clients:
+                if client.address and location.lower() in client.address.lower():
+                    event['suggested_client_id'] = client.id
+                    event['suggested_client'] = client.name
+                    break
+        
+        # Second try: match by name from earlier parsing
+        if not event['suggested_client_id'] and event.get('suggested_client'):
+            for client in clients:
+                if client.name.lower() == event['suggested_client'].lower():
+                    event['suggested_client_id'] = client.id
+                    break
+        
+        # Store location for display
+        event['display_location'] = location
     
     context = {
         'events': events,

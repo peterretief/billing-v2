@@ -115,11 +115,32 @@ def sync_todo_to_calendar(user, todo: Todo, service=None):
     
     # Build event data with marker so we can filter them in import view
     todo_title = f"{todo.category.name if todo.category else 'Todo'} - {todo.client.name}" if todo.client else f"{todo.category.name if todo.category else 'Todo'}"
+    
+    # Build description with client details if available
+    description_parts = []
+    if todo.description:
+        description_parts.append(todo.description)
+    
+    # Add client contact information to description
+    if todo.client:
+        client_info = f"\n\n--- CLIENT DETAILS ---\nName: {todo.client.name}"
+        if todo.client.contact_name:
+            client_info += f"\nContact: {todo.client.contact_name}"
+        if todo.client.phone:
+            client_info += f"\nPhone: {todo.client.phone}"
+        if todo.client.email:
+            client_info += f"\nEmail: {todo.client.email}"
+        description_parts.append(client_info)
+    
     event = {
         'summary': f"[Synced] {todo_title}",
-        'description': todo.description or '',
+        'description': ''.join(description_parts),
         'status': 'cancelled' if todo.status == 'cancelled' else 'confirmed',
     }
+    
+    # Add client address as location (enables Google Maps integration)
+    if todo.client and todo.client.address:
+        event['location'] = todo.client.address
     
     # Add date if due_date is set
     if todo.due_date:

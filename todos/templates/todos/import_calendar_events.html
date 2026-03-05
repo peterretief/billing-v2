@@ -69,9 +69,38 @@
                                                     <input type="checkbox" name="events[]" value="{{ event.id }}" class="form-check-input event-checkbox">
                                                 </td>
                                                 <td>
-                                                    <strong>{{ event.summary }}</strong>
-                                                    {% if event.description %}
-                                                        <br><small class="text-muted">{{ event.description|truncatewords:20 }}</small>
+                                                    <div>
+                                                        <strong>{{ event.summary }}</strong>
+                                                        {% if event.description and "--- CLIENT DETAILS ---" not in event.description %}
+                                                            <br><small class="text-muted">{{ event.description|truncatewords:20 }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                    
+                                                    <!-- Display Client Details if present -->
+                                                    {% if event.client_details %}
+                                                        <div class="mt-2 ps-2 border-start border-warning">
+                                                            <small class="text-muted fw-bold">Client Details:</small><br>
+                                                            {% if event.client_details.Name %}
+                                                                <small><strong>{{ event.client_details.Name }}</strong></small><br>
+                                                            {% endif %}
+                                                            {% if event.client_details.Contact %}
+                                                                <small>👤 {{ event.client_details.Contact }}</small><br>
+                                                            {% endif %}
+                                                            {% if event.client_details.Phone %}
+                                                                <small>📞 {{ event.client_details.Phone }}</small><br>
+                                                            {% endif %}
+                                                            {% if event.client_details.Email %}
+                                                                <small>📧 {{ event.client_details.Email }}</small><br>
+                                                            {% endif %}
+                                                        </div>
+                                                    {% endif %}
+                                                    
+                                                    <!-- Display Location if present -->
+                                                    {% if event.display_location %}
+                                                        <div class="mt-2 ps-2 border-start border-info">
+                                                            <small class="text-muted fw-bold">📍 Location:</small><br>
+                                                            <small>{{ event.display_location }}</small>
+                                                        </div>
                                                     {% endif %}
                                                 </td>
                                                 <td>
@@ -102,7 +131,7 @@
                                                     <select name="client_id_{{ event.id }}" class="form-select form-select-sm" required>
                                                         <option value="">-- Select --</option>
                                                         {% for client in clients %}
-                                                            <option value="{{ client.id }}" {% if client.name == event.suggested_client %}selected{% endif %}>
+                                                            <option value="{{ client.id }}" {% if event.suggested_client_id == client.id %}selected{% elif client.name == event.suggested_client %}selected{% endif %}>
                                                                 {{ client.name }}
                                                             </option>
                                                         {% endfor %}
