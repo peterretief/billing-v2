@@ -209,54 +209,40 @@
 
             if (logModal) {
                 logModal.addEventListener('show.bs.modal', function(event) {
-                    // Use setTimeout to ensure modal is fully rendered
                     setTimeout(() => {
                         const form = document.getElementById('logTimeForm');
                         if (!form) return;
 
-                        // Set todo and client IDs
                         const todoField = document.getElementById('id_todo');
                         const clientField = document.getElementById('id_client');
 
                         if (todoField) todoField.value = todoId;
                         if (clientField) {
                             clientField.value = clientId;
-                            // Trigger change event to load hourly rate
                             clientField.dispatchEvent(new Event('change', {
                                 bubbles: true
                             }));
                         }
 
-                        // Reset form fields
                         form.action = "{% url 'timesheets:log_time' %}";
-                        form.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], textarea').forEach(el => {
-                            if (el.name !== 'todo' && el.name !== 'client' && el.name !== 'category_hidden' && el.name !== 'hourly_rate') {
-                                el.value = '';
-                            }
-                        });
 
-                        // Set today's date
                         const dateField = form.querySelector('[name="date"]');
                         if (dateField) {
                             dateField.value = new Date().toISOString().split('T')[0];
                         }
 
-                        // Auto-fill hours from estimated hours
                         const hoursField = form.querySelector('[name="hours"]');
                         if (hoursField && estimatedHours) {
                             hoursField.value = estimatedHours;
                         }
 
-                        // Auto-fill hourly rate
                         const rateField = form.querySelector('[name="hourly_rate"]');
                         if (rateField && clientRate) {
                             rateField.value = clientRate;
                         }
 
-                        // Find and select category matching todo title
                         const categoryField = form.querySelector('[name="category"]');
                         if (categoryField) {
-                            // Look for existing category with todo title
                             const options = categoryField.querySelectorAll('option');
                             let found = false;
                             options.forEach(opt => {
@@ -265,16 +251,11 @@
                                     found = true;
                                 }
                             });
-
-                            // If not found, leave empty (will auto-create on submit)
                             if (!found) categoryField.value = '';
-
-                            // Trigger change to load category fields
                             categoryField.dispatchEvent(new Event('change', {
                                 bubbles: true
                             }));
                         }
-
                     }, 100);
                 });
             }
