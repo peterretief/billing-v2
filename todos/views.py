@@ -97,6 +97,16 @@ class TodoDetailView(LoginRequiredMixin, DetailView):
         # Get linked timesheets
         context['linked_timesheets'] = self.object.timesheet_entries.select_related('client', 'category')
         
+        # Find matching category by todo title
+        matching_category = None
+        try:
+            matching_category = WorkCategory.objects.get(
+                user=self.request.user,
+                name=self.object.title
+            )
+        except WorkCategory.DoesNotExist:
+            pass
+        
         # Add timesheet form with pre-filled initial data
         initial_data = {
             'client': self.object.client.id,
@@ -105,10 +115,13 @@ class TodoDetailView(LoginRequiredMixin, DetailView):
             'date': timezone.now().date(),
             'todo': self.object.id,
         }
+        if matching_category:
+            initial_data['category'] = matching_category.id
+            
         context['timesheet_form'] = TimesheetEntryForm(initial=initial_data)
         context['categories'] = WorkCategory.objects.filter(user=self.request.user)
         context['clients'] = self.request.user.client_related.all()
-        context['todo_title'] = self.object.title  # Pass to template for JS use
+        context['pre_selected_category_id'] = matching_category.id if matching_category else None
         
         return context
 

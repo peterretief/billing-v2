@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded',function(){
   var m=document.getElementById('logTimeModal');
   var tid='{{ todo.pk|escapejs }}';
   var cid='{{ todo.client.id|escapejs }}';
-  var title='{{ todo.title|escapejs }}';
+  var catid='{{ pre_selected_category_id|default:"" }}';
   if(!m)return;
   m.addEventListener('show.bs.modal',function(){
     setTimeout(function(){
@@ -207,14 +207,9 @@ document.addEventListener('DOMContentLoaded',function(){
         cf.value=cid;
         cf.dispatchEvent(new Event('change',{bubbles:true}));
       }
-      if(catf){
-        var opts=catf.querySelectorAll('option');
-        for(var i=0;i<opts.length;i++){
-          if(opts[i].text.trim()===title){
-            catf.value=opts[i].value;
-            break;
-          }
-        }
+      if(catf && catid){
+        catf.value=catid;
+        console.log('Set category to:',catid);
         catf.dispatchEvent(new Event('change',{bubbles:true}));
       }
     },100);
