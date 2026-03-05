@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-8">
+                <h2 class="fw-bold mb-1">Import Calendar Events</h2>
+                <p class="text-muted small">Select calendar events to create timesheet entries.</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <a href="{% url 'todos:todo_list' %}" class="btn btn-secondary btn-sm">Back to Todos</a>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-4">
+                {% if events %}
+                    <form method="post" action="{% url 'todos:create_timesheets_from_events' %}">
+                        {% csrf_token %}
+                        
+                        <!-- Date Range Filter -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold d-block mb-2">Load events from last</label>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a href="?days_back=1{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 1 %}active{% endif %}">1 day</a>
+                                    <a href="?days_back=7{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 7 %}active{% endif %}">7 days</a>
+                                    <a href="?days_back=14{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 14 %}active{% endif %}">14 days</a>
+                                    <a href="?days_back=30{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 30 %}active{% endif %}">30 days</a>
+                                </div>
+                                <div class="form-check mt-3">
+                                    <input class="form-check-input" type="checkbox" name="show_synced_filter" id="showSynced" {% if request.GET.show_synced %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}&show_synced=on' : '?days_back={{ days_back }}'">
+                                    <label class="form-check-label" for="showSynced">
+                                        Show synced todos
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Events List with Per-Event Category and Client Selection -->
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 50px;">
+                                            <input type="checkbox" class="form-check-input" id="selectAll">
+                                        </th>
+                                        <th>Event</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th style="width: 150px;">Work Category</th>
+                                        <th style="width: 150px;">Client</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for event in events %}
+                                        {% with start=event.start end=event.end %}
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" name="events[]" value="{{ event.id }}" class="form-check-input event-checkbox">
+                                                </td>
+                                                <td>
+                                                    <strong>{{ event.summary }}</strong>
+                                                    {% if event.description %}
+                                                        <br><small class="text-muted">{{ event.description|truncatewords:20 }}</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if start.date %}
+                                                        {{ start.date }}
+                                                    {% elif start.dateTime %}
+                                                        {{ start.dateTime|slice:":10" }}
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if start.dateTime and end.dateTime %}
+                                                        {{ start.dateTime|slice:"11:16" }} - {{ end.dateTime|slice:"11:16" }}
+                                                    {% else %}
+                                                        <span class="badge bg-info">All Day</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <select name="category_id_{{ event.id }}" class="form-select form-select-sm" required>
+                                                        <option value="">-- Select --</option>
+                                                        {% for category in categories %}
+                                                            <option value="{{ category.id }}" {% if category.name == event.suggested_category %}selected{% endif %}>
+                                                                {{ category.name }}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select name="client_id_{{ event.id }}" class="form-select form-select-sm" required>
+                                                        <option value="">-- Select --</option>
+                                                        {% for client in clients %}
+                                                            <option value="{{ client.id }}" {% if client.name == event.suggested_client %}selected{% endif %}>
+                                                                {{ client.name }}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        {% endwith %}
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-4">
+                                                No events found for the selected period.
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-success fw-bold" onclick="return validateSelection()">
+                                <i class="bi bi-check-circle me-1"></i> Create Timesheets
+                            </button>
+                            <a href="{% url 'todos:todo_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-calendar-event" style="font-size: 3rem; color: #ccc;"></i>
+                        <p class="mt-3 text-muted">
+                            No calendar events found for the selected period.
+                        </p>
+                        <a href="{% url 'todos:todo_list' %}" class="btn btn-outline-secondary">Back to Todos</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Validate that at least one event is selected
+        function validateSelection() {
+            const checkedCheckboxes = document.querySelectorAll('.event-checkbox:checked');
+            if (checkedCheckboxes.length === 0) {
+                alert('Please select at least one event');
+                return false;
+            }
+            return true;
+        }
+        
+        // Select all checkbox functionality
+        document.getElementById('selectAll').addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.event-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+
+        // Update "Select All" checkbox when individual checkboxes change
+        document.querySelectorAll('.event-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const selectAllCheckbox = document.getElementById('selectAll');
+                const allCheckboxes = document.querySelectorAll('.event-checkbox');
+                const checkedCheckboxes = document.querySelectorAll('.event-checkbox:checked');
+                
+                selectAllCheckbox.checked = allCheckboxes.length === checkedCheckboxes.length;
+                selectAllCheckbox.indeterminate = checkedCheckboxes.length > 0 && allCheckboxes.length !== checkedCheckboxes.length;
+            });
+        });
+    </script>
+{% endblock %}

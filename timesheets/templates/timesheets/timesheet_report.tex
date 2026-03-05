@@ -1,63 +1,48 @@
-\documentclass{article}
-\usepackage{geometry}
-\geometry{a4paper, margin=1in}
-\usepackage[T1]{fontenc}
-\usepackage{helvet}
-\renewcommand{\familydefault}{\sfdefault}
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{longtable}
 
-% Table packages
-\usepackage{tabularx}
-\usepackage{booktabs} % For professional looking tables
-\usepackage[table]{xcolor} % For coloring table cells
-
-% Currency symbols
-\usepackage{eurosym}
+\definecolor{primary}{RGB}{40, 40, 40}
 
 \begin{document}
 
-% --- HEADER ---
-\begin{center}
-    {\Huge\bfseries Timesheet Report\par}
-    \vspace{0.2cm}
-    {\large For Invoice \#{{ invoice.number | default:'N/A' }}\par}
-\end{center}
+\begin{flushleft}
+    {\huge \textbf{Time Detail Report}} \\
+    \vspace{2mm}
+    \large \textcolor{primary}{Reference Invoice: \#{{ invoice.number }}} \\
+    \large Client: {{ invoice.client.name }} \\
+    \large Date Generated: {{ invoice.date_issued|date:"d M Y" }}
+\end{flushleft}
 
-\vspace{1cm}
+\vspace{10mm}
 
-% --- CLIENT INFO ---
-\noindent\begin{tabularx}{\textwidth}{@{}lX@{}}
-    \textbf{Client:} & {{ invoice.client.name }} \\
-    \textbf{Date:} & {{ invoice.date_issued|date:"F j, Y" }} \\
-\end{tabularx}
-
-\vspace{1cm}
-
-% --- TIMESHEET TABLE ---
-\rowcolors{2}{gray!10}{white} % Alternate row colors for readability
-\begin{tabularx}{\textwidth}{ l l >{\raggedright\arraybackslash}X r r r }
-\toprule
-\textbf{Date} & \textbf{Category} & \textbf{Details} & \textbf{Hours} & \textbf{Rate} & \textbf{Total} \\
-\midrule
-{% for entry in timesheets %}
-{{ entry.date|date:"Y-m-d" }} & 
-{{ entry.category.name | default:'' }} & 
-{{ entry.formatted_metadata | default:'' }} & 
-{{ entry.hours | floatformat:2 }} & 
-{{ entry.hourly_rate | floatformat:2 }} & 
-{{ entry.total_value | floatformat:2 }} \\
+{% regroup timesheets by category as grouped_timesheets %}
+{% for group in grouped_timesheets %}
+    \section*{ {{ group.grouper.name }} }
+    \begin{longtable}{lp{8cm}r}
+        \toprule
+        \textbf{Date} & \textbf{Details} & \textbf{Hours} \\
+        \midrule
+        {% for entry in group.list %}
+            {{ entry.date|date:"d M Y" }} & 
+            {% if entry.formatted_metadata %}
+                {{ entry.formatted_metadata }}
+            {% else %}
+                Standard work
+            {% endif %}
+            & {{ entry.hours }}h \\
+        {% endfor %}
+        \bottomrule
+    \end{longtable}
+    \vspace{5mm}
 {% endfor %}
-\bottomrule
-\end{tabularx}
 
-\vspace{1cm}
-
-% --- TOTALS ---
-\begin{flushright}
-    \begin{tabular}{lr}
-        \textbf{Total Hours:} & {{ total_hours | floatformat:2 }} \\
-        \addlinespace
-        \textbf{Total Value:} & \textbf{{ profile.currency }} {{ total_value | floatformat:2 }} \\
-    \end{tabular}
-\end{flushright}
+\vfill
+\begin{center}
+    \footnotesize Detailed time report for Invoice \#{{ invoice.number }}.
+\end{center}
 
 \end{document}

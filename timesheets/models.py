@@ -74,9 +74,20 @@ class TimesheetEntry(TenantModel):
         # Create the string
         text = ", ".join([f"{k}: {v}" for k, v in self.metadata.items() if v])
 
-        # Safety fix for your LaTeX PDFs:
         # Escape characters that break LaTeX if they appear in your metadata
-        return text.replace("&", r"\&").replace("$", r"\$").replace("%", r"\%")
+        # Order matters: escape backslash first!
+        text = text.replace("\\", r"\textbackslash{}")
+        text = text.replace("&", r"\&")
+        text = text.replace("%", r"\%")
+        text = text.replace("$", r"\$")
+        text = text.replace("#", r"\#")
+        text = text.replace("_", r"\_")
+        text = text.replace("{", r"\{")
+        text = text.replace("}", r"\}")
+        text = text.replace("~", r"\textasciitilde{}")
+        text = text.replace("^", r"\textasciicircum{}")
+        
+        return text
 
     @property
     def metadata_json(self):

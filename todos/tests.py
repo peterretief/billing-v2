@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from clients.models import Client
+from timesheets.models import WorkCategory
 from .models import Todo
 
 User = get_user_model()
@@ -17,24 +18,32 @@ class TodoModelTests(TestCase):
             name='Test Client',
             email='client@test.com'
         )
+        self.category = WorkCategory.objects.create(
+            user=self.user,
+            name='Test Task'
+        )
     
     def test_create_todo(self):
         """Test creating a todo."""
         todo = Todo.objects.create(
             user=self.user,
             client=self.client,
-            title='Test Task',
+            category=self.category,
             description='Test Description'
         )
-        self.assertEqual(todo.title, 'Test Task')
+        self.assertEqual(todo.category.name, 'Test Task')
         self.assertEqual(todo.status, Todo.Status.TODO)
     
     def test_mark_completed(self):
         """Test marking todo as completed."""
+        category = WorkCategory.objects.create(
+            user=self.user,
+            name='Complete Me'
+        )
         todo = Todo.objects.create(
             user=self.user,
             client=self.client,
-            title='Complete Me'
+            category=category
         )
         todo.mark_completed()
         self.assertEqual(todo.status, Todo.Status.COMPLETED)
@@ -46,20 +55,22 @@ class TodoModelTests(TestCase):
         future_date = timezone.now().date() + timezone.timedelta(days=1)
         
         # Overdue todo
+        overdue_cat = WorkCategory.objects.create(user=self.user, name='Overdue')
         overdue = Todo.objects.create(
             user=self.user,
             client=self.client,
-            title='Overdue',
+            category=overdue_cat,
             due_date=past_date,
             status=Todo.Status.TODO
         )
         self.assertTrue(overdue.is_overdue)
         
         # Not overdue todo
+        upcoming_cat = WorkCategory.objects.create(user=self.user, name='Upcoming')
         upcoming = Todo.objects.create(
             user=self.user,
             client=self.client,
-            title='Upcoming',
+            category=upcoming_cat,
             due_date=future_date
         )
         self.assertFalse(upcoming.is_overdue)

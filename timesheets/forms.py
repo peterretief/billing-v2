@@ -7,17 +7,41 @@ from .models import TimesheetEntry, WorkCategory
 class TimesheetEntryForm(forms.ModelForm):
     class Meta:
         model = TimesheetEntry
-        fields = ["client", "date", "hours", "hourly_rate", "todo"]
+        fields = ["client", "date", "hours", "hourly_rate", "category", "todo"]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "hours": forms.NumberInput(attrs={"class": "form-control", "step": "0.25"}),
             "hourly_rate": forms.NumberInput(attrs={"class": "form-control"}),
             "client": forms.Select(attrs={"class": "form-select"}),
+            "category": forms.Select(attrs={"class": "form-select"}),
             "todo": forms.HiddenInput(),
+        }
+        help_texts = {
+            'category': '',  # Remove default help text
         }
 
     def __init__(self, *args, **kwargs):
+        # Extract user before calling parent __init__
+        user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        
+        print(f"[DEBUG FORM] Initializing TimesheetEntryForm")
+        print(f"[DEBUG FORM] User: {user}")
+        print(f"[DEBUG FORM] Initial data: {self.initial}")
+        
+        # Filter categories by current user if available
+        if user:
+            cats = WorkCategory.objects.filter(user=user)
+            self.fields['category'].queryset = cats
+            print(f"[DEBUG FORM] Set category queryset for user {user.username}: {list(cats.values_list('id', 'name'))}")
+            if 'category' in self.initial:
+                print(f"[DEBUG FORM] Category in initial: {self.initial['category']}")
+        else:
+            # Try to get from instance
+            if self.instance and self.instance.pk:
+                cats = WorkCategory.objects.filter(user=self.instance.user)
+                self.fields['category'].queryset = cats
+                print(f"[DEBUG FORM] Set category queryset from instance user: {list(cats.values_list('id', 'name'))}")
         
         # Disable client field if timesheet is already linked to an invoice
         if self.instance and self.instance.pk and self.instance.invoice_id:
@@ -42,6 +66,7 @@ class WorkCategoryForm(forms.ModelForm):
     metadata_schema_raw = forms.CharField(
         label="Fields (comma separated)",
         help_text="e.g. Project_Phase, Stakeholder, Location",
+        required=False,
         widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Field1, Field2"}),
     )
 
@@ -51,6 +76,13 @@ class WorkCategoryForm(forms.ModelForm):
         widgets = {
             "name": forms.TextInput(attrs={"class": "form-control"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Pre-fill metadata_schema_raw with existing data when editing
+        if self.instance and self.instance.pk:
+            if self.instance.metadata_schema:
+                self.fields['metadata_schema_raw'].initial = ", ".join(self.instance.metadata_schema)
 
     def save(self, commit=True):
         instance = super().save(commit=False)

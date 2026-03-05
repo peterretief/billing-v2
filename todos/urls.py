@@ -16,4 +16,11 @@ urlpatterns = [
     # Actions
     path('<int:pk>/complete/', views.mark_todo_completed, name='todo_complete'),
     path('<int:pk>/cancel/', views.mark_todo_cancelled, name='todo_cancel'),
+    
+    # Google Calendar integration
+    path('calendar/auth/start/', views.calendar_auth_start, name='calendar_auth_start'),
+    path('calendar/auth/callback/', views.calendar_auth_callback, name='calendar_auth_callback'),
+    path('calendar/sync/', views.sync_todos_to_calendar, name='calendar_sync'),
+    path('calendar/import/', views.import_calendar_events, name='import_calendar_events'),
+    path('calendar/import-create-timesheets/', views.create_timesheets_from_events, name='create_timesheets_from_events'),
 ]

@@ -203,3 +203,9 @@ LOGGING = {
         },
     },
 }
+
+# --- GOOGLE CALENDAR OAUTH ---
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_CREDENTIALS_PATH = os.path.join(BASE_DIR, "google_credentials.json")
+GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8003/todos/calendar/auth/callback/")

@@ -9,6 +9,35 @@
                         class="btn-close btn-close-white"
                         data-bs-dismiss="modal"></button>
             </div>
+            <!-- Todo Context Display -->
+            {% if todo %}
+            <div class="bg-light border-bottom p-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-2 text-dark fw-bold">
+                            <i class="bi bi-list-check me-2"></i>{{ todo.category.name }}
+                        </h6>
+                        {% if todo.description %}
+                            <small class="text-muted d-block mb-2">{{ todo.description }}</small>
+                        {% endif %}
+                        <div>
+                            {% if todo.category %}
+                                <span class="badge bg-info me-2">{{ todo.category.name }}</span>
+                            {% endif %}
+                            {% if todo.estimated_hours %}
+                                <span class="badge bg-secondary">{{ todo.estimated_hours }}h estimated</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if todo.get_linked_hours %}
+                    <div class="text-end ps-3">
+                        <small class="text-muted d-block">Logged</small>
+                        <strong class="text-success">{{ todo.get_linked_hours }}h</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
             <form action="{% url 'timesheets:log_time' %}"
                   method="post"
                   id="logTimeForm">
@@ -16,6 +45,7 @@
                 <div class="modal-body p-4">
                     <div class="mb-4">
                         <label class="form-label text-muted small fw-bold text-uppercase">Client</label>
+                        <!-- Using manual select to allow HTMX trigger, but will set value with JS -->
                         <select name="client"
                                 class="form-select"
                                 required
@@ -23,8 +53,8 @@
                                 hx-get="{% url 'timesheets:get_client_rate' %}"
                                 hx-target="#rate-input-wrapper"
                                 hx-trigger="change">
-                            <option value="" selected disabled>Choose a client...</option>
-                            {% for client in clients %}<option value="{{ client.id }}">{{ client.name }}</option>{% endfor %}
+                            <option value="">Choose a client...</option>
+                            {% for client in clients %}<option value="{{ client.id }}" {% if timesheet_form.client.value == client.id|stringformat:"s" %}selected{% endif %}>{{ client.name }}</option>{% endfor %}
                         </select>
                     </div>
                     <div class="row g-3 mb-4">
@@ -44,17 +74,12 @@
                     <hr class="my-4 opacity-25">
                     <div class="mb-3">
                         <label class="form-label text-dark fw-bold small text-uppercase">Work Category</label>
-                        <select name="category"
-                                id="id_category"
-                                class="form-select"
-                                hx-get="{% url 'timesheets:get_category_fields' %}"
-                                hx-target="#dynamicFields"
-                                hx-trigger="change">
-                            <option value="">Select Category</option>
-                            {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
-                        </select>
+                        <!-- DEBUG: category field initial={{ timesheet_form.category.value|default:"NONE" }} -->
+                        {{ timesheet_form.category }}
                     </div>
-                    <input type="hidden" name="category_hidden" id="category_hidden" value="">
+                    <!-- DEBUG RAW FIELD: {{ timesheet_form.category }} -->
+                    <input type="hidden" name="category_hidden" id="category_hidden" value=""
+                           data-debug-field="{{ timesheet_form.category.value|default:'NONE' }}">
                     <input type="hidden" name="todo" id="id_todo" value="">
                     <div id="dynamicFieldsContainer"
                          class="p-4 mb-3 border-start border-4 border-primary bg-light rounded shadow-sm"

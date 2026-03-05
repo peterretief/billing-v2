@@ -25,22 +25,51 @@
                             <i class="bi bi-plus-lg me-2"></i> Create New Todo
                         {% endif %}
                     </div>
+                    {% if linked_timesheet %}
+                        <div class="alert alert-warning m-0 rounded-0 border-bottom" role="alert">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <strong><i class="bi bi-exclamation-triangle me-2"></i> This todo has a linked timesheet</strong>
+                                    <br>
+                                    <small>You cannot edit this todo while a timesheet is linked to it.</small>
+                                    {% if timesheet_is_invoiced %}
+                                        <br>
+                                        <small><span class="badge bg-danger">Invoiced</span> - This timesheet cannot be unlinked.</small>
+                                    {% else %}
+                                        <br>
+                                        <small>You can unlink the timesheet below to enable editing.</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
                     <div class="card-body p-4">
                         <form method="post">
                             {% csrf_token %}
-                            <!-- Title -->
+                            <!-- Category - Select or Add New -->
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Title</label>
-                                {{ form.title }}
-                                {% if form.title.errors %}
-                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.title.errors }}</div>
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-tag me-1"></i>Work Category
+                                </label>
+                                {{ form.category_text }}
+                                <datalist id="category_list">
+                                    {% for cat in categories %}
+                                        <option value="{{ cat.name }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                                <small class="form-text text-muted d-block mt-1">Pick from list or type to create new</small>
+                                {% if form.category_text.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.category_text.errors }}</div>
+                                {% endif %}
+                                {% if form.category.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.category.errors }}</div>
                                 {% endif %}
                             </div>
                             <!-- Description -->
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Description</label>
                                 {{ form.description }}
-                                <small class="form-text text-muted d-block mt-1">Provide detailed information about this task</small>
+                                <small class="form-text text-muted d-block mt-1">Additional details about this work</small>
                                 {% if form.description.errors %}
                                     <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.description.errors }}</div>
                                 {% endif %}
@@ -90,13 +119,19 @@
                             </div>
                             <!-- Buttons -->
                             <div class="mt-4">
-                                <button type="submit" class="btn btn-primary fw-bold px-4 me-2">
-                                    {% if form.instance.pk %}
-                                        <i class="bi bi-check me-1"></i> Update Todo
-                                    {% else %}
-                                        <i class="bi bi-plus me-1"></i> Create Todo
-                                    {% endif %}
-                                </button>
+                                {% if not linked_timesheet %}
+                                    <button type="submit" class="btn btn-primary fw-bold px-4 me-2">
+                                        {% if form.instance.pk %}
+                                            <i class="bi bi-check me-1"></i> Update Todo
+                                        {% else %}
+                                            <i class="bi bi-plus me-1"></i> Create Todo
+                                        {% endif %}
+                                    </button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-primary fw-bold px-4 me-2" disabled>
+                                        <i class="bi bi-lock me-1"></i> Cannot Edit
+                                    </button>
+                                {% endif %}
                                 <a href="{% url 'todos:todo_list' %}"
                                    class="btn btn-outline-secondary fw-bold px-4">
                                     <i class="bi bi-x me-1"></i> Cancel
@@ -109,6 +144,33 @@
                                     </a>
                                 {% endif %}
                             </div>
+                            
+                            <!-- Unlink Timesheet Section -->
+                            {% if linked_timesheet %}
+                                <hr class="my-4">
+                                <div class="bg-light p-3 rounded">
+                                    <h6 class="fw-bold text-danger mb-3">
+                                        <i class="bi bi-link-45deg me-2"></i> Unlink Timesheet
+                                    </h6>
+                                    <p class="text-muted small mb-3">
+                                        To edit this todo, you need to unlink the timesheet entry. The timesheet will be permanently deleted.
+                                    </p>
+                                    {% if timesheet_is_invoiced %}
+                                        <button type="button" class="btn btn-danger" disabled>
+                                            <i class="bi bi-lock me-1"></i> Cannot Unlink (Invoiced)
+                                        </button>
+                                    {% else %}
+                                        <form method="post" style="display: inline;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="unlink_timesheet" value="on">
+                                            <button type="submit" class="btn btn-outline-danger" 
+                                                    onclick="return confirm('Delete this timesheet? This cannot be undone.');">
+                                                <i class="bi bi-trash me-1"></i> Delete Timesheet
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         </form>
                     </div>
                 </div>

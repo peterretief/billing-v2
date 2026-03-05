@@ -191,6 +191,33 @@ def manage_categories(request):
 
 
 @login_required
+def edit_category(request, pk):
+    category = get_object_or_404(WorkCategory, id=pk, user=request.user)
+    if request.method == "POST":
+        form = WorkCategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Category updated!")
+            return redirect("timesheets:manage_categories")
+    else:
+        form = WorkCategoryForm(instance=category)
+    
+    return render(request, "timesheets/edit_category.html", {"form": form, "category": category})
+
+
+@login_required
+def delete_category(request, pk):
+    category = get_object_or_404(WorkCategory, id=pk, user=request.user)
+    if request.method == "POST":
+        category_name = category.name
+        category.delete()
+        messages.success(request, f"Category '{category_name}' deleted!")
+        return redirect("timesheets:manage_categories")
+    
+    return render(request, "timesheets/delete_category.html", {"category": category})
+
+
+@login_required
 def get_category_fields(request):
     category_id = request.GET.get("category")
     if category_id:
@@ -220,7 +247,7 @@ class TimesheetListView(LoginRequiredMixin, ListView):
         categories = WorkCategory.objects.filter(user=self.request.user).order_by("name")
         
         # Create form
-        form = TimesheetEntryForm()
+        form = TimesheetEntryForm(user=self.request.user)
 
         clients = (
             Client.objects.filter(user=self.request.user)
@@ -279,7 +306,7 @@ class TimesheetListView(LoginRequiredMixin, ListView):
 @login_required
 def log_time(request):
     if request.method == "POST":
-        form = TimesheetEntryForm(request.POST)
+        form = TimesheetEntryForm(request.POST, user=request.user)
         if form.is_valid():
             entry = form.save(commit=False)
             entry.user = request.user
@@ -289,12 +316,17 @@ def log_time(request):
             if todo_id and Todo:
                 try:
                     todo = Todo.objects.get(id=todo_id, user=request.user)
-                    # Create or get category with todo's title
-                    category, created = WorkCategory.objects.get_or_create(
-                        user=request.user,
-                        name=todo.title,
-                    )
-                    entry.category = category
+                    
+                    # Check if a timesheet entry already exists for this todo
+                    if TimesheetEntry.objects.filter(todo=todo).exists():
+                        messages.error(request, f"A timesheet entry already exists for this todo. Please edit that entry instead.")
+                        return redirect("todos:todo_detail", pk=todo.pk)
+                    
+                    # Use the todo's category directly
+                    if todo.category:
+                        entry.category = todo.category
+                    
+                    entry.todo = todo
                 except Todo.DoesNotExist:
                     pass
             else:
@@ -314,11 +346,14 @@ def log_time(request):
                 k.replace("meta_", ""): v for k, v in request.POST.items() if k.startswith("meta_") and v.strip()
             }
             
-            # Add todo title to metadata if available
+            # Add todo info to metadata if available
             if todo_id and Todo:
                 try:
                     todo = Todo.objects.get(id=todo_id, user=request.user)
-                    meta_data["Todo"] = todo.title
+                    todo_label = todo.category.name if todo.category else "Uncategorized"
+                    if todo.description:
+                        todo_label += f" - {todo.description}"
+                    meta_data["Todo"] = todo_label
                 except Todo.DoesNotExist:
                     pass
             
@@ -351,7 +386,7 @@ def edit_entry(request, pk):
         return redirect("timesheets:timesheet_list")
 
     if request.method == "POST":
-        form = TimesheetEntryForm(request.POST, instance=entry)
+        form = TimesheetEntryForm(request.POST, instance=entry, user=request.user)
         if form.is_valid():
             # Manually handle category from POST (try regular field first, then backup)
             category_id = request.POST.get("category") or request.POST.get("category_hidden")
@@ -386,7 +421,7 @@ def delete_entry(request, pk):
         messages.error(request, "Cannot delete invoiced entries.")
     else:
         entry.delete()
-        messages.success(request, "Entry deleted.")
+        messages.success(request, "Timesheet deleted.")
     return redirect("timesheets:timesheet_list")
 
 
