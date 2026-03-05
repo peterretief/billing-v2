@@ -56,9 +56,6 @@ class TimesheetEntry(TenantModel):
 
     objects = TimesheetManager()  # Attach it here
 
-    class Meta:
-        ordering = ["-date"]
-
     # Defined only once
     metadata = models.JSONField(default=dict, blank=True)
 
@@ -95,7 +92,7 @@ class TimesheetEntry(TenantModel):
         return json.dumps(self.metadata)
 
     class Meta:
-        ordering = ["-date"]
+        ordering = ["-date", "-id"]
         verbose_name_plural = "Timesheet Entries"
 
     def __str__(self):

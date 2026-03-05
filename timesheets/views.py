@@ -234,7 +234,7 @@ class TimesheetListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         """Only show uninvoiced items in the main table view."""
-        return TimesheetEntry.objects.filter(user=self.request.user, is_billed=False).order_by("-date")
+        return TimesheetEntry.objects.filter(user=self.request.user, is_billed=False).order_by("-date", "-id")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
