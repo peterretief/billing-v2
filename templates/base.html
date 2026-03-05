@@ -88,6 +88,10 @@
                                 <a class="nav-link {% if 'timesheets' in request.path and 'categories' not in request.path %}active fw-bold{% endif %}"
                                    href="{% url 'timesheets:timesheet_list' %}"><i class="bi bi-clock-history me-1"></i>Timesheets</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'todos' in request.path %}active fw-bold{% endif %}"
+                                   href="{% url 'todos:todo_list' %}"><i class="bi bi-check-square me-1"></i>Todos</a>
+                            </li>
                             {# Updated: Changed is_ops to is_staff/superuser for visibility #}
                             {% if user.is_staff or user.is_superuser %}
                                 <li class="nav-item ms-lg-3">
