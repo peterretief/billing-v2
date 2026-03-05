@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
+from django.utils import timezone
 
 from timesheets.models import WorkCategory
 from timesheets.forms import TimesheetEntryForm
@@ -96,10 +97,18 @@ class TodoDetailView(LoginRequiredMixin, DetailView):
         # Get linked timesheets
         context['linked_timesheets'] = self.object.timesheet_entries.select_related('client', 'category')
         
-        # Add timesheet form and categories for the log time modal
-        context['timesheet_form'] = TimesheetEntryForm()
+        # Add timesheet form with pre-filled initial data
+        initial_data = {
+            'client': self.object.client.id,
+            'hourly_rate': self.object.client.default_hourly_rate,
+            'hours': self.object.estimated_hours,
+            'date': timezone.now().date(),
+            'todo': self.object.id,
+        }
+        context['timesheet_form'] = TimesheetEntryForm(initial=initial_data)
         context['categories'] = WorkCategory.objects.filter(user=self.request.user)
         context['clients'] = self.request.user.client_related.all()
+        context['todo_title'] = self.object.title  # Pass to template for JS use
         
         return context
 

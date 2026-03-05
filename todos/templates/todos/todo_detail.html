@@ -189,76 +189,36 @@
     <!-- Log Time Modal -->
     {% include "timesheets/includes/log_time_modal.html" %}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const logModal = document.getElementById('logTimeModal');
-            const todoId = '{{ todo.pk }}';
-            const clientId = '{{ todo.client.id }}';
-            const clientRate = {
-                {
-                    todo.client.default_hourly_rate |
-                        default: "0"
-                }
-            };
-            const estimatedHours = {
-                {
-                    todo.estimated_hours |
-                        default: "0"
-                }
-            };
-            const todoTitle = '{{ todo.title|escapejs }}';
-
-            if (logModal) {
-                logModal.addEventListener('show.bs.modal', function(event) {
-                    setTimeout(() => {
-                        const form = document.getElementById('logTimeForm');
-                        if (!form) return;
-
-                        const todoField = document.getElementById('id_todo');
-                        const clientField = document.getElementById('id_client');
-
-                        if (todoField) todoField.value = todoId;
-                        if (clientField) {
-                            clientField.value = clientId;
-                            clientField.dispatchEvent(new Event('change', {
-                                bubbles: true
-                            }));
-                        }
-
-                        form.action = "{% url 'timesheets:log_time' %}";
-
-                        const dateField = form.querySelector('[name="date"]');
-                        if (dateField) {
-                            dateField.value = new Date().toISOString().split('T')[0];
-                        }
-
-                        const hoursField = form.querySelector('[name="hours"]');
-                        if (hoursField && estimatedHours) {
-                            hoursField.value = estimatedHours;
-                        }
-
-                        const rateField = form.querySelector('[name="hourly_rate"]');
-                        if (rateField && clientRate) {
-                            rateField.value = clientRate;
-                        }
-
-                        const categoryField = form.querySelector('[name="category"]');
-                        if (categoryField) {
-                            const options = categoryField.querySelectorAll('option');
-                            let found = false;
-                            options.forEach(opt => {
-                                if (opt.textContent.trim() === todoTitle) {
-                                    categoryField.value = opt.value;
-                                    found = true;
-                                }
-                            });
-                            if (!found) categoryField.value = '';
-                            categoryField.dispatchEvent(new Event('change', {
-                                bubbles: true
-                            }));
-                        }
-                    }, 100);
-                });
-            }
-        });
+document.addEventListener('DOMContentLoaded',function(){
+  var m=document.getElementById('logTimeModal');
+  var tid='{{ todo.pk|escapejs }}';
+  var cid='{{ todo.client.id|escapejs }}';
+  var title='{{ todo.title|escapejs }}';
+  if(!m)return;
+  m.addEventListener('show.bs.modal',function(){
+    setTimeout(function(){
+      var f=document.getElementById('logTimeForm');
+      if(!f)return;
+      var tf=document.getElementById('id_todo');
+      var cf=document.getElementById('id_client');
+      var catf=document.getElementById('id_category');
+      if(tf)tf.value=tid;
+      if(cf){
+        cf.value=cid;
+        cf.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+      if(catf){
+        var opts=catf.querySelectorAll('option');
+        for(var i=0;i<opts.length;i++){
+          if(opts[i].text.trim()===title){
+            catf.value=opts[i].value;
+            break;
+          }
+        }
+        catf.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+    },100);
+  });
+});
     </script>
 {% endblock %}

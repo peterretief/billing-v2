@@ -2,3 +2,7 @@
 venv/
 .git/
 staticfiles/
+# Ignore all Django templates to prevent formatter from breaking template syntax
+**/*.html
+*.html
+*/templates/**
