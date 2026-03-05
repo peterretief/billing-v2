@@ -6,6 +6,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 
+from timesheets.models import WorkCategory
+from timesheets.forms import TimesheetEntryForm
+
 from .models import Todo
 from .forms import TodoForm
 
@@ -92,6 +95,12 @@ class TodoDetailView(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         # Get linked timesheets
         context['linked_timesheets'] = self.object.timesheet_entries.select_related('client', 'category')
+        
+        # Add timesheet form and categories for the log time modal
+        context['timesheet_form'] = TimesheetEntryForm()
+        context['categories'] = WorkCategory.objects.filter(user=self.request.user)
+        context['clients'] = self.request.user.client_related.all()
+        
         return context
 
 

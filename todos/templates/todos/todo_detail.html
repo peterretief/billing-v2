@@ -188,7 +188,5 @@
         </div>
     </div>
     <!-- Log Time Modal -->
-    {% with clients=request.user.client_related.all categories=request.user.workcategory_related.all %}
-        {% include "timesheets/includes/log_time_modal.html" %}
-    {% endwith %}
+    {% include "timesheets/includes/log_time_modal.html" %}
 {% endblock %}
