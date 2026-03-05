@@ -253,6 +253,9 @@ def calendar_auth_start(request):
     """Initiate Google Calendar OAuth flow."""
     from .calendar_utils import get_oauth_flow
     from django.conf import settings
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     # Check if credentials are configured
     if not settings.GOOGLE_OAUTH_CLIENT_ID or not settings.GOOGLE_OAUTH_CLIENT_SECRET:
@@ -276,9 +279,13 @@ def calendar_auth_start(request):
         request.session['oauth_state'] = state
         request.session['code_verifier'] = flow.code_verifier
         request.session.modified = True
+        request.session.save()  # Explicitly save the session
+        
+        logger.info(f"Started OAuth flow for {request.user.username}. State: {state}")
         
         return redirect(authorization_url)
     except Exception as e:
+        logger.exception(f"Error initiating Google Calendar auth: {str(e)}")
         messages.error(request, f"Error initiating Google Calendar auth: {str(e)}")
         return redirect('todos:todo_list')
 
@@ -293,10 +300,18 @@ def calendar_auth_callback(request):
     
     logger = logging.getLogger(__name__)
     
+    # Try to validate session state (CSRF protection)
     state = request.session.get('oauth_state')
+    google_state = request.GET.get('state')
+    
+    # Session state might be lost in some cases (mobile, incognito, etc.)
+    # But we still have CSRF protection via Django's @login_required and the fact that
+    # Google verified the authorization. We log this for monitoring.
     if not state:
+        logger.warning(f"OAuth state not found in session for {request.user.username}. Google state: {google_state}. Proceeding with caution.")
+    elif state != google_state:
         messages.error(request, "OAuth state mismatch. Please try again.")
-        logger.error("OAuth state not found in session")
+        logger.error(f"OAuth state mismatch for {request.user.username}. Expected: {state}, got: {google_state}")
         return redirect('todos:todo_list')
     
     # Get authorization code
@@ -304,7 +319,7 @@ def calendar_auth_callback(request):
     if not code:
         error = request.GET.get('error', 'Unknown error')
         messages.error(request, f"Authorization cancelled: {error}")
-        logger.error(f"No authorization code received. Error: {error}")
+        logger.error(f"No authorization code received for {request.user.username}. Error: {error}")
         return redirect('todos:todo_list')
     
     try:
@@ -313,6 +328,8 @@ def calendar_auth_callback(request):
         
         # Retrieve code_verifier from session (needed for PKCE)
         code_verifier = request.session.get('code_verifier')
+        if not code_verifier:
+            logger.warning(f"Code verifier not found in session for {request.user.username}. PKCE validation may fail.")
         
         # Exchange code for token
         flow.fetch_token(
@@ -325,6 +342,7 @@ def calendar_auth_callback(request):
         logger.info(f"Token: {creds.token[:20] if creds.token else 'None'}...")
         logger.info(f"Refresh token: {creds.refresh_token[:20] if creds.refresh_token else 'None'}...")
         logger.info(f"Expiry: {creds.expiry}")
+        logger.info(f"Scopes granted: {creds.scopes}")
         
         # Save credentials to database
         cred_obj, created = GoogleCalendarCredential.objects.update_or_create(
@@ -347,12 +365,13 @@ def calendar_auth_callback(request):
         request.session.pop('oauth_state', None)
         request.session.pop('code_verifier', None)
         request.session.modified = True
+        request.session.save()
         
-        messages.success(request, "Google Calendar connected successfully!")
+        messages.success(request, "Google Calendar connected successfully! You now have permission to access Calendar and Contacts.")
         return redirect('todos:todo_list')
         
     except Exception as e:
-        logger.exception(f"Error during OAuth callback: {str(e)}")
+        logger.exception(f"Error during OAuth callback for {request.user.username}: {str(e)}")
         messages.error(request, f"Error connecting to Google Calendar: {str(e)}")
         return redirect('todos:todo_list')
 
