@@ -118,7 +118,7 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <select name="category_id_{{ event.id }}" class="form-select form-select-sm" required>
+                                                    <select name="category_id_{{ event.id }}" class="form-select form-select-sm">
                                                         <option value="">-- Select --</option>
                                                         {% for category in categories %}
                                                             <option value="{{ category.id }}" {% if category.name == event.suggested_category %}selected{% endif %}>
@@ -128,7 +128,7 @@
                                                     </select>
                                                 </td>
                                                 <td>
-                                                    <select name="client_id_{{ event.id }}" class="form-select form-select-sm" required>
+                                                    <select name="client_id_{{ event.id }}" class="form-select form-select-sm">
                                                         <option value="">-- Select --</option>
                                                         {% for client in clients %}
                                                             <option value="{{ client.id }}" {% if event.suggested_client_id == client.id %}selected{% elif client.name == event.suggested_client %}selected{% endif %}>
@@ -172,13 +172,32 @@
     </div>
 
     <script>
-        // Validate that at least one event is selected
+        // Validate that at least one event is selected and all selected events have category and client
         function validateSelection() {
             const checkedCheckboxes = document.querySelectorAll('.event-checkbox:checked');
+            
             if (checkedCheckboxes.length === 0) {
                 alert('Please select at least one event');
                 return false;
             }
+            
+            // Check that each selected event has both category and client selected
+            for (const checkbox of checkedCheckboxes) {
+                const eventId = checkbox.value;
+                const categorySelect = document.querySelector(`select[name="category_id_${eventId}"]`);
+                const clientSelect = document.querySelector(`select[name="client_id_${eventId}"]`);
+                
+                if (!categorySelect.value) {
+                    alert(`Please select a Work Category for event "${checkbox.closest('tr').querySelector('strong').textContent}"`);
+                    return false;
+                }
+                
+                if (!clientSelect.value) {
+                    alert(`Please select a Client for event "${checkbox.closest('tr').querySelector('strong').textContent}"`);
+                    return false;
+                }
+            }
+            
             return true;
         }
         
