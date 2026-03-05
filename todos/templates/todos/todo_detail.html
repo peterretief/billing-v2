@@ -188,35 +188,49 @@
     </div>
     <!-- Log Time Modal -->
     {% include "timesheets/includes/log_time_modal.html" %}
-    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const logModal = document.getElementById('logTimeModal');
             const todoId = '{{ todo.pk }}';
             const clientId = '{{ todo.client.id }}';
-            
+
             if (logModal) {
                 logModal.addEventListener('show.bs.modal', function(event) {
-                    const button = event.relatedTarget;
-                    
-                    // Set todo and client IDs
-                    const todoField = document.getElementById('id_todo');
-                    const clientField = document.getElementById('id_client');
-                    
-                    if (todoField) todoField.value = todoId;
-                    if (clientField) clientField.value = clientId;
-                    
-                    // Reset form fields
-                    const form = document.getElementById('logTimeForm');
-                    if (form) {
+                    // Use setTimeout to ensure modal is fully rendered
+                    setTimeout(() => {
+                        const form = document.getElementById('logTimeForm');
+                        if (!form) return;
+                        
+                        // Set todo and client IDs
+                        const todoField = document.getElementById('id_todo');
+                        const clientField = document.getElementById('id_client');
+                        
+                        if (todoField) todoField.value = todoId;
+                        if (clientField) {
+                            clientField.value = clientId;
+                            // Trigger change event to load hourly rate
+                            clientField.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+
+                        // Reset form fields
                         form.action = "{% url 'timesheets:log_time' %}";
                         form.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], textarea').forEach(el => {
-                            if (el.name !== 'todo' && el.name !== 'client' && el.name !== 'category_hidden') {
+                            if (el.name !== 'todo' && el.name !== 'client' && el.name !== 'category_hidden' && el.name !== 'hourly_rate') {
                                 el.value = '';
                             }
                         });
-                        form.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
-                    }
+                        
+                        // Set today's date
+                        const dateField = form.querySelector('[name="date"]');
+                        if (dateField) {
+                            dateField.value = new Date().toISOString().split('T')[0];
+                        }
+                        
+                        // Clear category selection
+                        const categoryField = form.querySelector('[name="category"]');
+                        if (categoryField) categoryField.value = '';
+                        
+                    }, 100);
                 });
             }
         });
