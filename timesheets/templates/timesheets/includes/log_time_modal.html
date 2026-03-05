@@ -54,6 +54,7 @@
                             {% for cat in categories %}<option value="{{ cat.id }}">{{ cat.name }}</option>{% endfor %}
                         </select>
                     </div>
+                    <input type="hidden" name="category_hidden" id="category_hidden" value="">
                     <div id="dynamicFieldsContainer"
                          class="p-4 mb-3 border-start border-4 border-primary bg-light rounded shadow-sm"
                          style="display: none">

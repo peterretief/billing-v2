@@ -7,13 +7,12 @@ from .models import TimesheetEntry, WorkCategory
 class TimesheetEntryForm(forms.ModelForm):
     class Meta:
         model = TimesheetEntry
-        fields = ["client", "category", "date", "hours", "hourly_rate"]
+        fields = ["client", "date", "hours", "hourly_rate"]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "hours": forms.NumberInput(attrs={"class": "form-control", "step": "0.25"}),
             "hourly_rate": forms.NumberInput(attrs={"class": "form-control"}),
             "client": forms.Select(attrs={"class": "form-select"}),
-            "category": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):

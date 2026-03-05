@@ -212,6 +212,9 @@ class TimesheetListView(LoginRequiredMixin, ListView):
 
         # FETCH CATEGORIES FOR THE MODAL
         categories = WorkCategory.objects.filter(user=self.request.user).order_by("name")
+        
+        # Create form
+        form = TimesheetEntryForm()
 
         clients = (
             Client.objects.filter(user=self.request.user)
@@ -257,7 +260,7 @@ class TimesheetListView(LoginRequiredMixin, ListView):
                 "total_value": total_val,
                 "target_amount": target_amount,
                 "progress_percent": float(min((total_val / target_amount) * 100, 100)) if target_amount > 0 else 0,
-                "timesheet_form": TimesheetEntryForm(),
+                "timesheet_form": form,
                 "invoices": invoices,
             }
         )
@@ -275,10 +278,12 @@ def log_time(request):
             entry = form.save(commit=False)
             entry.user = request.user
 
-            # Capture the Category ID
-            category_id = request.POST.get("category")
+            # Manually handle category from POST (try regular field first, then backup)
+            category_id = request.POST.get("category") or request.POST.get("category_hidden")
             if category_id:
                 entry.category_id = category_id
+            else:
+                entry.category = None
 
             # Set default hourly rate if missing
             if not entry.hourly_rate or entry.hourly_rate == 0:
@@ -307,14 +312,21 @@ def log_time(request):
 def edit_entry(request, pk):
     entry = get_object_or_404(TimesheetEntry, pk=pk, user=request.user)
 
+    if entry.is_billed:
+        messages.error(request, "Cannot edit invoiced entries.")
+        return redirect("timesheets:timesheet_list")
+
     if request.method == "POST":
         form = TimesheetEntryForm(request.POST, instance=entry)
         if form.is_valid():
-            entry = form.save(commit=False)
-
-            category_id = request.POST.get("category")
+            # Manually handle category from POST (try regular field first, then backup)
+            category_id = request.POST.get("category") or request.POST.get("category_hidden")
             if category_id:
                 entry.category_id = category_id
+            else:
+                entry.category = None
+            
+            entry = form.save(commit=False)
 
             # Re-capture metadata during edit
             meta_data = {}
@@ -326,29 +338,11 @@ def edit_entry(request, pk):
             entry.save()
             messages.success(request, "Entry updated.")
             return redirect("timesheets:timesheet_list")
+        else:
+            messages.error(request, "Please correct the errors below.")
+            return redirect("timesheets:timesheet_list")
 
-    if entry.is_billed:
-        messages.error(request, "Cannot edit invoiced entries.")
-        return redirect("timesheets:timesheet_list")
-
-    form = TimesheetEntryForm(request.POST or None, instance=entry)
-    if request.method == "POST" and form.is_valid():
-        entry = form.save(commit=False)
-
-        # Update metadata during edit
-        meta_data = {}
-        for key, value in request.POST.items():
-            if key.startswith("meta_"):
-                meta_data[key.replace("meta_", "")] = value
-
-        entry.metadata = meta_data
-        entry.save()
-        messages.success(request, "Updated successfully.")
-        return redirect("timesheets:timesheet_list")
-
-    # Need categories here for the edit template dropdown
-    categories = WorkCategory.objects.filter(user=request.user)
-    return render(request, "timesheets/edit_entry_form.html", {"form": form, "entry": entry, "categories": categories})
+    return redirect("timesheets:timesheet_list")
 
 
 @login_required

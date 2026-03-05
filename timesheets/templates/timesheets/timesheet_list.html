@@ -182,13 +182,21 @@
                 form.querySelector('[name="date"]').value = button.getAttribute('data-date');
                 form.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
                 form.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate');
-                form.querySelector('[name="description"]').value = button.getAttribute('data-desc');
 
+                // Always set category value when editing
+                const catSelect = form.querySelector('[name="category"]');
+                const catHidden = form.querySelector('[name="category_hidden"]');
+                if (catSelect) {
+                    catSelect.value = catId || '';
+                }
+                if (catHidden) {
+                    catHidden.value = catId || '';
+                }
+
+                // Load dynamic fields if category has metadata schema or if there's saved metadata
                 if (catId || (metadataString && metadataString !== '{}')) {
                     if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'block';
                     const activeCatId = (catId && catId !== "") ? catId : "1";
-                    const catSelect = form.querySelector('[name="category"]');
-                    if (catSelect && catId) catSelect.value = catId;
 
                     htmx.ajax('GET', `{% url "timesheets:get_category_fields" %}?category=${activeCatId}`, {
                         target: '#dynamicFields',
@@ -208,6 +216,10 @@
                             console.error("Metadata Parse Error", e);
                         }
                     });
+                } else {
+                    // If no category or metadata, clear the dynamic fields
+                    if (dynamicFieldsTarget) dynamicFieldsTarget.innerHTML = '';
+                    if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'none';
                 }
             });
 
