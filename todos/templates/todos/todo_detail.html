@@ -193,6 +193,19 @@
             const logModal = document.getElementById('logTimeModal');
             const todoId = '{{ todo.pk }}';
             const clientId = '{{ todo.client.id }}';
+            const clientRate = {
+                {
+                    todo.client.default_hourly_rate |
+                        default: "0"
+                }
+            };
+            const estimatedHours = {
+                {
+                    todo.estimated_hours |
+                        default: "0"
+                }
+            };
+            const todoTitle = '{{ todo.title|escapejs }}';
 
             if (logModal) {
                 logModal.addEventListener('show.bs.modal', function(event) {
@@ -200,16 +213,18 @@
                     setTimeout(() => {
                         const form = document.getElementById('logTimeForm');
                         if (!form) return;
-                        
+
                         // Set todo and client IDs
                         const todoField = document.getElementById('id_todo');
                         const clientField = document.getElementById('id_client');
-                        
+
                         if (todoField) todoField.value = todoId;
                         if (clientField) {
                             clientField.value = clientId;
                             // Trigger change event to load hourly rate
-                            clientField.dispatchEvent(new Event('change', { bubbles: true }));
+                            clientField.dispatchEvent(new Event('change', {
+                                bubbles: true
+                            }));
                         }
 
                         // Reset form fields
@@ -219,17 +234,47 @@
                                 el.value = '';
                             }
                         });
-                        
+
                         // Set today's date
                         const dateField = form.querySelector('[name="date"]');
                         if (dateField) {
                             dateField.value = new Date().toISOString().split('T')[0];
                         }
-                        
-                        // Clear category selection
+
+                        // Auto-fill hours from estimated hours
+                        const hoursField = form.querySelector('[name="hours"]');
+                        if (hoursField && estimatedHours) {
+                            hoursField.value = estimatedHours;
+                        }
+
+                        // Auto-fill hourly rate
+                        const rateField = form.querySelector('[name="hourly_rate"]');
+                        if (rateField && clientRate) {
+                            rateField.value = clientRate;
+                        }
+
+                        // Find and select category matching todo title
                         const categoryField = form.querySelector('[name="category"]');
-                        if (categoryField) categoryField.value = '';
-                        
+                        if (categoryField) {
+                            // Look for existing category with todo title
+                            const options = categoryField.querySelectorAll('option');
+                            let found = false;
+                            options.forEach(opt => {
+                                if (opt.textContent.trim() === todoTitle) {
+                                    categoryField.value = opt.value;
+                                    found = true;
+                                }
+                            });
+
+                            // If not found, leave empty (will auto-create on submit)
+                            if (!found) categoryField.value = '';
+
+                            // Trigger change to load category fields
+                            categoryField.dispatchEvent(new Event('change', {
+                                bubbles: true
+                            }));
+                        }
+
                     }, 100);
                 });
             }
