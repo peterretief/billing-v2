@@ -170,8 +170,7 @@
                         <button type="button"
                                 class="btn btn-sm btn-outline-success w-100 mb-2"
                                 data-bs-toggle="modal"
-                                data-bs-target="#logTimeModal"
-                                onclick="document.getElementById('id_todo').value = '{{ todo.pk }}'; document.getElementById('id_client').value = '{{ todo.client.id }}'">
+                                data-bs-target="#logTimeModal">
                             <i class="bi bi-clock-history me-1"></i> Log Time
                         </button>
                         <a href="{% url 'todos:todo_list' %}"
@@ -189,4 +188,37 @@
     </div>
     <!-- Log Time Modal -->
     {% include "timesheets/includes/log_time_modal.html" %}
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const logModal = document.getElementById('logTimeModal');
+            const todoId = '{{ todo.pk }}';
+            const clientId = '{{ todo.client.id }}';
+            
+            if (logModal) {
+                logModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    
+                    // Set todo and client IDs
+                    const todoField = document.getElementById('id_todo');
+                    const clientField = document.getElementById('id_client');
+                    
+                    if (todoField) todoField.value = todoId;
+                    if (clientField) clientField.value = clientId;
+                    
+                    // Reset form fields
+                    const form = document.getElementById('logTimeForm');
+                    if (form) {
+                        form.action = "{% url 'timesheets:log_time' %}";
+                        form.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], textarea').forEach(el => {
+                            if (el.name !== 'todo' && el.name !== 'client' && el.name !== 'category_hidden') {
+                                el.value = '';
+                            }
+                        });
+                        form.querySelector('[name="date"]').value = new Date().toISOString().split('T')[0];
+                    }
+                });
+            }
+        });
+    </script>
 {% endblock %}
