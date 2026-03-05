@@ -50,7 +50,7 @@ class TodoListView(LoginRequiredMixin, ListView):
         # Add filter options
         context['statuses'] = Todo.Status.choices
         context['priorities'] = Todo.Priority.choices
-        context['clients'] = self.request.user.clients.all()
+        context['clients'] = self.request.user.client_related.all()
         
         # Add current filters for template
         context['current_status'] = self.request.GET.get('status', '')

@@ -298,7 +298,12 @@ def log_time(request):
             entry.save()
 
             messages.success(request, f"Logged {entry.hours}h for {entry.client.name}.")
-            response = redirect("timesheets:timesheet_list")
+            
+            # Redirect to the todo if this was logged from a todo
+            if entry.todo:
+                response = redirect("todos:todo_detail", pk=entry.todo.pk)
+            else:
+                response = redirect("timesheets:timesheet_list")
             response["HX-Trigger"] = "timesheetAdded"
             return response
         else:
