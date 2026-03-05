@@ -360,7 +360,7 @@ def calendar_auth_callback(request):
 @login_required
 def sync_todos_to_calendar(request):
     """Sync all todos to Google Calendar."""
-    from .calendar_utils import sync_all_todos_to_calendar
+    from .calendar_utils import sync_all_todos_to_calendar, InvalidScopeError
     from .models import GoogleCalendarCredential
     
     # Check if user has Google Calendar connected
@@ -370,12 +370,16 @@ def sync_todos_to_calendar(request):
         messages.error(request, "Please connect to Google Calendar first.")
         return redirect('todos:calendar_auth_start')
     
-    synced_count = sync_all_todos_to_calendar(request.user)
-    
-    if synced_count > 0:
-        messages.success(request, f"Successfully synced {synced_count} todos to Google Calendar!")
-    else:
-        messages.info(request, "No todos to sync. Please create a todo with a due date first.")
+    try:
+        synced_count = sync_all_todos_to_calendar(request.user)
+        
+        if synced_count > 0:
+            messages.success(request, f"Successfully synced {synced_count} todos to Google Calendar!")
+        else:
+            messages.info(request, "No todos to sync. Please create a todo with a due date first.")
+    except InvalidScopeError:
+        messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
+        return redirect('todos:calendar_auth_start')
     
     return redirect('todos:todo_list')
 
@@ -383,7 +387,7 @@ def sync_todos_to_calendar(request):
 @login_required
 def import_calendar_events(request):
     """Display Google Calendar events to import as timesheets."""
-    from .calendar_utils import get_google_calendar_service
+    from .calendar_utils import get_google_calendar_service, InvalidScopeError
     from .models import GoogleCalendarCredential
     from datetime import datetime, timedelta, timezone
     
@@ -394,7 +398,12 @@ def import_calendar_events(request):
         messages.error(request, "Please connect to Google Calendar first.")
         return redirect('todos:calendar_auth_start')
     
-    service = get_google_calendar_service(request.user)
+    try:
+        service = get_google_calendar_service(request.user)
+    except InvalidScopeError:
+        messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
+        return redirect('todos:calendar_auth_start')
+    
     if not service:
         messages.error(request, "Could not access Google Calendar. Please reconnect.")
         return redirect('todos:todo_list')
@@ -719,7 +728,7 @@ def sync_clients_to_contacts(request):
     import logging
     logger = logging.getLogger(__name__)
     
-    from .calendar_utils import sync_all_clients_to_contacts
+    from .calendar_utils import sync_all_clients_to_contacts, InvalidScopeError
     from .models import GoogleCalendarCredential
     
     # Check if user has Google Calendar connected
@@ -735,6 +744,10 @@ def sync_clients_to_contacts(request):
         synced_count = sync_all_clients_to_contacts(request.user)
         messages.success(request, f"Successfully synced {synced_count} clients to Google Contacts!")
         logger.info(f"Successfully synced {synced_count} clients for {request.user.username}")
+    except InvalidScopeError:
+        logger.warning(f"Scope mismatch for {request.user.username}")
+        messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
+        return redirect('todos:calendar_auth_start')
     except Exception as e:
         logger.exception(f"Error syncing contacts for {request.user.username}: {e}")
         messages.error(request, f"Error syncing contacts: {str(e)}")

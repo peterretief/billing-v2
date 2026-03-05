@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from django.conf import settings
 from django.utils import timezone as django_timezone
@@ -12,6 +13,11 @@ from django.utils import timezone as django_timezone
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = 'true'
 
 from .models import GoogleCalendarCredential, Todo
+
+
+class InvalidScopeError(Exception):
+    """Raised when OAuth scope mismatch is detected (usually after new permissions added)."""
+    pass
 
 
 # Google Calendar and Contacts API scopes
@@ -62,6 +68,16 @@ def get_google_calendar_service(user):
                 creds_obj.token_expiry = creds.expiry.replace(tzinfo=timezone.utc)
             creds_obj.save()
             logger.info(f"Successfully refreshed token for {user.username}")
+        except RefreshError as e:
+            error_str = str(e)
+            # Check if it's a scope mismatch error (usually happens when new permissions are added)
+            if 'invalid_scope' in error_str:
+                logger.warning(f"Scope mismatch for {user.username}. New permissions added. Clearing credentials for re-auth.")
+                # Delete the credential to force re-authentication with new scopes
+                creds_obj.delete()
+                raise InvalidScopeError("Google permissions were updated. Please reconnect your Google account.")
+            logger.exception(f"Error refreshing token for {user.username}: {e}")
+            return None
         except Exception as e:
             logger.exception(f"Error refreshing token for {user.username}: {e}")
             return None
@@ -254,6 +270,16 @@ def get_google_contacts_service(user):
                 creds_obj.token_expiry = creds.expiry.replace(tzinfo=timezone.utc)
             creds_obj.save()
             logger.info(f"Successfully refreshed token for {user.username}")
+        except RefreshError as e:
+            error_str = str(e)
+            # Check if it's a scope mismatch error (usually happens when new permissions are added)
+            if 'invalid_scope' in error_str:
+                logger.warning(f"Scope mismatch for {user.username}. New permissions added. Clearing credentials for re-auth.")
+                # Delete the credential to force re-authentication with new scopes
+                creds_obj.delete()
+                raise InvalidScopeError("Google permissions were updated. Please reconnect your Google account.")
+            logger.exception(f"Error refreshing token for {user.username}: {e}")
+            return None
         except Exception as e:
             logger.exception(f"Error refreshing token for {user.username}: {e}")
             return None
