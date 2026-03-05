@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "clients",
     "invoices",
     "timesheets",
+    "todos",
     "items",
     "notifications",
     "widget_tweaks",

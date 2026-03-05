@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'todos:todo_list' %}">Todos</a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            {% if form.instance.pk %}
+                                Edit
+                            {% else %}
+                                Create
+                            {% endif %}
+                        </li>
+                    </ol>
+                </nav>
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        {% if form.instance.pk %}
+                            <i class="bi bi-pencil me-2"></i> Edit Todo
+                        {% else %}
+                            <i class="bi bi-plus-lg me-2"></i> Create New Todo
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="post">
+                            {% csrf_token %}
+                            <!-- Title -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Title</label>
+                                {{ form.title }}
+                                {% if form.title.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.title.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <!-- Description -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Description</label>
+                                {{ form.description }}
+                                <small class="form-text text-muted d-block mt-1">Provide detailed information about this task</small>
+                                {% if form.description.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.description.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <!-- Client -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Client</label>
+                                {{ form.client }}
+                                {% if form.client.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.client.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <!-- Row: Status & Priority -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Status</label>
+                                    {{ form.status }}
+                                    {% if form.status.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.status.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Priority</label>
+                                    {{ form.priority }}
+                                    {% if form.priority.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.priority.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Row: Due Date & Estimated Hours -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Due Date</label>
+                                    {{ form.due_date }}
+                                    {% if form.due_date.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.due_date.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Estimated Hours</label>
+                                    {{ form.estimated_hours }}
+                                    <small class="form-text text-muted d-block mt-1">Total hours you expect this task to take</small>
+                                    {% if form.estimated_hours.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.estimated_hours.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Buttons -->
+                            <div class="mt-4">
+                                <button type="submit" class="btn btn-primary fw-bold px-4 me-2">
+                                    {% if form.instance.pk %}
+                                        <i class="bi bi-check me-1"></i> Update Todo
+                                    {% else %}
+                                        <i class="bi bi-plus me-1"></i> Create Todo
+                                    {% endif %}
+                                </button>
+                                <a href="{% url 'todos:todo_list' %}"
+                                   class="btn btn-outline-secondary fw-bold px-4">
+                                    <i class="bi bi-x me-1"></i> Cancel
+                                </a>
+                                {% if form.instance.pk %}
+                                    <a href="{% url 'todos:todo_delete' form.instance.pk %}"
+                                       class="btn btn-outline-danger fw-bold px-4 float-end"
+                                       onclick="return confirm('Are you sure you want to delete this todo?');">
+                                        <i class="bi bi-trash me-1"></i> Delete
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

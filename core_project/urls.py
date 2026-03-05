@@ -16,6 +16,7 @@ urlpatterns = [
     path("clients/", include("clients.urls")),
     # path('core/', include('core.urls')), # This is now the root
     path("timesheets/", include("timesheets.urls")),
+    path("todos/", include("todos.urls")),
     path("items/", include("items.urls")),
     path("notifications/", include("notifications.urls")),
     path("__debug__/", include("debug_toolbar.urls")),
