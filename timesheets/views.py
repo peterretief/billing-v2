@@ -30,6 +30,12 @@ from .forms import TimesheetEntryForm, WorkCategoryForm
 # Internal App Imports
 from .models import TimesheetEntry, WorkCategory
 
+# Try importing Todo from todos app (optional, for todo-based category creation)
+try:
+    from todos.models import Todo
+except ImportError:
+    Todo = None
+
 
 @login_required
 def get_client_rate(request):
@@ -278,12 +284,26 @@ def log_time(request):
             entry = form.save(commit=False)
             entry.user = request.user
 
-            # Manually handle category from POST (try regular field first, then backup)
-            category_id = request.POST.get("category") or request.POST.get("category_hidden")
-            if category_id:
-                entry.category_id = category_id
+            # Handle todo-based category creation
+            todo_id = request.POST.get("todo")
+            if todo_id and Todo:
+                try:
+                    todo = Todo.objects.get(id=todo_id, user=request.user)
+                    # Create or get category with todo's title
+                    category, created = WorkCategory.objects.get_or_create(
+                        user=request.user,
+                        name=todo.title,
+                    )
+                    entry.category = category
+                except Todo.DoesNotExist:
+                    pass
             else:
-                entry.category = None
+                # Manually handle category from POST (try regular field first, then backup)
+                category_id = request.POST.get("category") or request.POST.get("category_hidden")
+                if category_id:
+                    entry.category_id = category_id
+                else:
+                    entry.category = None
 
             # Set default hourly rate if missing
             if not entry.hourly_rate or entry.hourly_rate == 0:
@@ -293,6 +313,15 @@ def log_time(request):
             meta_data = {
                 k.replace("meta_", ""): v for k, v in request.POST.items() if k.startswith("meta_") and v.strip()
             }
+            
+            # Add todo title to metadata if available
+            if todo_id and Todo:
+                try:
+                    todo = Todo.objects.get(id=todo_id, user=request.user)
+                    meta_data["Todo"] = todo.title
+                except Todo.DoesNotExist:
+                    pass
+            
             entry.metadata = meta_data
 
             entry.save()
