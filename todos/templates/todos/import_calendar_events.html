@@ -129,11 +129,18 @@
                                                 <td>
                                                     <select name="category_id_{{ event.id }}" class="form-select form-select-sm">
                                                         <option value="">-- Select --</option>
-                                                        {% for category in categories %}
-                                                            <option value="{{ category.id }}" {% if category.name == event.suggested_category %}selected{% endif %}>
-                                                                {{ category.name }}
+                                                        {% if event.suggested_category %}
+                                                            <option value="" selected style="font-style: italic;">
+                                                                ✨ {{ event.suggested_category }} (new)
                                                             </option>
-                                                        {% endfor %}
+                                                        {% endif %}
+                                                        <optgroup label="Existing Categories">
+                                                            {% for category in categories %}
+                                                                <option value="{{ category.id }}" {% if event.suggested_category and category.name != event.suggested_category and category.name == event.suggested_category %}selected{% endif %}>
+                                                                    {{ category.name }}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </optgroup>
                                                     </select>
                                                 </td>
                                                 <td>
