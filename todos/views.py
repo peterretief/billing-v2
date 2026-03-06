@@ -501,7 +501,8 @@ def import_calendar_events(request):
             event['suggested_category'] = parts[0].strip()
             event['suggested_client'] = parts[1].strip()
         else:
-            event['suggested_category'] = ''
+            # If no " - " separator, use title as category
+            event['suggested_category'] = title.strip()
             event['suggested_client'] = ''
         
         # Extract client details from description
@@ -526,6 +527,16 @@ def import_calendar_events(request):
         
         logger.info(f"Processing event: {title}")
         logger.info(f"  Location: {location}, Organizer: {organizer_email}")
+        
+        # Strategy 0: Match by client name found in location (quick check)
+        if location and not event['suggested_client_id']:
+            for client in clients:
+                # Check if client name appears in location (case-insensitive)
+                if client.name.lower() in location.lower():
+                    event['suggested_client_id'] = client.id
+                    event['suggested_client'] = client.name
+                    logger.info(f"  ✓ Matched by client name in location to: {client.name} (ID: {client.id})")
+                    break
         
         # Strategy 1: Match by UUID from Google Contact (most reliable)
         if not event['suggested_client_id']:
