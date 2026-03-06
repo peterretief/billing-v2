@@ -474,6 +474,8 @@ def import_calendar_events(request):
     # Parse event titles and extract client/category suggestions
     from timesheets.models import WorkCategory, TimesheetEntry
     from clients.models import Client
+    import logging
+    logger = logging.getLogger(__name__)
     
     # Get work categories and clients for the user
     categories = WorkCategory.objects.filter(user=request.user).order_by('name')
@@ -481,6 +483,9 @@ def import_calendar_events(request):
     
     # Fetch contacts from Google Contacts address book for enhanced matching
     google_contacts = get_google_contacts_list(request.user)
+    logger.info(f"Fetched {len(google_contacts)} Google Contacts for {request.user.username}")
+    for contact in google_contacts:
+        logger.info(f"  Contact: {contact.get('name')} - Email: {contact.get('email')} - Address: {contact.get('address')}")
     
     # Check if user wants to hide already-imported events
     hide_imported = request.GET.get('hide_imported', False)
@@ -519,18 +524,23 @@ def import_calendar_events(request):
         organizer_info = event.get('organizer', {})
         organizer_email = organizer_info.get('email', '')
         
+        logger.info(f"Processing event: {title}")
+        logger.info(f"  Location: {location}, Organizer: {organizer_email}")
+        
         # Strategy 1: Match by location address
         if location and not event['suggested_client_id']:
             for client in clients:
                 if client.address and location.lower() in client.address.lower():
                     event['suggested_client_id'] = client.id
                     event['suggested_client'] = client.name
+                    logger.info(f"  ✓ Matched by address to client: {client.name}")
                     break
         
         # Strategy 2: Match by Google Contact address
         if location and not event['suggested_client_id']:
             for contact in google_contacts:
                 if contact.get('address') and location.lower() in contact['address'].lower():
+                    logger.info(f"  Found matching Google Contact by address: {contact.get('name')}")
                     # Try to find matching client
                     for client in clients:
                         if (client.name.lower() == contact.get('name', '').lower() or
@@ -538,6 +548,7 @@ def import_calendar_events(request):
                             client.phone == contact.get('phone')):
                             event['suggested_client_id'] = client.id
                             event['suggested_client'] = client.name
+                            logger.info(f"  ✓ Matched by Google Contact to client: {client.name}")
                             break
                     if event['suggested_client_id']:
                         break
@@ -546,12 +557,14 @@ def import_calendar_events(request):
         if organizer_email and not event['suggested_client_id']:
             for contact in google_contacts:
                 if contact.get('email') == organizer_email:
+                    logger.info(f"  Found matching Google Contact by email: {contact.get('name')}")
                     # Found matching contact, now find client
                     for client in clients:
                         if (client.name.lower() == contact.get('name', '').lower() or
                             client.email == contact.get('email')):
                             event['suggested_client_id'] = client.id
                             event['suggested_client'] = client.name
+                            logger.info(f"  ✓ Matched by organizer email to client: {client.name}")
                             break
                     if event['suggested_client_id']:
                         break
@@ -561,6 +574,7 @@ def import_calendar_events(request):
             for client in clients:
                 if client.name.lower() == event['suggested_client'].lower():
                     event['suggested_client_id'] = client.id
+                    logger.info(f"  ✓ Matched by name from title to client: {client.name}")
                     break
         
         # Store location for display
