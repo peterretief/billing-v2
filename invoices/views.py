@@ -1,10 +1,34 @@
-from django.contrib.auth.decorators import login_required
-from django.db import models
-from django.utils import timezone
-from django.views.decorators.http import require_POST
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 
-from core.models import BillingAuditLog
-from invoices.models import Coupon
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db import models, transaction
+from django.db.models import BooleanField, Case, F, Prefetch, Q, Sum, When
+from django.db.models.functions import Coalesce
+from django.forms import inlineformset_factory
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.safestring import mark_safe
+from django.views.decorators.http import require_POST
+from google import genai
+
+from clients.models import Client
+from core.decorators import setup_required
+from core.models import BillingAuditLog, UserProfile
+from core.utils import get_anomaly_status
+from invoices.models import Coupon, Invoice, InvoiceEmailStatusLog
+from items.models import Item
+from timesheets.models import TimesheetEntry
+
+from .forms import InvoiceForm, VATPaymentForm
+from .models import Payment, TaxPayment, VATReport
+from .utils import email_invoice_to_client, generate_invoice_pdf
 
 
 @login_required
@@ -74,12 +98,6 @@ def cancel_invoice_from_audit(request, pk):
     return redirect("invoices:billing_audit_report")
 
 
-from datetime import date, timedelta
-
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-
-
 @login_required
 @require_POST
 def toggle_attach_timesheet(request, pk):
@@ -109,37 +127,6 @@ def toggle_attach_timesheet(request, pk):
             )
         return redirect("invoices:invoice_list")
 
-
-from decimal import Decimal, InvalidOperation
-
-from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator
-from django.db import transaction
-from django.db.models import BooleanField, Case, F, Prefetch, Q, Sum, When
-from django.db.models.functions import Coalesce
-from django.forms import inlineformset_factory
-from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
-from django.utils.safestring import mark_safe
-
-# AI Integration
-from google import genai
-
-from clients.models import Client
-from core.decorators import setup_required
-from core.models import UserProfile
-from core.utils import get_anomaly_status
-from invoices.models import Invoice, InvoiceEmailStatusLog
-from items.models import Item
-from timesheets.models import TimesheetEntry
-
-from .forms import InvoiceForm, VATPaymentForm
-from .models import Payment, VATReport, TaxPayment
-from .utils import email_invoice_to_client, generate_invoice_pdf
 
 # --- FORMSET DEFINITION ---
 InvoiceItemFormSet = inlineformset_factory(
@@ -435,10 +422,38 @@ def invoice_list(request):
 @login_required
 @setup_required
 def invoice_detail(request, pk):
+    from collections import defaultdict
+    from decimal import Decimal
+    
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
     # Auto-fix orphaned invoices (have delivery logs but wrong status)
     invoice.sync_status_with_delivery()
-    return render(request, "invoices/invoice_detail.html", {"invoice": invoice})
+    
+    # Group timesheets by category for aggregated display
+    grouped_timesheets = defaultdict(lambda: {"hours": Decimal("0.00"), "hourly_rate": Decimal("0.00"), "entries": []})
+    for ts in invoice.billed_timesheets.all().select_related("category"):
+        category_name = ts.category.name if ts.category else "Timesheet"
+        key = (category_name, ts.hourly_rate)
+        grouped_timesheets[key]["hours"] += ts.hours
+        grouped_timesheets[key]["hourly_rate"] = ts.hourly_rate  # All in same group should have same rate
+        grouped_timesheets[key]["entries"].append(ts)
+    
+    # Convert to sorted list for consistent display order
+    grouped_timesheets_list = [
+        {
+            "category_name": key[0],
+            "hourly_rate": key[1],
+            "hours": data["hours"],
+            "total_value": data["hours"] * data["hourly_rate"],
+            "entries": data["entries"],
+        }
+        for key, data in sorted(grouped_timesheets.items())
+    ]
+    
+    return render(request, "invoices/invoice_detail.html", {
+        "invoice": invoice,
+        "grouped_timesheets": grouped_timesheets_list,
+    })
 
 
 @login_required

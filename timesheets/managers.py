@@ -1,9 +1,10 @@
 # timesheets/managers.py
 from django.db import models
 from django.db.models import F, Sum
+from core.managers import TenantManager
 
 
-class TimesheetManager(models.Manager):
+class TimesheetManager(TenantManager):
     def unbilled(self, user):
         return self.filter(user=user, is_billed=False)
 

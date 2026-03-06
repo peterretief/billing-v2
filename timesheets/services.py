@@ -22,15 +22,9 @@ def create_invoice_from_timesheets(user, client, timesheet_ids):
         # 2. Create the Invoice
         invoice = Invoice.objects.create(user=user, client=client, status="DRAFT")
 
-        # 3. Create Line Items
+        # 3. Link timesheets directly to invoice (don't create separate InvoiceItems)
+        #    This allows proper grouping by category in build_invoice_items_list()
         for entry in entries:
-            InvoiceItem.objects.create(
-                invoice=invoice,
-                description=f"{entry.date}: {entry.description}",
-                quantity=entry.hours,
-                unit_price=entry.hourly_rate,
-            )
-            # Link and Mark as billed
             entry.is_billed = True
             entry.invoice = invoice
             entry.save()

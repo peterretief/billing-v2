@@ -9,6 +9,11 @@ from django.utils import timezone
 from invoices.models import Invoice
 from items.models import Item
 
+from django.db import transaction
+from invoices.utils import email_invoice_to_client
+from items.models import Item
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -62,12 +67,16 @@ def send_invoice_async(invoice_id):
     Returns:
         dict: Result with status and message
     """
-    from django.db import transaction
-    from invoices.utils import email_invoice_to_client
-    from items.models import Item
+    import logging
+    logger = logging.getLogger(__name__)
     
     try:
         invoice = Invoice.objects.get(pk=invoice_id)
+        
+        # DEBUG: Log what's on this invoice
+        billed_items_count = invoice.billed_items.all().count()
+        billed_ts_count = invoice.billed_timesheets.all().count()
+        logger.debug(f"send_invoice_async for {invoice.id}: billed_items={billed_items_count}, billed_timesheets={billed_ts_count}")
         
         with transaction.atomic():
             invoice.status = "PENDING"

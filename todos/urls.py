@@ -27,4 +27,6 @@ urlpatterns = [
     # Google Contacts integration
     path('contacts/sync/', views.sync_contacts_page, name='sync_contacts_page'),
     path('contacts/sync-now/', views.sync_clients_to_contacts, name='sync_clients_to_contacts'),
+    path('contacts/import/', views.import_contacts_page, name='import_contacts_page'),
+    path('contacts/import-create/', views.create_clients_from_contacts, name='create_clients_from_contacts'),
 ]

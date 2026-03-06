@@ -229,3 +229,136 @@ class TimesheetFormTests(BaseBillingTest):
         self.assertIn("hourly_rate", form.fields)
         # Verify description is NOT in form
         self.assertNotIn("description", form.fields)
+
+class DecimalNormalizationTests(BaseBillingTest):
+    """Test Decimal field normalization to prevent precision mismatches."""
+
+    def setUp(self):
+        super().setUp()
+        self.category = WorkCategory.objects.create(user=self.user, name="Consulting")
+
+    def test_hourly_rate_normalized_to_two_decimals(self):
+        """Verify hourly_rate is normalized to 2 decimal places on save."""
+        # Create with various Decimal representations
+        entry = TimesheetEntry.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            category=self.category,
+            date=timezone.now().date(),
+            hours=Decimal("5"),
+            hourly_rate=Decimal("250"),  # No decimal places
+        )
+        # Reload from DB
+        entry.refresh_from_db()
+        # Should be normalized to 2 decimal places
+        self.assertEqual(entry.hourly_rate, Decimal("250.00"))
+        self.assertEqual(entry.hours, Decimal("5.00"))
+
+    def test_hourly_rate_different_precisions_are_equivalent_after_save(self):
+        """Verify entries with different Decimal precisions are equivalent after save."""
+        entry1 = TimesheetEntry.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            category=self.category,
+            date=timezone.now().date(),
+            hours=Decimal("5.00"),
+            hourly_rate=Decimal("250.00"),
+        )
+        entry2 = TimesheetEntry.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            category=self.category,
+            date=timezone.now().date(),
+            hours=Decimal("4.75"),
+            hourly_rate=Decimal("250"),  # Different precision
+        )
+        # Reload from DB
+        entry1.refresh_from_db()
+        entry2.refresh_from_db()
+        # After normalization, they should have identical rates
+        self.assertEqual(entry1.hourly_rate, entry2.hourly_rate)
+        # Creating dict keys should produce identical keys for grouping
+        key1 = (entry1.category.name, entry1.hourly_rate)
+        key2 = (entry2.category.name, entry2.hourly_rate)
+        self.assertEqual(key1, key2)
+
+    def test_grouping_key_consistency_with_normalized_decimals(self):
+        """Verify grouping works regardless of Decimal input precision."""
+        # Create timesheets with different Decimal precisions but same value
+        from decimal import ROUND_HALF_UP
+        
+        entry1 = TimesheetEntry.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            category=self.category,
+            date=timezone.now().date(),
+            hours=Decimal("5"),
+            hourly_rate=Decimal("250"),
+        )
+        entry2 = TimesheetEntry.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            category=self.category,
+            date=timezone.now().date(),
+            hours=Decimal("4.75"),
+            hourly_rate=Decimal("250.00"),
+        )
+        
+        # Reload and verify normalization
+        entry1.refresh_from_db()
+        entry2.refresh_from_db()
+        
+        # Build grouping dictionary like build_invoice_items_list() does
+        grouped = {}
+        for entry in [entry1, entry2]:
+            normalized_rate = Decimal(str(entry.hourly_rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            key = (entry.category.name, normalized_rate)
+            if key not in grouped:
+                grouped[key] = Decimal("0")
+            grouped[key] += entry.hours
+        
+        # Should have only ONE key (both grouped together)
+        self.assertEqual(len(grouped), 1)
+        # Total hours should be 9.75
+        total_hours = list(grouped.values())[0]
+        self.assertEqual(total_hours, Decimal("9.75"))
+
+    def test_three_way_decimal_precision_grouping(self):
+        """Test grouping with three different Decimal representations of same rate."""
+        rates = [
+            Decimal("250"),      # No decimal places
+            Decimal("250.0"),    # One decimal place
+            Decimal("250.00"),   # Two decimal places
+        ]
+        
+        from decimal import ROUND_HALF_UP
+        
+        entries = []
+        for i, rate in enumerate(rates):
+            entry = TimesheetEntry.objects.create(
+                user=self.user,
+                client=self.client_obj,
+                category=self.category,
+                date=timezone.now().date(),
+                hours=Decimal("1.00"),
+                hourly_rate=rate,
+            )
+            entries.append(entry)
+        
+        # Reload all and verify normalization
+        for entry in entries:
+            entry.refresh_from_db()
+        
+        # Group using normalized approach
+        grouped = {}
+        for entry in entries:
+            normalized_rate = Decimal(str(entry.hourly_rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            key = (entry.category.name, normalized_rate)
+            if key not in grouped:
+                grouped[key] = Decimal("0")
+            grouped[key] += entry.hours
+        
+        # All three should be in ONE group
+        self.assertEqual(len(grouped), 1)
+        # Total should be 3.00 hours
+        self.assertEqual(list(grouped.values())[0], Decimal("3.00"))

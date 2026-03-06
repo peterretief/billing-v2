@@ -8,6 +8,9 @@ from django.core.mail import EmailMessage, get_connection
 from django.template.loader import render_to_string
 from django.utils.timezone import now
 
+from collections import defaultdict
+import logging
+
 # --- Helper Functions ---
 
 
@@ -36,6 +39,90 @@ def tex_safe(text):
         "\\": r"\textbackslash{}",
     }
     return "".join(mapping.get(c, c) for c in text)
+
+
+def build_invoice_items_list(invoice, is_service=False):
+    """
+    Build a unified items list for invoice display, with grouped timesheets.
+    
+    This function consolidates the logic for building invoice line items,
+    ensuring consistency across PDF generation, LaTeX rendering, and email.
+    
+    Args:
+        invoice: Invoice object with billed_items and billed_timesheets
+        is_service: Boolean to format quantity as decimal or integer
+    
+    Returns:
+        List of dicts with keys: description, quantity, unit_price, row_subtotal
+    """
+    logger = logging.getLogger(__name__)
+    
+    items_list = []
+    
+    # Check if invoice has timesheets
+    has_timesheets = invoice.billed_timesheets.exists()
+    
+    if hasattr(invoice, "custominvoice"):
+        logger.debug(f"Invoice {invoice.id} has CustomInvoice - using custom lines only")
+        for line in invoice.custominvoice.custom_lines.all():
+            items_list.append(
+                {
+                    "description": tex_safe(line.description),
+                    "quantity": f"{line.quantity:.2f} {tex_safe(line.unit_label)}",
+                    "unit_price": f"{line.unit_price:,.2f}",
+                    "row_subtotal": f"{line.total:,.2f}",
+                }
+            )
+    else:
+        # If invoice has timesheets, skip billed_items and only show grouped timesheets
+        # This ensures timesheets are always grouped by category
+        if not has_timesheets:
+            logger.debug(f"Invoice {invoice.id} - adding billed_items (no timesheets)")
+            # Add regular items only if NO timesheets exist
+            for item in invoice.billed_items.all():
+                items_list.append(
+                    {
+                        "description": tex_safe(item.description),
+                        "quantity": f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
+                        "unit_price": f"{item.unit_price:,.2f}",
+                        "row_subtotal": f"{(item.quantity * item.unit_price):,.2f}",
+                    }
+                )
+        else:
+            logger.debug(f"Invoice {invoice.id} - SKIPPING billed_items (has timesheets)")
+        
+        # Group timesheets by category for aggregated display
+        grouped_timesheets = defaultdict(lambda: {"hours": Decimal("0.00"), "hourly_rate": Decimal("0.00")})
+        
+        ts_list = list(invoice.billed_timesheets.all().select_related("category"))
+        logger.debug(f"Invoice {invoice.id} has {len(ts_list)} billed timesheets")
+        
+        for timesheet in ts_list:
+            category_name = timesheet.category.name if timesheet.category else "Timesheet Entry"
+            # Normalize hourly_rate to ensure consistent grouping keys
+            # Convert to string first, then to Decimal with 2 decimal places
+            normalized_rate = Decimal(str(timesheet.hourly_rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            key = (category_name, normalized_rate)
+            logger.debug(f"  TS: {category_name} | {timesheet.hours}h @ {timesheet.hourly_rate} (normalized: {normalized_rate}) | key={key}")
+            grouped_timesheets[key]["hours"] += timesheet.hours
+            grouped_timesheets[key]["hourly_rate"] = normalized_rate
+        
+        logger.debug(f"After grouping: {len(grouped_timesheets)} groups: {list(grouped_timesheets.keys())}")
+        
+        # Add grouped timesheets to items list
+        for (category_name, hourly_rate), data in sorted(grouped_timesheets.items()):
+            logger.debug(f"  GROUP OUTPUT: {category_name} | {data['hours']}h @ {hourly_rate}")
+            items_list.append(
+                {
+                    "description": tex_safe(category_name),
+                    "quantity": f"{data['hours']:.2f}",
+                    "unit_price": f"{hourly_rate:,.2f}",
+                    "row_subtotal": f"{(data['hours'] * hourly_rate):,.2f}",
+                }
+            )
+    
+    logger.debug(f"build_invoice_items_list returning {len(items_list)} items")
+    return items_list
 
 
 # --- PDF Generation ---
@@ -108,39 +195,8 @@ def generate_invoice_pdf(invoice, template_name="invoice_template.tex"):
     raw_vat_rate = getattr(profile, "vat_rate", Decimal("15.00")) or Decimal("15.00")
     context["tax_rate"] = f"{raw_vat_rate:.0f}"
 
-    # Item List Assembly
-    items_list = []
-    if hasattr(invoice, "custominvoice"):
-        for line in invoice.custominvoice.custom_lines.all():
-            items_list.append(
-                {
-                    "description": tex_safe(line.description),
-                    "quantity": f"{line.quantity:.2f} {tex_safe(line.unit_label)}",
-                    "unit_price": f"{line.unit_price:,.2f}",
-                    "row_subtotal": f"{line.total:,.2f}",
-                }
-            )
-    else:
-        for item in invoice.billed_items.all():
-            items_list.append(
-                {
-                    "description": tex_safe(item.description),
-                    "quantity": f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
-                    "unit_price": f"{item.unit_price:,.2f}",
-                    "row_subtotal": f"{(item.quantity * item.unit_price):,.2f}",
-                }
-            )
-        # Add timesheets to the items list
-        for timesheet in invoice.billed_timesheets.all():
-            description = tex_safe(timesheet.category.name) if timesheet.category else "Timesheet Entry"
-            items_list.append(
-                {
-                    "description": description,
-                    "quantity": f"{timesheet.hours:.2f}",
-                    "unit_price": f"{timesheet.hourly_rate:,.2f}",
-                    "row_subtotal": f"{(timesheet.hours * timesheet.hourly_rate):,.2f}",
-                }
-            )
+    # Item List Assembly - Use shared function for consistency
+    items_list = build_invoice_items_list(invoice, is_service)
     context["items"] = items_list
 
     # 4. Render and Compile
@@ -225,38 +281,8 @@ def render_invoice_tex(invoice, template_name="invoice_template.tex"):
     raw_vat_rate = getattr(profile, "vat_rate", Decimal("15.00")) or Decimal("15.00")
     context["tax_rate"] = f"{raw_vat_rate:.0f}"
 
-    items_list = []
-    if hasattr(invoice, "custominvoice"):
-        for line in invoice.custominvoice.custom_lines.all():
-            items_list.append(
-                {
-                    "description": tex_safe(line.description),
-                    "quantity": f"{line.quantity:.2f} {tex_safe(line.unit_label)}",
-                    "unit_price": f"{line.unit_price:,.2f}",
-                    "row_subtotal": f"{line.total:,.2f}",
-                }
-            )
-    else:
-        for item in invoice.billed_items.all():
-            items_list.append(
-                {
-                    "description": tex_safe(item.description),
-                    "quantity": f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
-                    "unit_price": f"{item.unit_price:,.2f}",
-                    "row_subtotal": f"{(item.quantity * item.unit_price):,.2f}",
-                }
-            )
-        # Add timesheets to the items list
-        for timesheet in invoice.billed_timesheets.all():
-            description = tex_safe(timesheet.category.name) if timesheet.category else "Timesheet Entry"
-            items_list.append(
-                {
-                    "description": description,
-                    "quantity": f"{timesheet.hours:.2f}",
-                    "unit_price": f"{timesheet.hourly_rate:,.2f}",
-                    "row_subtotal": f"{(timesheet.hours * timesheet.hourly_rate):,.2f}",
-                }
-            )
+    # Item List Assembly - Use shared function for consistency
+    items_list = build_invoice_items_list(invoice, is_service)
     context["items"] = items_list
 
     return render_to_string(f"invoices/latex/{template_name}", context)

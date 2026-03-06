@@ -106,5 +106,67 @@
                 </div>
             </div>
         </div>
+
+        <!-- Import Contacts Section -->
+        <div class="card shadow-sm border-0 mt-4">
+            <div class="card-body p-4">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h5 class="fw-bold mb-3">⬇️ Import Contacts as Clients</h5>
+                        
+                        {% if has_google_connected %}
+                            <p class="text-muted mb-4">
+                                Take your Google Contacts and create them as new billing clients. Perfect for quickly adding vendors, partners, and other contacts to your system.
+                            </p>
+                            
+                            <div class="alert alert-info mb-4">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>What you can do:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Browse all your Google Contacts</li>
+                                    <li>Select which contacts to import</li>
+                                    <li>Set hourly billing rates</li>
+                                    <li>Contact info is auto-filled from Google</li>
+                                    <li>Imported contacts can be used in calendar matching</li>
+                                </ul>
+                            </div>
+                            
+                            <a href="{% url 'todos:import_contacts_page' %}" class="btn btn-primary btn-lg fw-bold">
+                                <i class="bi bi-cloud-arrow-down me-2"></i>
+                                Import Contacts
+                            </a>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                <strong>Google Calendar Not Connected</strong>
+                                <p class="mt-2 mb-0">
+                                    You need to connect your Google account first.
+                                    <a href="{% url 'todos:calendar_auth_start' %}" class="btn btn-sm btn-primary">Connect Google Account</a>
+                                </p>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card bg-light border-0">
+                            <div class="card-body">
+                                <h6 class="fw-bold mb-3">🔄 Two-Way Sync</h6>
+                                <div class="small text-muted">
+                                    <p><strong>Push</strong><br>
+                                    Send your clients to Google Contacts
+                                    </p>
+                                    <p><strong>Pull</strong><br>
+                                    Import contacts as new clients
+                                    </p>
+                                    <p class="mb-0"><strong>Auto-Match</strong><br>
+                                    Use in calendar event matching
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock %}

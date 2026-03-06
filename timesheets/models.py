@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import models
 from django.utils import timezone
@@ -110,3 +111,12 @@ class TimesheetEntry(TenantModel):
     @property
     def total_value(self):
         return self.hours * self.hourly_rate
+
+    def save(self, *args, **kwargs):
+        """Normalize Decimal fields to prevent precision mismatches during grouping."""
+        # Ensure consistent 2 decimal place representation
+        if self.hours:
+            self.hours = Decimal(str(self.hours)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        if self.hourly_rate:
+            self.hourly_rate = Decimal(str(self.hourly_rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        super().save(*args, **kwargs)

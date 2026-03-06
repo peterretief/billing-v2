@@ -521,6 +521,7 @@ def import_calendar_events(request):
         
         # Smart client matching: try multiple strategies
         event['suggested_client_id'] = None
+        event['match_strategy'] = None
         location = event.get('location', '')
         organizer_info = event.get('organizer', {})
         organizer_email = organizer_info.get('email', '')
@@ -535,6 +536,7 @@ def import_calendar_events(request):
                 if client.name.lower() in location.lower():
                     event['suggested_client_id'] = client.id
                     event['suggested_client'] = client.name
+                    event['match_strategy'] = 'location_name'
                     logger.info(f"  ✓ Matched by client name in location to: {client.name} (ID: {client.id})")
                     break
         
@@ -550,6 +552,7 @@ def import_calendar_events(request):
                             (location and contact.get('address') and location.lower() in contact['address'].lower())):
                             event['suggested_client_id'] = client.id
                             event['suggested_client'] = client.name
+                            event['match_strategy'] = 'google_contact_uuid'
                             logger.info(f"  ✓ Matched by UUID to client: {client.name} (ID: {client.id}, UUID: {contact.get('client_uuid')})")
                             break
                     except Client.DoesNotExist:
@@ -561,6 +564,7 @@ def import_calendar_events(request):
                 if client.address and location.lower() in client.address.lower():
                     event['suggested_client_id'] = client.id
                     event['suggested_client'] = client.name
+                    event['match_strategy'] = 'location_address'
                     logger.info(f"  ✓ Matched by address to client: {client.name} (ID: {client.id})")
                     break
         
@@ -576,6 +580,7 @@ def import_calendar_events(request):
                             client.phone == contact.get('phone')):
                             event['suggested_client_id'] = client.id
                             event['suggested_client'] = client.name
+                            event['match_strategy'] = 'google_contact_address'
                             logger.info(f"  ✓ Matched by Google Contact to client: {client.name} (ID: {client.id})")
                             break
                     if event['suggested_client_id']:
@@ -592,6 +597,7 @@ def import_calendar_events(request):
                             client.email == contact.get('email')):
                             event['suggested_client_id'] = client.id
                             event['suggested_client'] = client.name
+                            event['match_strategy'] = 'google_contact_email'
                             logger.info(f"  ✓ Matched by organizer email to client: {client.name} (ID: {client.id})")
                             break
                     if event['suggested_client_id']:
@@ -602,6 +608,7 @@ def import_calendar_events(request):
             for client in clients:
                 if client.name.lower() == event['suggested_client'].lower():
                     event['suggested_client_id'] = client.id
+                    event['match_strategy'] = 'title_name'
                     logger.info(f"  ✓ Matched by name from title to client: {client.name} (ID: {client.id})")
                     break
         
@@ -909,3 +916,122 @@ def sync_clients_to_contacts(request):
         messages.error(request, f"Error syncing contacts: {str(e)}")
     
     return redirect('todos:sync_contacts_page')
+
+@login_required
+def import_contacts_page(request):
+    """Display Google Contacts to import as clients."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    from .calendar_utils import get_google_contacts_list, InvalidScopeError
+    from .models import GoogleCalendarCredential
+    from clients.models import Client
+    
+    # Check if user has Google Calendar connected
+    try:
+        GoogleCalendarCredential.objects.get(user=request.user)
+    except GoogleCalendarCredential.DoesNotExist:
+        messages.error(request, "Please connect to Google Calendar first.")
+        return redirect('todos:calendar_auth_start')
+    
+    try:
+        google_contacts = get_google_contacts_list(request.user)
+    except InvalidScopeError:
+        messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
+        return redirect('todos:calendar_auth_start')
+    except Exception as e:
+        logger.exception(f"Error fetching Google Contacts: {e}")
+        messages.error(request, f"Error fetching Google Contacts: {str(e)}")
+        return redirect('todos:sync_contacts_page')
+    
+    # Get existing client emails to show which are already created
+    existing_emails = set(Client.objects.filter(user=request.user).values_list('email', flat=True))
+    
+    # Filter out contacts that are already clients (by email)
+    available_contacts = []
+    for contact in google_contacts:
+        if contact.get('email') and contact['email'] not in existing_emails:
+            available_contacts.append(contact)
+    
+    logger.info(f"Found {len(available_contacts)} available contacts to import for {request.user.username}")
+    
+    context = {
+        'contacts': available_contacts,
+        'existing_count': len(existing_emails),
+    }
+    
+    return render(request, 'todos/import_contacts.html', context)
+
+
+@login_required
+def create_clients_from_contacts(request):
+    """Create new clients from selected Google Contacts."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    from django.apps import apps
+    
+    if request.method != 'POST':
+        return redirect('todos:import_contacts_page')
+    
+    Client = apps.get_model('clients', 'Client')
+    
+    # Get selected contacts from POST data
+    selected_contacts = []
+    for key in request.POST.keys():
+        if key.startswith('contact_'):
+            email = request.POST.get(key)
+            hourly_rate = request.POST.get(f'rate_{email}', '0.00')
+            contact_name = request.POST.get(f'name_{email}', '')
+            selected_contacts.append({
+                'email': email,
+                'hourly_rate': hourly_rate,
+                'contact_name': contact_name,
+            })
+    
+    logger.info(f"Creating {len(selected_contacts)} clients for {request.user.username}")
+    
+    created_count = 0
+    failed_count = 0
+    
+    for contact_data in selected_contacts:
+        try:
+            # Fetch the full contact info from Google to get all details
+            from .calendar_utils import get_google_contacts_list
+            all_contacts = get_google_contacts_list(request.user)
+            contact_info = None
+            for c in all_contacts:
+                if c.get('email') == contact_data['email']:
+                    contact_info = c
+                    break
+            
+            if not contact_info:
+                logger.warning(f"Could not find contact {contact_data['email']}")
+                failed_count += 1
+                continue
+            
+            # Create client from contact
+            client = Client.objects.create(
+                user=request.user,
+                name=contact_info.get('name', contact_data['email']),
+                contact_name=contact_data['contact_name'] or contact_info.get('given_name', ''),
+                email=contact_data['email'],
+                phone=contact_info.get('phone', ''),
+                address=contact_info.get('address', ''),
+                default_hourly_rate=contact_data['hourly_rate'],
+            )
+            
+            logger.info(f"Created client: {client.name} ({client.email})")
+            created_count += 1
+            
+        except Exception as e:
+            logger.exception(f"Error creating client from contact {contact_data['email']}: {e}")
+            failed_count += 1
+    
+    if created_count > 0:
+        messages.success(request, f"Successfully imported {created_count} client{'s' if created_count != 1 else ''}!")
+    
+    if failed_count > 0:
+        messages.warning(request, f"Failed to import {failed_count} contact{'s' if failed_count != 1 else ''}.")
+    
+    return redirect('todos:import_contacts_page')
