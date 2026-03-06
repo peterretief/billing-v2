@@ -533,7 +533,7 @@ def import_calendar_events(request):
                 if client.address and location.lower() in client.address.lower():
                     event['suggested_client_id'] = client.id
                     event['suggested_client'] = client.name
-                    logger.info(f"  ✓ Matched by address to client: {client.name}")
+                    logger.info(f"  ✓ Matched by address to client: {client.name} (ID: {client.id})")
                     break
         
         # Strategy 2: Match by Google Contact address
@@ -548,7 +548,7 @@ def import_calendar_events(request):
                             client.phone == contact.get('phone')):
                             event['suggested_client_id'] = client.id
                             event['suggested_client'] = client.name
-                            logger.info(f"  ✓ Matched by Google Contact to client: {client.name}")
+                            logger.info(f"  ✓ Matched by Google Contact to client: {client.name} (ID: {client.id})")
                             break
                     if event['suggested_client_id']:
                         break
@@ -564,7 +564,7 @@ def import_calendar_events(request):
                             client.email == contact.get('email')):
                             event['suggested_client_id'] = client.id
                             event['suggested_client'] = client.name
-                            logger.info(f"  ✓ Matched by organizer email to client: {client.name}")
+                            logger.info(f"  ✓ Matched by organizer email to client: {client.name} (ID: {client.id})")
                             break
                     if event['suggested_client_id']:
                         break
@@ -574,8 +574,13 @@ def import_calendar_events(request):
             for client in clients:
                 if client.name.lower() == event['suggested_client'].lower():
                     event['suggested_client_id'] = client.id
-                    logger.info(f"  ✓ Matched by name from title to client: {client.name}")
+                    logger.info(f"  ✓ Matched by name from title to client: {client.name} (ID: {client.id})")
                     break
+        
+        if event['suggested_client_id']:
+            logger.info(f"  Final suggested_client_id: {event['suggested_client_id']} (type: {type(event['suggested_client_id']).__name__})")
+        else:
+            logger.info(f"  No client match found for event")
         
         # Store location for display
         event['display_location'] = location

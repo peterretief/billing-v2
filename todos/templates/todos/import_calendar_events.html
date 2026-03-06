@@ -138,7 +138,7 @@
                                                     <select name="client_id_{{ event.id }}" class="form-select form-select-sm">
                                                         <option value="">-- Select --</option>
                                                         {% for client in clients %}
-                                                            <option value="{{ client.id }}" {% if event.suggested_client_id == client.id %}selected{% elif client.name == event.suggested_client %}selected{% endif %}>
+                                                            <option value="{{ client.id }}" {% if event.suggested_client_id and event.suggested_client_id|stringformat:"d" == client.id|stringformat:"d" %}selected{% endif %}>
                                                                 {{ client.name }}
                                                             </option>
                                                         {% endfor %}
