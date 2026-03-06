@@ -1,5 +1,6 @@
 import re
 from decimal import Decimal
+import uuid
 
 from django.db import models
 from django.db.models import DecimalField, Q, Sum
@@ -33,6 +34,7 @@ class Client(TenantModel):
     )
     objects = ClientQuerySet.as_manager()
     name = models.CharField(max_length=255)
+    client_uuid = models.UUIDField(default=uuid.uuid4, editable=False, help_text="Unique identifier for syncing with Google Contacts")
     contact_name = models.CharField(max_length=255, blank=True, verbose_name="Contact Name")
     email = models.EmailField()
     phone = models.CharField(max_length=20, blank=True)

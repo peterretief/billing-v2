@@ -527,7 +527,24 @@ def import_calendar_events(request):
         logger.info(f"Processing event: {title}")
         logger.info(f"  Location: {location}, Organizer: {organizer_email}")
         
-        # Strategy 1: Match by location address
+        # Strategy 1: Match by UUID from Google Contact (most reliable)
+        if not event['suggested_client_id']:
+            for contact in google_contacts:
+                if contact.get('client_uuid'):
+                    try:
+                        # Try to find client by UUID
+                        client = Client.objects.get(client_uuid=contact.get('client_uuid'), user=request.user)
+                        # Check if this contact matches the event (by organizer email or location)
+                        if ((organizer_email and organizer_email == contact.get('email')) or
+                            (location and contact.get('address') and location.lower() in contact['address'].lower())):
+                            event['suggested_client_id'] = client.id
+                            event['suggested_client'] = client.name
+                            logger.info(f"  ✓ Matched by UUID to client: {client.name} (ID: {client.id}, UUID: {contact.get('client_uuid')})")
+                            break
+                    except Client.DoesNotExist:
+                        logger.warning(f"  UUID found in contact but no matching client: {contact.get('client_uuid')}")
+        
+        # Strategy 2: Match by location address
         if location and not event['suggested_client_id']:
             for client in clients:
                 if client.address and location.lower() in client.address.lower():
@@ -536,7 +553,7 @@ def import_calendar_events(request):
                     logger.info(f"  ✓ Matched by address to client: {client.name} (ID: {client.id})")
                     break
         
-        # Strategy 2: Match by Google Contact address
+        # Strategy 3: Match by Google Contact address
         if location and not event['suggested_client_id']:
             for contact in google_contacts:
                 if contact.get('address') and location.lower() in contact['address'].lower():
@@ -553,7 +570,7 @@ def import_calendar_events(request):
                     if event['suggested_client_id']:
                         break
         
-        # Strategy 3: Match by event organizer email (from Google Contacts)
+        # Strategy 4: Match by event organizer email (from Google Contacts)
         if organizer_email and not event['suggested_client_id']:
             for contact in google_contacts:
                 if contact.get('email') == organizer_email:
@@ -569,7 +586,7 @@ def import_calendar_events(request):
                     if event['suggested_client_id']:
                         break
         
-        # Strategy 4: Match by client name from title
+        # Strategy 5: Match by client name from title
         if not event['suggested_client_id'] and event.get('suggested_client'):
             for client in clients:
                 if client.name.lower() == event['suggested_client'].lower():

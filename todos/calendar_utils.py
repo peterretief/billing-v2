@@ -326,8 +326,10 @@ def sync_client_to_contacts(user, client, service=None):
             'type': 'work'
         }]
     
-    # Add note with VAT/Tax info
+    # Add note with VAT/Tax info and client UUID for syncing
     notes_parts = []
+    # Add client UUID as first line (critical for matching)
+    notes_parts.append(f"CLIENT_UUID: {client.client_uuid}")
     if client.contact_name:
         notes_parts.append(f"Contact: {client.contact_name}")
     if client.vat_number:
@@ -408,7 +410,7 @@ def get_google_contacts_list(user, service=None):
         results = service.people().connections().list(
             resourceName='people/me',
             pageSize=1000,
-            personFields='names,emailAddresses,phoneNumbers,addresses',
+            personFields='names,emailAddresses,phoneNumbers,addresses,biographies',
             sortOrder='LAST_MODIFIED_DESCENDING'
         ).execute()
         
@@ -440,12 +442,21 @@ def get_google_contacts_list(user, service=None):
             if addresses:
                 contact_data['address'] = addresses[0].get('formattedValue', '')
             
+            # Extract UUID from biography
+            biographies = person.get('biographies', [])
+            if biographies:
+                bio_text = biographies[0].get('value', '')
+                # Extract CLIENT_UUID: xxx-xxx-xxx format
+                for part in bio_text.split(' | '):
+                    if part.startswith('CLIENT_UUID:'):
+                        contact_data['client_uuid'] = part.replace('CLIENT_UUID:', '').strip()
+                        break
+            
             if contact_data.get('name'):
                 contacts.append(contact_data)
         
         logger.info(f"Parsed {len(contacts)} contacts for matching")
         return contacts
-        
     except Exception as e:
         logger.exception(f"Error fetching Google Contacts for {user.username}: {str(e)}")
         return []
