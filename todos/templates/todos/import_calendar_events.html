@@ -71,6 +71,8 @@
                                             <tr>
                                                 <td>
                                                     <input type="checkbox" name="events[]" value="{{ event.id }}" class="form-check-input event-checkbox">
+                                                    <!-- Hidden field to send suggested category for auto-creation -->
+                                                    <input type="hidden" name="suggested_category_{{ event.id }}" value="{{ event.suggested_category }}">
                                                 </td>
                                                 <td>
                                                     <div>

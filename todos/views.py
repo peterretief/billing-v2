@@ -699,17 +699,43 @@ def create_timesheets_from_events(request):
         
         logger.info(f"  Event {event_id}: category_id={category_id}, client_id={client_id}")
         
-        if not category_id or not client_id:
-            logger.error(f"VALIDATION FAILED - Event {event_id}: missing category ({category_id}) or client ({client_id})")
-            messages.error(request, f"Event {event_id}: Please select a work category and client.")
+        if not client_id:
+            logger.error(f"VALIDATION FAILED - Event {event_id}: missing client ({client_id})")
+            messages.error(request, f"Event {event_id}: Please select a client.")
             return redirect('todos:import_calendar_events')
         
-        # Validate category
-        try:
-            category = WorkCategory.objects.get(id=category_id, user=request.user)
-        except WorkCategory.DoesNotExist:
-            logger.error(f"Category {category_id} not found for user {request.user.username}")
-            messages.error(request, f"Invalid work category selected for event {event_id}.")
+        # Handle category - either use existing or auto-create
+        category = None
+        if category_id:
+            try:
+                category = WorkCategory.objects.get(id=category_id, user=request.user)
+                logger.info(f"  Found existing category: {category.name}")
+            except WorkCategory.DoesNotExist:
+                logger.warning(f"Category {category_id} not found, will try auto-create")
+        
+        # If no category found or no ID provided, try to auto-create from suggested name
+        if not category:
+            suggested_category_name = request.POST.get(f'suggested_category_{event_id}', '').strip()
+            if suggested_category_name:
+                # Try to find existing category by name
+                category, created = WorkCategory.objects.get_or_create(
+                    user=request.user,
+                    name=suggested_category_name,
+                    defaults={'metadata_schema': ['description']}
+                )
+                if created:
+                    logger.info(f"  Auto-created new category: {category.name} with description metadata")
+                    messages.success(request, f"Auto-created new work category: '{suggested_category_name}'")
+                else:
+                    logger.info(f"  Found existing category by name: {category.name}")
+            else:
+                logger.error(f"VALIDATION FAILED - Event {event_id}: no category selected and no suggested category name")
+                messages.error(request, f"Event {event_id}: Please select a work category.")
+                return redirect('todos:import_calendar_events')
+        
+        if not category:
+            logger.error(f"VALIDATION FAILED - Event {event_id}: could not determine category")
+            messages.error(request, f"Event {event_id}: Could not determine work category.")
             return redirect('todos:import_calendar_events')
         
         # Validate client
