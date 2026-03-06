@@ -384,3 +384,68 @@ def sync_all_clients_to_contacts(user):
     
     logger.info(f"Contacts sync complete. Synced {synced_count} clients for {user.username}")
     return synced_count
+
+
+def get_google_contacts_list(user, service=None):
+    """
+    Fetch all contacts from Google Contacts (address book).
+    Returns a list of contact dictionaries with name, email, phone, address.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not service:
+        service = get_google_contacts_service(user)
+    
+    if not service:
+        logger.error(f"No Google Contacts service available for {user.username}")
+        return []
+    
+    contacts = []
+    
+    try:
+        # Fetch contacts from Google Contacts
+        results = service.people().list(
+            resourceName='people/me',
+            pageSize=1000,
+            personFields='names,emailAddresses,phoneNumbers,addresses',
+            sortOrder='LAST_MODIFIED_DESCENDING'
+        ).execute()
+        
+        connections = results.get('connections', [])
+        logger.info(f"Fetched {len(connections)} contacts from Google Contacts for {user.username}")
+        
+        for person in connections:
+            contact_data = {}
+            
+            # Get name
+            names = person.get('names', [])
+            if names:
+                contact_data['name'] = names[0].get('displayName', '')
+                contact_data['given_name'] = names[0].get('givenName', '')
+                contact_data['family_name'] = names[0].get('familyName', '')
+            
+            # Get email
+            emails = person.get('emailAddresses', [])
+            if emails:
+                contact_data['email'] = emails[0].get('value', '')
+            
+            # Get phone
+            phones = person.get('phoneNumbers', [])
+            if phones:
+                contact_data['phone'] = phones[0].get('value', '')
+            
+            # Get address
+            addresses = person.get('addresses', [])
+            if addresses:
+                contact_data['address'] = addresses[0].get('formattedValue', '')
+            
+            if contact_data.get('name'):
+                contacts.append(contact_data)
+        
+        logger.info(f"Parsed {len(contacts)} contacts for matching")
+        return contacts
+        
+    except Exception as e:
+        logger.exception(f"Error fetching Google Contacts for {user.username}: {str(e)}")
+        return []

@@ -406,7 +406,7 @@ def sync_todos_to_calendar(request):
 @login_required
 def import_calendar_events(request):
     """Display Google Calendar events to import as timesheets."""
-    from .calendar_utils import get_google_calendar_service, InvalidScopeError
+    from .calendar_utils import get_google_calendar_service, get_google_contacts_list, InvalidScopeError
     from .models import GoogleCalendarCredential
     from datetime import datetime, timedelta, timezone
     
@@ -479,6 +479,9 @@ def import_calendar_events(request):
     categories = WorkCategory.objects.filter(user=request.user).order_by('name')
     clients = Client.objects.filter(user=request.user).order_by('name')
     
+    # Fetch contacts from Google Contacts address book for enhanced matching
+    google_contacts = get_google_contacts_list(request.user)
+    
     # Check if user wants to hide already-imported events
     hide_imported = request.GET.get('hide_imported', False)
     
@@ -510,24 +513,85 @@ def import_calendar_events(request):
                     value = value.strip()
                     event['client_details'][key] = value
         
-        # Smart client matching: try to match by address or name
+        # Smart client matching: try multiple strategies
         event['suggested_client_id'] = None
         location = event.get('location', '')
+        organizer_info = event.get('organizer', {})
+        organizer_email = organizer_info.get('email', '')
         
-        # First try: match by address (most accurate)
-        if location:
+        # Strategy 1: Match by location address
+        if location and not event['suggested_client_id']:
             for client in clients:
                 if client.address and location.lower() in client.address.lower():
                     event['suggested_client_id'] = client.id
                     event['suggested_client'] = client.name
                     break
         
-        # Second try: match by name from earlier parsing
+        # Strategy 2: Match by Google Contact address
+        if location and not event['suggested_client_id']:
+            for contact in google_contacts:
+                if contact.get('address') and location.lower() in contact['address'].lower():
+                    # Try to find matching client
+                    for client in clients:
+                        if (client.name.lower() == contact.get('name', '').lower() or
+                            client.email == contact.get('email') or
+                            client.phone == contact.get('phone')):
+                            event['suggested_client_id'] = client.id
+                            event['suggested_client'] = client.name
+                            break
+                    if event['suggested_client_id']:
+                        break
+        
+        # Strategy 3: Match by event organizer email (from Google Contacts)
+        if organizer_email and not event['suggested_client_id']:
+            for contact in google_contacts:
+                if contact.get('email') == organizer_email:
+                    # Found matching contact, now find client
+                    for client in clients:
+                        if (client.name.lower() == contact.get('name', '').lower() or
+                            client.email == contact.get('email')):
+                            event['suggested_client_id'] = client.id
+                            event['suggested_client'] = client.name
+                            break
+                    if event['suggested_client_id']:
+                        break
+        
+        # Strategy 4: Match by client name from title
         if not event['suggested_client_id'] and event.get('suggested_client'):
             for client in clients:
                 if client.name.lower() == event['suggested_client'].lower():
                     event['suggested_client_id'] = client.id
                     break
+        
+        # Store location for display
+        event['display_location'] = location
+        
+        # Check if this event has already been imported
+        event_id = event.get('id', '')
+        existing_import = TimesheetEntry.objects.filter(
+            user=request.user,
+            google_calendar_event_id=event_id
+        ).first()
+        
+        event['already_imported'] = existing_import is not None
+        event['imported_timesheet'] = existing_import
+    
+    # Filter out already-imported events if requested
+    if hide_imported:
+        events = [e for e in events if not e.get('already_imported', False)]
+    
+    context = {
+        'events': events,
+        'days_back': days_back,
+        'days_forward': days_forward,
+        'categories': categories,
+        'clients': clients,
+        'show_synced': show_synced,
+        'hide_imported': hide_imported,
+    }
+    
+    return render(request, 'todos/import_calendar_events.html', context)
+
         
         # Store location for display
         event['display_location'] = location
