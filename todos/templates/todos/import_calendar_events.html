@@ -21,22 +21,31 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-bold d-block mb-2">Load events from last</label>
                                 <div class="d-flex gap-2 flex-wrap">
-                                    <a href="?days_back=1{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 1 %}active{% endif %}">1 day</a>
-                                    <a href="?days_back=7{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 7 %}active{% endif %}">7 days</a>
-                                    <a href="?days_back=14{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 14 %}active{% endif %}">14 days</a>
-                                    <a href="?days_back=30{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 30 %}active{% endif %}">30 days</a>
+                                    <a href="?days_back=1&days_forward={{ days_forward }}{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 1 %}active{% endif %}">1 day</a>
+                                    <a href="?days_back=7&days_forward={{ days_forward }}{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 7 %}active{% endif %}">7 days</a>
+                                    <a href="?days_back=14&days_forward={{ days_forward }}{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 14 %}active{% endif %}">14 days</a>
+                                    <a href="?days_back=30&days_forward={{ days_forward }}{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 30 %}active{% endif %}">30 days</a>
                                 </div>
                                 <div class="form-check mt-3">
-                                    <input class="form-check-input" type="checkbox" name="show_synced_filter" id="showSynced" {% if request.GET.show_synced %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}&show_synced=on{% if hide_imported %}&hide_imported=on{% endif %}' : '?days_back={{ days_back }}{% if hide_imported %}&hide_imported=on{% endif %}'">
+                                    <input class="form-check-input" type="checkbox" name="show_synced_filter" id="showSynced" {% if request.GET.show_synced %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}&days_forward={{ days_forward }}&show_synced=on{% if hide_imported %}&hide_imported=on{% endif %}' : '?days_back={{ days_back }}&days_forward={{ days_forward }}{% if hide_imported %}&hide_imported=on{% endif %}'">
                                     <label class="form-check-label" for="showSynced">
                                         Show synced todos
                                     </label>
                                 </div>
                                 <div class="form-check mt-2">
-                                    <input class="form-check-input" type="checkbox" name="hide_imported_filter" id="hideImported" {% if hide_imported %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}{% if request.GET.show_synced %}&show_synced=on{% endif %}&hide_imported=on' : '?days_back={{ days_back }}{% if request.GET.show_synced %}&show_synced=on{% endif %}'">
+                                    <input class="form-check-input" type="checkbox" name="hide_imported_filter" id="hideImported" {% if hide_imported %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}&days_forward={{ days_forward }}{% if request.GET.show_synced %}&show_synced=on{% endif %}&hide_imported=on' : '?days_back={{ days_back }}&days_forward={{ days_forward }}{% if request.GET.show_synced %}&show_synced=on{% endif %}'">
                                     <label class="form-check-label" for="hideImported">
                                         Hide already imported ✓
                                     </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold d-block mb-2">Load events for next</label>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a href="?days_back={{ days_back }}&days_forward=7{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_forward == 7 %}active{% endif %}">7 days</a>
+                                    <a href="?days_back={{ days_back }}&days_forward=14{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_forward == 14 %}active{% endif %}">14 days</a>
+                                    <a href="?days_back={{ days_back }}&days_forward=30{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_forward == 30 %}active{% endif %}">30 days</a>
+                                    <a href="?days_back={{ days_back }}&days_forward=60{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_forward == 60 %}active{% endif %}">60 days</a>
                                 </div>
                             </div>
                         </div>

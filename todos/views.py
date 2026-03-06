@@ -427,25 +427,29 @@ def import_calendar_events(request):
         messages.error(request, "Could not access Google Calendar. Please reconnect.")
         return redirect('todos:todo_list')
     
-    # Get date range from request or default to last 7 days
+    # Get date range from request or default to last 7 days and next 30 days
     days_back = request.GET.get('days_back', 7)
+    days_forward = request.GET.get('days_forward', 30)
     try:
         days_back = int(days_back)
+        days_forward = int(days_forward)
     except (ValueError, TypeError):
         days_back = 7
+        days_forward = 30
     
     # Check if user wants to see synced todos
     show_synced = request.GET.get('show_synced', False)
     
     now = datetime.now(tz=timezone.utc)
     start_date = now - timedelta(days=days_back)
+    end_date = now + timedelta(days=days_forward)
     
     try:
         # Fetch events from Google Calendar
         events_result = service.events().list(
             calendarId='primary',
             timeMin=start_date.isoformat(),
-            timeMax=now.isoformat(),
+            timeMax=end_date.isoformat(),
             maxResults=50,
             singleEvents=True,
             orderBy='startTime'
@@ -545,6 +549,7 @@ def import_calendar_events(request):
     context = {
         'events': events,
         'days_back': days_back,
+        'days_forward': days_forward,
         'categories': categories,
         'clients': clients,
         'show_synced': show_synced,
