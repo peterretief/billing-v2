@@ -405,7 +405,7 @@ def get_google_contacts_list(user, service=None):
     
     try:
         # Fetch contacts from Google Contacts
-        results = service.people().list(
+        results = service.people().connections().list(
             resourceName='people/me',
             pageSize=1000,
             personFields='names,emailAddresses,phoneNumbers,addresses',
