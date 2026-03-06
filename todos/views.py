@@ -592,36 +592,6 @@ def import_calendar_events(request):
     
     return render(request, 'todos/import_calendar_events.html', context)
 
-        
-        # Store location for display
-        event['display_location'] = location
-        
-        # Check if this event has already been imported
-        event_id = event.get('id', '')
-        existing_import = TimesheetEntry.objects.filter(
-            user=request.user,
-            google_calendar_event_id=event_id
-        ).first()
-        
-        event['already_imported'] = existing_import is not None
-        event['imported_timesheet'] = existing_import
-    
-    # Filter out already-imported events if requested
-    if hide_imported:
-        events = [e for e in events if not e.get('already_imported', False)]
-    
-    context = {
-        'events': events,
-        'days_back': days_back,
-        'days_forward': days_forward,
-        'categories': categories,
-        'clients': clients,
-        'show_synced': show_synced,
-        'hide_imported': hide_imported,
-    }
-    
-    return render(request, 'todos/import_calendar_events.html', context)
-
 
 @login_required
 def create_timesheets_from_events(request):
