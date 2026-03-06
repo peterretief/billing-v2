@@ -38,9 +38,15 @@
                                     <a href="?days_back=30{% if request.GET.show_synced %}&show_synced=on{% endif %}" class="btn btn-sm btn-outline-secondary {% if days_back == 30 %}active{% endif %}">30 days</a>
                                 </div>
                                 <div class="form-check mt-3">
-                                    <input class="form-check-input" type="checkbox" name="show_synced_filter" id="showSynced" {% if request.GET.show_synced %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}&show_synced=on' : '?days_back={{ days_back }}'">
+                                    <input class="form-check-input" type="checkbox" name="show_synced_filter" id="showSynced" {% if request.GET.show_synced %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}&show_synced=on{% if hide_imported %}&hide_imported=on{% endif %}' : '?days_back={{ days_back }}{% if hide_imported %}&hide_imported=on{% endif %}'">
                                     <label class="form-check-label" for="showSynced">
                                         Show synced todos
+                                    </label>
+                                </div>
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" name="hide_imported_filter" id="hideImported" {% if hide_imported %}checked{% endif %} onchange="window.location.href = this.checked ? '?days_back={{ days_back }}{% if request.GET.show_synced %}&show_synced=on{% endif %}&hide_imported=on' : '?days_back={{ days_back }}{% if request.GET.show_synced %}&show_synced=on{% endif %}'">
+                                    <label class="form-check-label" for="hideImported">
+                                        Hide already imported ✓
                                     </label>
                                 </div>
                             </div>
@@ -71,6 +77,9 @@
                                                 <td>
                                                     <div>
                                                         <strong>{{ event.summary }}</strong>
+                                                        {% if event.already_imported %}
+                                                            <span class="badge bg-success ms-2" title="Imported on {{ event.imported_timesheet.date|date:'M d, Y' }}">✓ Already imported</span>
+                                                        {% endif %}
                                                         {% if event.description and "--- CLIENT DETAILS ---" not in event.description %}
                                                             <br><small class="text-muted">{{ event.description|truncatewords:20 }}</small>
                                                         {% endif %}

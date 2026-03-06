@@ -468,12 +468,15 @@ def import_calendar_events(request):
         events = []
     
     # Parse event titles and extract client/category suggestions
-    from timesheets.models import WorkCategory
+    from timesheets.models import WorkCategory, TimesheetEntry
     from clients.models import Client
     
     # Get work categories and clients for the user
     categories = WorkCategory.objects.filter(user=request.user).order_by('name')
     clients = Client.objects.filter(user=request.user).order_by('name')
+    
+    # Check if user wants to hide already-imported events
+    hide_imported = request.GET.get('hide_imported', False)
     
     for event in events:
         title = event.get('summary', '')
@@ -524,6 +527,20 @@ def import_calendar_events(request):
         
         # Store location for display
         event['display_location'] = location
+        
+        # Check if this event has already been imported
+        event_id = event.get('id', '')
+        existing_import = TimesheetEntry.objects.filter(
+            user=request.user,
+            google_calendar_event_id=event_id
+        ).first()
+        
+        event['already_imported'] = existing_import is not None
+        event['imported_timesheet'] = existing_import
+    
+    # Filter out already-imported events if requested
+    if hide_imported:
+        events = [e for e in events if not e.get('already_imported', False)]
     
     context = {
         'events': events,
@@ -531,6 +548,7 @@ def import_calendar_events(request):
         'categories': categories,
         'clients': clients,
         'show_synced': show_synced,
+        'hide_imported': hide_imported,
     }
     
     return render(request, 'todos/import_calendar_events.html', context)
@@ -694,7 +712,8 @@ def create_timesheets_from_events(request):
                 date=event_date,
                 hours=duration_hours,
                 hourly_rate=hourly_rate,
-                metadata={'event_title': title, 'event_description': description}
+                metadata={'event_title': title, 'event_description': description},
+                google_calendar_event_id=event_id  # Store event ID for deduplication
             )
             created_count += 1
             logger.info(f"Created timesheet entry {entry.id} with {duration_hours}h at ${hourly_rate}/hr")

@@ -58,6 +58,15 @@ class TimesheetEntry(TenantModel):
 
     # Defined only once
     metadata = models.JSONField(default=dict, blank=True)
+    
+    # Track which Google Calendar event this was imported from (for deduplication)
+    google_calendar_event_id = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        db_index=True,
+        help_text="Google Calendar event ID if imported from calendar"
+    )
 
     @property
     def formatted_metadata(self):
