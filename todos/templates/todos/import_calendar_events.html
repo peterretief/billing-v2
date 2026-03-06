@@ -68,9 +68,9 @@
                                 <tbody>
                                     {% for event in events %}
                                         {% with start=event.start end=event.end %}
-                                            <tr>
+                                            <tr {% if event.already_imported %}style="opacity: 0.6; background-color: #f8f9fa;"{% endif %}>
                                                 <td>
-                                                    <input type="checkbox" name="events[]" value="{{ event.id }}" class="form-check-input event-checkbox">
+                                                    <input type="checkbox" name="events[]" value="{{ event.id }}" class="form-check-input event-checkbox" {% if event.already_imported %}disabled title="Already imported as timesheet"{% endif %}>
                                                     <!-- Hidden field to send suggested category for auto-creation -->
                                                     <input type="hidden" name="suggested_category_{{ event.id }}" value="{{ event.suggested_category }}">
                                                 </td>
@@ -78,7 +78,7 @@
                                                     <div>
                                                         <strong>{{ event.summary }}</strong>
                                                         {% if event.already_imported %}
-                                                            <span class="badge bg-success ms-2" title="Imported on {{ event.imported_timesheet.date|date:'M d, Y' }}">✓ Already imported</span>
+                                                            <span class="badge bg-success ms-2" title="Timesheet created on {{ event.imported_timesheet.date|date:'M d, Y' }}">✓ Timesheet created</span>
                                                         {% endif %}
                                                         {% if event.description and "--- CLIENT DETAILS ---" not in event.description %}
                                                             <br><small class="text-muted">{{ event.description|truncatewords:20 }}</small>
