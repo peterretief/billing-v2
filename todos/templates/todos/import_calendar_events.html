@@ -131,7 +131,7 @@
                                                         <option value="">-- Select --</option>
                                                         {% if event.suggested_category %}
                                                             <optgroup label="From Event Title">
-                                                                <option value="" selected>
+                                                                <option value="create_new_{{ event.id }}" selected>
                                                                     {{ event.suggested_category }}
                                                                 </option>
                                                             </optgroup>

@@ -706,6 +706,12 @@ def create_timesheets_from_events(request):
         
         # Handle category - either use existing or auto-create
         category = None
+        
+        # Check if this is a "create new" marker (from suggested category in dropdown)
+        if category_id and category_id.startswith('create_new_'):
+            logger.info(f"  'Create new' category marker detected")
+            category_id = None  # Treat as empty so it falls through to auto-create
+        
         if category_id:
             try:
                 category = WorkCategory.objects.get(id=category_id, user=request.user)
