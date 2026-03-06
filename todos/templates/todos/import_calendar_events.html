@@ -130,9 +130,9 @@
                                                     <select name="category_id_{{ event.id }}" class="form-select form-select-sm">
                                                         <option value="">-- Select --</option>
                                                         {% if event.suggested_category %}
-                                                            <optgroup label="Create New">
-                                                                <option value="" selected style="font-style: italic; font-weight: bold;">
-                                                                    ✨ Create: "{{ event.suggested_category }}"
+                                                            <optgroup label="From Event Title">
+                                                                <option value="" selected>
+                                                                    {{ event.suggested_category }}
                                                                 </option>
                                                             </optgroup>
                                                         {% endif %}
