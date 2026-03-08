@@ -653,7 +653,11 @@ def _find_event_by_calendar_uuid(user, calendar_uuid):
 def _update_event_from_calendar(event, gc_event):
     """
     Pull scheduling changes FROM Google Calendar into app.
-    Only updates calendar-owned fields.
+    Only updates calendar-owned fields (dates/times).
+    
+    Field ownership model:
+    - Calendar OWNS: scheduling (dates, times)
+    - App OWNS: metadata (title, category, description)
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -726,10 +730,11 @@ def _sync_metadata_to_calendar(user, event, service=None):
         creds_obj = GoogleCalendarCredential.objects.get(user=user)
         calendar_id = creds_obj.calendar_id or 'primary'
         
-        # Fetch current calendar event
+        # Fetch current calendar event (explicitly request start/end to ensure we get them)
         gc_event = service.events().get(
             calendarId=calendar_id,
-            eventId=event.google_calendar_event_id
+            eventId=event.google_calendar_event_id,
+            fields='id,start,end,summary,description,status,location,etag'
         ).execute()
         
         # Build update with app metadata (preserving calendar's date/time)
@@ -740,14 +745,19 @@ def _sync_metadata_to_calendar(user, event, service=None):
         }
         
         # PRESERVE the calendar event's start and end times (required by Google API)
-        if 'start' in gc_event:
+        if 'start' in gc_event and gc_event['start']:
             update_data['start'] = gc_event['start']
-        if 'end' in gc_event:
+            logger.debug(f"Preserving start time: {gc_event['start']}")
+        if 'end' in gc_event and gc_event['end']:
             update_data['end'] = gc_event['end']
+            logger.debug(f"Preserving end time: {gc_event['end']}")
         
         # Add client location if available
         if event.client and event.client.address:
             update_data['location'] = event.client.address
+        
+        # Log what we're updating
+        logger.info(f"Updating event {event.google_calendar_event_id}: summary='{update_data['summary']}', start={update_data.get('start')}, end={update_data.get('end')}")
         
         # Update the event (preserving start/end times from calendar)
         service.events().update(
