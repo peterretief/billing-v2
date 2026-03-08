@@ -693,9 +693,10 @@ def _update_event_from_calendar(event, gc_event):
         estimated_hours = duration.total_seconds() / 3600  # Convert to hours
         
         # Only update if it changed significantly (more than 1 minute difference)
-        if event.estimated_hours is None or abs((event.estimated_hours or 0) - estimated_hours) > (1/60):
+        current_hours = float(event.estimated_hours or 0)
+        if event.estimated_hours is None or abs(current_hours - estimated_hours) > (1/60):
             changes['estimated_hours'] = {
-                'from': float(event.estimated_hours) if event.estimated_hours else None,
+                'from': current_hours if event.estimated_hours else None,
                 'to': round(estimated_hours, 2),
             }
             event.estimated_hours = round(estimated_hours, 2)
