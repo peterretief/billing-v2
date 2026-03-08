@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from celery.schedules import crontab, schedule
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 # Celery Beat schedule - runs daily billing task at 00:01 Africa/Johannesburg time
@@ -12,7 +12,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "sync-all-users-events-with-calendar": {
         "task": "events.tasks.sync_all_users_events_with_calendar",
-        "schedule": schedule(run_every=30),  # Run every 30 seconds (faster for testing)
+        "schedule": crontab(minute="*/5"),  # Run every 5 minutes
     },
     "cleanup-old-sync-logs": {
         "task": "events.tasks.cleanup_old_sync_logs",

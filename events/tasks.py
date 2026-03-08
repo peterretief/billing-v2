@@ -42,8 +42,8 @@ def sync_user_events_with_calendar(self, user_id):
             return False
         
         # Find events that need syncing
-        # Priority: pending/failed status, or not synced recently (>30 seconds for testing)
-        cutoff = timezone.now() - timedelta(seconds=30)
+        # Priority: pending/failed status, or not synced recently (>5 minutes)
+        cutoff = timezone.now() - timedelta(minutes=5)
         
         events_to_sync = Event.objects.filter(
             user=user,
