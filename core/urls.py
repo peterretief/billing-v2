@@ -37,4 +37,6 @@ urlpatterns = [
     # Audit Settings
     path("audit-settings/", views.audit_settings, name="audit_settings"),
     path("audit-history/", views.audit_history, name="audit_history"),
+    # Working Hours Settings
+    path("working-hours/", views.working_hours_settings, name="working_hours_settings"),
 ]

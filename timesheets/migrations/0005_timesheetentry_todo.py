@@ -8,13 +8,13 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('timesheets', '0004_defaultworkcategory'),
-        ('todos', '0001_initial'),
+        ('events', '0001_initial'),
     ]
 
     operations = [
         migrations.AddField(
             model_name='timesheetentry',
             name='todo',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='timesheet_entries', to='todos.todo'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='timesheet_entries', to='events.event'),
         ),
     ]

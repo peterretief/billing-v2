@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-lg-6 mx-auto">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'events:event_list' %}">Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item active">Working Hours</li>
+                    </ol>
+                </nav>
+
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        <i class="bi bi-clock me-2"></i> Working Hours & Availability
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="post">
+                            {% csrf_token %}
+
+                            <!-- Current Settings Info -->
+                            {% if profile.work_start_time or profile.work_end_time %}
+                                <div class="alert alert-info alert-sm mb-4" role="alert">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>Current Settings:</strong>
+                                    {{ profile.get_work_start_time }} - {{ profile.get_work_end_time }} on selected days
+                                </div>
+                            {% endif %}
+
+                            <!-- Work Days Selection -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold mb-3">
+                                    <i class="bi bi-calendar-week me-2"></i>Working Days
+                                </label>
+                                <div class="row gx-3">
+                                    {% for field in form %}
+                                        {% if field.name != 'work_start_time' and field.name != 'work_end_time' and field.name != 'break_minutes' %}
+                                            <div class="col-md-6 col-lg-4 mb-2">
+                                                <div class="form-check">
+                                                    {{ field }}
+                                                    <label class="form-check-label" for="id_{{ field.name }}">
+                                                        {{ field.label|capfirst }}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                {% if form.non_field_errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">
+                                        {{ form.non_field_errors }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Work Hours -->
+                            <div class="row mt-4">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-hourglass-start me-2"></i>Start Time
+                                    </label>
+                                    {{ form.work_start_time }}
+                                    <small class="form-text text-muted d-block mt-1">When your workday begins</small>
+                                    {% if form.work_start_time.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">
+                                            {{ form.work_start_time.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">
+                                        <i class="bi bi-hourglass-end me-2"></i>End Time
+                                    </label>
+                                    {{ form.work_end_time }}
+                                    <small class="form-text text-muted d-block mt-1">When your workday ends</small>
+                                    {% if form.work_end_time.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">
+                                            {{ form.work_end_time.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Break Duration -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-cup-straw me-2"></i>Break Time Buffer
+                                </label>
+                                <div class="input-group">
+                                    {{ form.break_minutes }}
+                                    <span class="input-group-text">minutes</span>
+                                </div>
+                                <small class="form-text text-muted d-block mt-1">
+                                    Buffer between scheduled events (used when finding available slots)
+                                </small>
+                                {% if form.break_minutes.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">
+                                        {{ form.break_minutes.errors }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Button Group -->
+                            <div class="mt-4 d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-circle me-2"></i>Save Settings
+                                </button>
+                                <a href="{% url 'events:event_list' %}" class="btn btn-secondary">
+                                    <i class="bi bi-x-circle me-2"></i>Cancel
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Information Card -->
+                <div class="card shadow-sm border-0 mt-4">
+                    <div class="card-header bg-light fw-bold small">
+                        <i class="bi bi-lightbulb me-2"></i> About Working Hours
+                    </div>
+                    <div class="card-body small text-muted">
+                        <p class="mb-2">
+                            <strong>Working Days:</strong> Select which days you're available for scheduling.
+                        </p>
+                        <p class="mb-2">
+                            <strong>Start/End Times:</strong> Define your working hours. These are used to suggest available time slots for new todos.
+                        </p>
+                        <p>
+                            <strong>Break Buffer:</strong> Minimum time between scheduled events to account for breaks or transitions.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

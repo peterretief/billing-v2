@@ -4,23 +4,23 @@ from core.models import TenantModel
 from clients.models import Client
 
 
-class TodoManager(models.Manager):
-    """Custom manager for Todo with data validation and checking methods."""
+class EventManager(models.Manager):
+    """Custom manager for Event with data validation and checking methods."""
     
     def check_missing_category(self):
-        """Get todos without a category assigned."""
+        """Get events without a category assigned."""
         return self.filter(category__isnull=True)
     
     def check_missing_description(self):
-        """Get todos without a description."""
+        """Get events without a description."""
         return self.filter(description__exact="")
     
     def check_missing_estimated_hours(self):
-        """Get todos without estimated hours set."""
+        """Get events without estimated hours set."""
         return self.filter(estimated_hours__isnull=True)
     
     def check_overdue(self):
-        """Get todos that are overdue (due_date in past, not completed/cancelled)."""
+        """Get events that are overdue (due_date in past, not completed/cancelled)."""
         today = timezone.now().date()
         return self.filter(
             due_date__lt=today
@@ -29,7 +29,7 @@ class TodoManager(models.Manager):
         )
     
     def check_due_soon(self, days=7):
-        """Get todos due within X days."""
+        """Get events due within X days."""
         today = timezone.now().date()
         future_date = today + timezone.timedelta(days=days)
         return self.filter(
@@ -39,26 +39,26 @@ class TodoManager(models.Manager):
         )
     
     def check_linked_timesheets(self):
-        """Get todos that have linked timesheet entries."""
+        """Get events that have linked timesheet entries."""
         return self.filter(timesheet_entries__isnull=False).distinct()
     
     def check_unlinked_timesheets(self):
-        """Get todos without any linked timesheet entries."""
+        """Get events without any linked timesheet entries."""
         return self.filter(timesheet_entries__isnull=True)
     
     def check_incomplete_logging(self):
-        """Get todos where logged hours don't match estimated hours."""
-        todos = []
+        """Get events where logged hours don't match estimated hours."""
+        events = []
         
-        for todo in self.filter(estimated_hours__isnull=False):
-            linked_hours = sum(entry.hours for entry in todo.timesheet_entries.all())
-            if linked_hours < todo.estimated_hours:
-                todos.append(todo)
+        for event in self.filter(estimated_hours__isnull=False):
+            linked_hours = sum(entry.hours for entry in event.timesheet_entries.all())
+            if linked_hours < event.estimated_hours:
+                events.append(event)
         
-        return todos
+        return events
     
     def check_no_activity(self, days=30):
-        """Get todos not updated in the last X days."""
+        """Get events not updated in the last X days."""
         cutoff_date = timezone.now() - timezone.timedelta(days=days)
         return self.filter(updated_at__lt=cutoff_date).exclude(
             status__in=["completed", "cancelled"]
@@ -69,7 +69,7 @@ class TodoManager(models.Manager):
         base_qs = self.filter(user=user) if user else self.all()
         
         report = {
-            'total_todos': base_qs.count(),
+            'total_events': base_qs.count(),
             'missing_category': base_qs.filter(category__isnull=True).count(),
             'missing_description': base_qs.filter(description__exact="").count(),
             'missing_estimated_hours': base_qs.filter(estimated_hours__isnull=True).count(),
@@ -84,9 +84,9 @@ class TodoManager(models.Manager):
         return report
 
 
-class Todo(TenantModel):
+class Event(TenantModel):
     """
-    Task/Todo linked to a client. Users can track todos and create timesheets from them.
+    Event/Task linked to a client. Users can track events and create timesheets from them.
     """
     
     class Status(models.TextChoices):
@@ -103,28 +103,82 @@ class Todo(TenantModel):
         CRITICAL = "critical", "Critical"
     
     # Custom manager for data validation and checking
-    objects = TodoManager()
+    objects = EventManager()
     
     category = models.ForeignKey(
         'timesheets.WorkCategory',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="todos",
+        related_name="events",
         help_text="Work category for this task"
     )
     description = models.TextField(blank=True, default="", help_text="Description (saved to category)")
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="todos")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="events")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
     priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.MEDIUM)
     
     due_date = models.DateField(null=True, blank=True)
+    suggested_start_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Suggested start time from slot finder (used for calendar sync)"
+    )
+    calendar_start_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Event start time from Google Calendar (read-only, synced from calendar)"
+    )
+    calendar_end_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Event end time from Google Calendar (read-only, synced from calendar)"
+    )
+    google_calendar_event_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Google Calendar event ID (to prevent duplicates)"
+    )
+    synced_to_calendar = models.BooleanField(
+        default=False,
+        help_text="Marked as synced to Google Calendar"
+    )
     estimated_hours = models.DecimalField(
         max_digits=6,
         decimal_places=2,
         null=True,
         blank=True,
         help_text="Estimated hours to complete this task"
+    )
+    
+    # Bidirectional sync tracking
+    google_calendar_etag = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="eTag for conflict detection with Google Calendar"
+    )
+    last_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last time this event was synced with Google Calendar"
+    )
+    last_synced_from = models.CharField(
+        max_length=10,
+        choices=[('app', 'App'), ('calendar', 'Calendar')],
+        blank=True,
+        help_text="Which system was the last source of truth"
+    )
+    sync_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending Sync'),
+            ('synced', 'Synced'),
+            ('failed', 'Sync Failed'),
+        ],
+        default='pending',
+        help_text="Current sync status with Google Calendar"
     )
     
     # Tracking
@@ -134,32 +188,38 @@ class Todo(TenantModel):
     
     class Meta:
         ordering = ["-created_at"]
-        verbose_name = "Todo"
-        verbose_name_plural = "Todos"
+        verbose_name = "Event"
+        verbose_name_plural = "Events"
+        db_table = "todos_todo"  # Use existing table from original todos app
+        indexes = [
+            models.Index(fields=['user', 'google_calendar_event_id']),
+            models.Index(fields=['user', 'sync_status']),
+            models.Index(fields=['last_synced_at']),
+        ]
     
     def __str__(self):
         cat_name = self.category.name if self.category else "Uncategorized"
         return f"{cat_name} ({self.client.name})"
     
     def mark_completed(self):
-        """Mark this todo as completed."""
+        """Mark this event as completed."""
         # Check if completion is allowed
         linked_timesheet = self.timesheet_entries.first()
         if linked_timesheet and linked_timesheet.is_billed:
-            raise ValueError("Cannot complete a todo with an invoiced timesheet.")
+            raise ValueError("Cannot complete an event with an invoiced timesheet.")
         
         self.status = self.Status.COMPLETED
         self.completed_at = timezone.now()
         self.save()
     
     def mark_cancelled(self):
-        """Mark this todo as cancelled."""
+        """Mark this event as cancelled."""
         # Check for linked timesheets
         linked_timesheet = self.timesheet_entries.first()
         
         if linked_timesheet:
             if linked_timesheet.is_billed:
-                raise ValueError("Cannot cancel a todo with an invoiced timesheet.")
+                raise ValueError("Cannot cancel an event with an invoiced timesheet.")
             else:
                 # Delete non-invoiced timesheet when cancelling (maintain integrity)
                 linked_timesheet.delete()
@@ -168,14 +228,14 @@ class Todo(TenantModel):
         self.save()
     
     def can_be_modified(self):
-        """Check if todo can be edited (no linked invoiced timesheet)."""
+        """Check if event can be edited (no linked invoiced timesheet)."""
         linked_timesheet = self.timesheet_entries.first()
         if linked_timesheet and linked_timesheet.is_billed:
             return False
         return True
     
     def get_linked_timesheet_status(self):
-        """Get status of linked timesheet if any."""
+        """Get status of linked timesheet if any for this event."""
         linked_timesheet = self.timesheet_entries.first()
         if not linked_timesheet:
             return None
@@ -189,7 +249,7 @@ class Todo(TenantModel):
     
     @property
     def is_overdue(self):
-        """Check if todo is overdue."""
+        """Check if event is overdue."""
         if self.due_date and self.status not in [self.Status.COMPLETED, self.Status.CANCELLED]:
             return self.due_date < timezone.now().date()
         return False
@@ -206,7 +266,7 @@ class Todo(TenantModel):
             return max(self.estimated_hours - self.get_linked_hours, 0)
         return None    
     def get_data_quality_issues(self):
-        """Get list of data quality issues for this todo."""
+        """Get list of data quality issues for this event."""
         issues = []
         
         if not self.category:
@@ -235,7 +295,7 @@ class Todo(TenantModel):
         return issues
     
     def is_data_quality_ok(self):
-        """Check if todo passes all data quality checks."""
+        """Check if event passes all data quality checks."""
         return len(self.get_data_quality_issues()) == 0
 
 
@@ -247,6 +307,7 @@ class GoogleCalendarCredential(TenantModel):
     token_expiry = models.DateTimeField(null=True, blank=True)
     sync_enabled = models.BooleanField(default=True)
     calendar_id = models.CharField(max_length=255, blank=True, null=True)
+    email_address = models.EmailField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -254,6 +315,7 @@ class GoogleCalendarCredential(TenantModel):
         verbose_name = "Google Calendar Credential"
         verbose_name_plural = "Google Calendar Credentials"
         unique_together = ('user',)
+        db_table = "todos_googlecalendarcredential"  # Use existing table from original todos app
     
     def __str__(self):
         return f"Google Calendar - {self.user.username}"
@@ -263,3 +325,40 @@ class GoogleCalendarCredential(TenantModel):
         if self.token_expiry:
             return timezone.now() >= self.token_expiry
         return False
+
+
+class EventSyncLog(models.Model):
+    """Audit trail for all sync operations between app and Google Calendar."""
+    
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='sync_logs')
+    sync_direction = models.CharField(
+        max_length=20,
+        choices=[('push', 'App → Calendar'), ('pull', 'Calendar → App')],
+        help_text="Direction of sync"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=[('success', 'Success'), ('error', 'Error')],
+        default='success'
+    )
+    
+    # Details about what was synced
+    synced_fields = models.JSONField(default=list, help_text="List of fields that were synced")
+    changes = models.JSONField(default=dict, help_text="Old and new values for each field")
+    
+    error_message = models.TextField(blank=True, help_text="Error message if sync failed")
+    notes = models.TextField(blank=True, help_text="Additional notes")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Event Sync Log"
+        verbose_name_plural = "Event Sync Logs"
+        indexes = [
+            models.Index(fields=['event', '-created_at']),
+            models.Index(fields=['status', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.event} - {self.sync_direction} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"

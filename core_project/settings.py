@@ -10,6 +10,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "billing_schedule.tasks.process_daily_billing_queue",
         "schedule": crontab(minute=1, hour=0),  # Run at 00:01 daily
     },
+    "sync-all-users-events-with-calendar": {
+        "task": "events.tasks.sync_all_users_events_with_calendar",
+        "schedule": crontab(minute="*/5"),  # Run every 5 minutes
+    },
+    "cleanup-old-sync-logs": {
+        "task": "events.tasks.cleanup_old_sync_logs",
+        "schedule": crontab(minute=0, hour=2),  # Run at 02:00 daily
+    },
 }
 
 
@@ -60,13 +68,16 @@ CSRF_CHECK_REFERER = False
 # --- APPLICATION DEFINITION ---
 INSTALLED_APPS = [
     # "ops",  # Disabled for now, can be re-enabled later if needed
+    "daphne",  # ASGI server for Channels - must be first
+    "channels",  # WebSocket support
     "billing_schedule",
     "core",
     "anymail",
     "clients",
     "invoices",
     "timesheets",
-    "todos",
+    "events",
+    # "todos",  # Deprecated - renamed to events app
     "items",
     "notifications",
     "widget_tweaks",
@@ -98,6 +109,7 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core_project.urls"
 WSGI_APPLICATION = "core_project.wsgi.application"
+ASGI_APPLICATION = "core_project.asgi.application"
 AUTH_USER_MODEL = "core.User"
 
 # --- TEMPLATES ---
@@ -159,6 +171,21 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
+# --- CHANNELS (WebSocket) ---
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                (
+                    REDIS_HOST,
+                    int(REDIS_PORT),
+                ) if not REDIS_PASSWORD else f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}"
+            ],
+        },
+    },
+}
+
 # --- MISC ---
 LOGIN_REDIRECT_URL = "/invoices/"
 LOGOUT_REDIRECT_URL = "/"
@@ -208,4 +235,4 @@ LOGGING = {
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
 GOOGLE_OAUTH_CREDENTIALS_PATH = os.path.join(BASE_DIR, "google_credentials.json")
-GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8003/todos/calendar/auth/callback/")
+GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8003/calendar/auth/callback/")

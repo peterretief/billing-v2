@@ -45,7 +45,7 @@ class WorkCategory(TenantModel):
 class TimesheetEntry(TenantModel):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="timesheets")
     category = models.ForeignKey(WorkCategory, on_delete=models.SET_NULL, null=True, blank=True)
-    todo = models.ForeignKey("todos.Todo", on_delete=models.SET_NULL, null=True, blank=True, related_name="timesheet_entries")
+    todo = models.ForeignKey("events.Event", on_delete=models.SET_NULL, null=True, blank=True, related_name="timesheet_entries")
     date = models.DateField(default=timezone.now)
     hours = models.DecimalField(max_digits=6, decimal_places=2)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)

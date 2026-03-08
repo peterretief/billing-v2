@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item">
+                            <a href="{% url 'events:event_list' %}">Events</a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            {% if form.instance.pk %}
+                                Edit
+                            {% else %}
+                                Create
+                            {% endif %}
+                        </li>
+                    </ol>
+                </nav>
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white fw-bold">
+                        {% if form.instance.pk %}
+                            <i class="bi bi-pencil me-2"></i> Edit Event
+                        {% else %}
+                            <i class="bi bi-plus-lg me-2"></i> Create New Event
+                        {% endif %}
+                    </div>
+                    {% if linked_timesheet %}
+                        <div class="alert alert-warning m-0 rounded-0 border-bottom" role="alert">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <strong><i class="bi bi-exclamation-triangle me-2"></i> This event has a linked timesheet</strong>
+                                    <br>
+                                    <small>You cannot edit this event while a timesheet is linked to it.</small>
+                                    {% if timesheet_is_invoiced %}
+                                        <br>
+                                        <small><span class="badge bg-danger">Invoiced</span> - This timesheet cannot be unlinked.</small>
+                                    {% else %}
+                                        <br>
+                                        <small>You can unlink the timesheet below to enable editing.</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    <div class="card-body p-4">
+                        <form method="post">
+                            {% csrf_token %}
+                            <!-- Category - Select or Add New -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-tag me-1"></i>Work Category
+                                </label>
+                                {{ form.category_text }}
+                                <datalist id="category_list">
+                                    {% for cat in categories %}
+                                        <option value="{{ cat.name }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                                <small class="form-text text-muted d-block mt-1">Pick from list or type to create new</small>
+                                {% if form.category_text.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.category_text.errors }}</div>
+                                {% endif %}
+                                {% if form.category.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.category.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <!-- Client - Prominent at Top -->
+                            <div class="mb-3 p-3 bg-light border-2 border-primary rounded">
+                                <label class="form-label fw-bold mb-2">
+                                    <i class="bi bi-person-check text-primary me-2"></i>Select Client
+                                </label>
+                                {{ form.client }}
+                                <small class="form-text text-muted d-block mt-2">
+                                    <i class="bi bi-info-circle me-1"></i>This ties the event to a specific client
+                                </small>
+                                {% if form.client.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.client.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <!-- Description -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Description</label>
+                                {{ form.description }}
+                                <small class="form-text text-muted d-block mt-1">Additional details about this work</small>
+                                {% if form.description.errors %}
+                                    <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.description.errors }}</div>
+                                {% endif %}
+                            </div>
+                            <!-- Row: Status & Priority -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Status</label>
+                                    {{ form.status }}
+                                    {% if form.status.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.status.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Priority</label>
+                                    {{ form.priority }}
+                                    {% if form.priority.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.priority.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <!-- Row: Due Date & Estimated Hours -->
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Due Date</label>
+                                    {{ form.due_date }}
+                                    {% if form.due_date.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.due_date.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">Estimated Hours</label>
+                                    {{ form.estimated_hours }}
+                                    <small class="form-text text-muted d-block mt-1">Total hours you expect this task to take</small>
+                                    {% if form.estimated_hours.errors %}
+                                        <div class="alert alert-danger alert-sm mt-2" role="alert">{{ form.estimated_hours.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Find Available Slots Section -->
+                            <div class="row mt-4" id="slots-section" style="display: none;">
+                                <div class="col-12">
+                                    <div class="card bg-light border">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                                <h6 class="mb-0 fw-bold">
+                                                    <i class="bi bi-calendar-check text-success me-2"></i>Find Available Slots
+                                                </h6>
+                                            </div>
+                                            
+                                            <p class="text-muted small mb-3">
+                                                Based on your working hours and calendar availability
+                                            </p>
+                                            
+                                            <div id="slots-loading" style="display: none;" class="text-center py-3">
+                                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                                    <span class="visually-hidden">Loading...</span>
+                                                </div>
+                                                <small class="text-muted">Finding available slots...</small>
+                                            </div>
+                                            
+                                            <div id="slots-error" style="display: none;" class="alert alert-warning alert-sm mb-0"></div>
+                                            
+                                            <div id="slots-list" style="display: none;">
+                                                <div class="list-group gap-2" id="slots-container">
+                                                    <!-- Slots will appear here -->
+                                                </div>
+                                            </div>
+                                            
+                                            <button type="button" class="btn btn-sm btn-outline-success" id="find-slots-btn">
+                                                <i class="bi bi-search me-1"></i> Find Slots
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" id="clear-slots-btn" style="display: none;">
+                                                <i class="bi bi-x-circle me-1"></i> Clear
+                                            </button>
+                                            
+                                            <!-- Hidden field to store suggested start time -->
+                                            <input type="hidden" name="suggested_start_time" id="suggested_start_time" value="">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <script>
+                                // Show/hide slot finder based on estimated_hours
+                                const estimatedHoursInput = document.querySelector('input[name="estimated_hours"]');
+                                const slotsSection = document.getElementById('slots-section');
+                                
+                                function updateSlotsSectionVisibility() {
+                                    if (estimatedHoursInput.value && parseFloat(estimatedHoursInput.value) > 0) {
+                                        slotsSection.style.display = 'block';
+                                    } else {
+                                        slotsSection.style.display = 'none';
+                                        // Clear any previous results
+                                        document.getElementById('slots-list').style.display = 'none';
+                                        document.getElementById('slots-error').style.display = 'none';
+                                    }
+                                }
+                                
+                                estimatedHoursInput.addEventListener('change', updateSlotsSectionVisibility);
+                                estimatedHoursInput.addEventListener('input', updateSlotsSectionVisibility);
+                                
+                                // Initialize on page load
+                                updateSlotsSectionVisibility();
+                                
+                                // Find slots button handler
+                                document.getElementById('find-slots-btn').addEventListener('click', function() {
+                                    const durationHours = parseFloat(estimatedHoursInput.value);
+                                    if (!durationHours || durationHours <= 0) {
+                                        alert('Please enter estimated hours first');
+                                        return;
+                                    }
+                                    
+                                    findAvailableSlots(durationHours);
+                                });
+                                
+                                // Clear slots button handler
+                                document.getElementById('clear-slots-btn').addEventListener('click', function() {
+                                    document.getElementById('slots-list').style.display = 'none';
+                                    document.getElementById('slots-error').style.display = 'none';
+                                    document.getElementById('clear-slots-btn').style.display = 'none';
+                                    document.getElementById('find-slots-btn').style.display = 'inline-block';
+                                });
+                                
+                                // Fetch available slots from server
+                                async function findAvailableSlots(durationHours) {
+                                    const loadingDiv = document.getElementById('slots-loading');
+                                    const errorDiv = document.getElementById('slots-error');
+                                    const listDiv = document.getElementById('slots-list');
+                                    const container = document.getElementById('slots-container');
+                                    
+                                    // Clear previous results
+                                    errorDiv.style.display = 'none';
+                                    listDiv.style.display = 'none';
+                                    loadingDiv.style.display = 'block';
+                                    document.getElementById('find-slots-btn').style.display = 'none';
+                                    
+                                    try {
+                                        const response = await fetch('{% url "events:find_available_slots_api" %}', {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                                            },
+                                            body: JSON.stringify({
+                                                duration_hours: durationHours,
+                                                num_slots: 5,
+                                                days_ahead: 30
+                                            })
+                                        });
+                                        
+                                        const data = await response.json();
+                                        loadingDiv.style.display = 'none';
+                                        
+                                        if (!data.success) {
+                                            errorDiv.textContent = data.error || 'Failed to find slots';
+                                            errorDiv.style.display = 'block';
+                                            document.getElementById('find-slots-btn').style.display = 'inline-block';
+                                            return;
+                                        }
+                                        
+                                        if (!data.slots || data.slots.length === 0) {
+                                            errorDiv.textContent = 'No available slots found';
+                                            errorDiv.style.display = 'block';
+                                            document.getElementById('find-slots-btn').style.display = 'inline-block';
+                                            return;
+                                        }
+                                        
+                                        // Display slots
+                                        container.innerHTML = '';
+                                        data.slots.forEach((slot, index) => {
+                                            const button = document.createElement('button');
+                                            button.type = 'button';
+                                            button.className = 'list-group-item list-group-item-action text-start';
+                                            button.innerHTML = `
+                                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                                    <div>
+                                                        <i class="bi bi-calendar-check text-success me-2"></i>
+                                                        <strong>${slot.display}</strong>
+                                                    </div>
+                                                    <small class="text-muted">${durationHours}h</small>
+                                                </div>
+                                            `;
+                                            button.addEventListener('click', function(e) {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                selectSlot(slot.date_only, slot.start);
+                                            });
+                                            container.appendChild(button);
+                                        });
+                                        
+                                        listDiv.style.display = 'block';
+                                        document.getElementById('clear-slots-btn').style.display = 'inline-block';
+                                        
+                                    } catch (error) {
+                                        console.error('Error:', error);
+                                        loadingDiv.style.display = 'none';
+                                        errorDiv.textContent = 'Error finding slots. Please check the console.';
+                                        errorDiv.style.display = 'block';
+                                        document.getElementById('find-slots-btn').style.display = 'inline-block';
+                                    }
+                                }
+                                
+                                // Set due date when slot is selected
+                                function selectSlot(dateString, startDateTime) {
+                                    const dueDateInput = document.querySelector('input[name="due_date"]');
+                                    const suggestedTimeInput = document.getElementById('suggested_start_time');
+                                    
+                                    dueDateInput.value = dateString;
+                                    suggestedTimeInput.value = startDateTime;  // Store full ISO datetime
+                                    
+                                    // Scroll to due_date field and highlight
+                                    dueDateInput.focus();
+                                    dueDateInput.classList.add('border-success');
+                                    setTimeout(() => {
+                                        dueDateInput.classList.remove('border-success');
+                                    }, 2000);
+                                }
+                            </script>
+
+                            <!-- Buttons -->
+                            <div class="mt-4">
+                                {% if not linked_timesheet %}
+                                    <button type="submit" class="btn btn-primary fw-bold px-4 me-2">
+                                        {% if form.instance.pk %}
+                                            <i class="bi bi-check me-1"></i> Update Event
+                                        {% else %}
+                                            <i class="bi bi-plus me-1"></i> Create Event
+                                        {% endif %}
+                                    </button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-primary fw-bold px-4 me-2" disabled>
+                                        <i class="bi bi-lock me-1"></i> Cannot Edit
+                                    </button>
+                                {% endif %}
+                                <a href="{% url 'events:event_list' %}"
+                                   class="btn btn-outline-secondary fw-bold px-4">
+                                    <i class="bi bi-x me-1"></i> Cancel
+                                </a>
+                                {% if form.instance.pk %}
+                                    <a href="{% url 'events:event_delete' form.instance.pk %}"
+                                       class="btn btn-outline-danger fw-bold px-4 float-end"
+                                       onclick="return confirm('Are you sure you want to delete this event?');">
+                                        <i class="bi bi-trash me-1"></i> Delete
+                                    </a>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Unlink Timesheet Section -->
+                            {% if linked_timesheet %}
+                                <hr class="my-4">
+                                <div class="bg-light p-3 rounded">
+                                    <h6 class="fw-bold text-danger mb-3">
+                                        <i class="bi bi-link-45deg me-2"></i> Unlink Timesheet
+                                    </h6>
+                                    <p class="text-muted small mb-3">
+                                        To edit this todo, you need to unlink the timesheet entry. The timesheet will be permanently deleted.
+                                    </p>
+                                    {% if timesheet_is_invoiced %}
+                                        <button type="button" class="btn btn-danger" disabled>
+                                            <i class="bi bi-lock me-1"></i> Cannot Unlink (Invoiced)
+                                        </button>
+                                    {% else %}
+                                        <form method="post" style="display: inline;">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="unlink_timesheet" value="on">
+                                            <button type="submit" class="btn btn-outline-danger" 
+                                                    onclick="return confirm('Delete this timesheet? This cannot be undone.');">
+                                                <i class="bi bi-trash me-1"></i> Delete Timesheet
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

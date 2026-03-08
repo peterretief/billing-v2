@@ -1,9 +1,9 @@
 from django.contrib import admin
-from .models import Todo, GoogleCalendarCredential
+from .models import Event, GoogleCalendarCredential
 
 
-@admin.register(Todo)
-class TodoAdmin(admin.ModelAdmin):
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
     list_display = ('get_category_name', 'client', 'status', 'priority', 'due_date', 'estimated_hours', 'created_at', 'user')
     list_filter = ('user', 'status', 'priority', 'client', 'created_at')
     search_fields = ('category__name', 'description', 'client__name')

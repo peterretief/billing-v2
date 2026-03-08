@@ -74,11 +74,11 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link {% if 'invoices' in request.path and request.resolver_match.url_name != 'dashboard' %}active{% endif %}"
-                                   href="{% url 'invoices:invoice_list' %}">Invoices</a>
+                                   href="{% url 'invoices:invoice_list' %}"><i class="bi bi-file-earmark-text me-1"></i>Invoices</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link {% if 'clients' in request.path %}active{% endif %}"
-                                   href="{% url 'clients:client_list' %}">Clients</a>
+                                   href="{% url 'clients:client_list' %}"><i class="bi bi-people me-1"></i>Clients</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link {% if 'items' in request.path %}active fw-bold{% endif %}"
@@ -89,8 +89,8 @@
                                    href="{% url 'timesheets:timesheet_list' %}"><i class="bi bi-clock-history me-1"></i>Timesheets</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link {% if 'todos' in request.path %}active fw-bold{% endif %}"
-                                   href="{% url 'todos:todo_list' %}"><i class="bi bi-check-square me-1"></i>Todos</a>
+                                <a class="nav-link {% if 'calendar' in request.path %}active fw-bold{% endif %}"
+                                   href="{% url 'events:event_list' %}"><i class="bi bi-calendar me-1"></i>Calendar</a>
                             </li>
                             {# Updated: Changed is_ops to is_staff/superuser for visibility #}
                             {% if user.is_staff or user.is_superuser %}

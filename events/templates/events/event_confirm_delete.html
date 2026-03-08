@@ -8,7 +8,7 @@
                         <i class="bi bi-exclamation-triangle me-2"></i> Delete Todo
                     </div>
                     <div class="card-body">
-                        <p class="card-text mb-3">Are you sure you want to delete this todo?</p>
+                        <p class="card-text mb-3">Are you sure you want to delete this event?</p>
                         <div class="alert alert-warning" role="alert">
                             <strong>{{ object.title }}</strong>
                             <br>
@@ -21,7 +21,7 @@
                                     <i class="bi bi-trash me-1"></i> Yes, Delete It
                                 </button>
                             </form>
-                            <a href="{% url 'todos:todo_detail' object.pk %}"
+                            <a href="{% url 'events:event_detail' object.pk %}"
                                class="btn btn-outline-secondary flex-grow-1">
                                 <i class="bi bi-x me-1"></i> Cancel
                             </a>

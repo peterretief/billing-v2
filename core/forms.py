@@ -5,6 +5,82 @@ from django.contrib.humanize.templatetags.humanize import intcomma
 from .models import GroupMember, User, UserProfile
 
 
+class WorkingHoursForm(forms.ModelForm):
+    """Form for configuring working hours and scheduling preferences."""
+    
+    # Day selection checkboxes
+    monday = forms.BooleanField(required=False, label="Monday")
+    tuesday = forms.BooleanField(required=False, label="Tuesday")
+    wednesday = forms.BooleanField(required=False, label="Wednesday")
+    thursday = forms.BooleanField(required=False, label="Thursday")
+    friday = forms.BooleanField(required=False, label="Friday")
+    saturday = forms.BooleanField(required=False, label="Saturday")
+    sunday = forms.BooleanField(required=False, label="Sunday")
+    
+    class Meta:
+        model = UserProfile
+        fields = ["work_start_time", "work_end_time", "break_minutes"]
+        widgets = {
+            "work_start_time": forms.TimeInput(attrs={
+                "type": "time",
+                "class": "form-control",
+                "help_text": "e.g., 09:00"
+            }),
+            "work_end_time": forms.TimeInput(attrs={
+                "type": "time",
+                "class": "form-control",
+                "help_text": "e.g., 17:00"
+            }),
+            "break_minutes": forms.NumberInput(attrs={
+                "class": "form-control",
+                "type": "number",
+                "min": "0",
+                "max": "120",
+                "step": "5",
+                "help_text": "Buffer time between appointments (minutes)"
+            }),
+        }
+        labels = {
+            "work_start_time": "Start Time",
+            "work_end_time": "End Time",
+            "break_minutes": "Break Between Appointments (minutes)",
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Populate day checkboxes from work_days
+        if self.instance and self.instance.pk:
+            work_days = self.instance.get_work_days()
+            day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+            for i, day_name in enumerate(day_names):
+                self.fields[day_name].initial = i in work_days
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Get selected work days
+        work_days = []
+        day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        for i, day_name in enumerate(day_names):
+            if cleaned_data.get(day_name):
+                work_days.append(i)
+        
+        if not work_days:
+            raise forms.ValidationError("You must select at least one work day.")
+        
+        cleaned_data["work_days"] = work_days
+        return cleaned_data
+    
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.work_days = self.cleaned_data.get("work_days", [0, 1, 2, 3, 4])
+        if commit:
+            instance.save()
+        return instance
+
+
+
 class AppInterestForm(forms.Form):
     name = forms.CharField(
         max_length=100, widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Your Name"})

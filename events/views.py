@@ -10,25 +10,30 @@ from django.utils import timezone
 from timesheets.models import WorkCategory
 from timesheets.forms import TimesheetEntryForm
 
-from .models import Todo
-from .forms import TodoForm
+from .models import Event
+from .forms import EventForm
 
 
-class TodoListView(LoginRequiredMixin, ListView):
-    """Display all todos for the current user."""
-    model = Todo
-    template_name = 'todos/todo_list.html'
-    context_object_name = 'todos'
+class EventListView(LoginRequiredMixin, ListView):
+    """Display all events for the current user."""
+    model = Event
+    template_name = 'events/event_list.html'
+    context_object_name = 'events'
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = Todo.objects.filter(user=self.request.user).select_related('client')
+        queryset = Event.objects.filter(user=self.request.user).select_related('client')
         
-        # Filter by today's todos if requested
-        today = self.request.GET.get('today')
-        if today == 'true':
+        # Always exclude cancelled events and events with processed/invoiced timesheets
+        queryset = queryset.exclude(status='cancelled')
+        queryset = queryset.exclude(timesheet_entries__is_billed=True).distinct()
+        
+        # Default to today and future events (show all if explicitly requested)
+        today = self.request.GET.get('today', 'true')  # Defaults to 'true'
+        if today != 'false':
             today_date = timezone.now().date()
-            queryset = queryset.filter(due_date=today_date)
+            # Show today AND future dates (not just today)
+            queryset = queryset.filter(due_date__gte=today_date)
         
         # Filter by status if provided
         status = self.request.GET.get('status')
@@ -58,8 +63,8 @@ class TodoListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         
         # Add filter options
-        context['statuses'] = Todo.Status.choices
-        context['priorities'] = Todo.Priority.choices
+        context['statuses'] = Event.Status.choices
+        context['priorities'] = Event.Priority.choices
         context['clients'] = self.request.user.client_related.all()
         
         # Add current filters for template
@@ -67,26 +72,28 @@ class TodoListView(LoginRequiredMixin, ListView):
         context['current_priority'] = self.request.GET.get('priority', '')
         context['current_client'] = self.request.GET.get('client', '')
         context['search_query'] = self.request.GET.get('search', '')
-        context['today_filter'] = self.request.GET.get('today', 'false') == 'true'
+        context['today_filter'] = self.request.GET.get('today', 'true') != 'false'  # Default is true
         context['today_date'] = timezone.now().date()
         
         # Check if user has Google Calendar connected
         from .models import GoogleCalendarCredential
         try:
-            GoogleCalendarCredential.objects.get(user=self.request.user)
+            cred = GoogleCalendarCredential.objects.get(user=self.request.user)
             context['google_calendar_connected'] = True
+            context['google_email'] = cred.email_address
         except GoogleCalendarCredential.DoesNotExist:
             context['google_calendar_connected'] = False
+            context['google_email'] = None
         
         return context
 
 
-class TodoCreateView(LoginRequiredMixin, CreateView):
-    """Create a new todo."""
-    model = Todo
-    form_class = TodoForm
-    template_name = 'todos/todo_form.html'
-    success_url = reverse_lazy('todos:todo_list')
+class EventCreateView(LoginRequiredMixin, CreateView):
+    """Create a new event."""
+    model = Event
+    form_class = EventForm
+    template_name = 'events/event_form.html'
+    success_url = reverse_lazy('events:event_list')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -95,7 +102,20 @@ class TodoCreateView(LoginRequiredMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.user = self.request.user
-        messages.success(self.request, "Todo created successfully!")
+        
+        # Add helpful message based on due_date
+        if form.instance.due_date:
+            today = timezone.now().date()
+            if form.instance.due_date != today:
+                messages.success(
+                    self.request, 
+                    f"✓ Event created for {form.instance.due_date.strftime('%A, %b %d')}! (Click 'All' to view events outside today)"
+                )
+            else:
+                messages.success(self.request, "✓ Event created successfully!")
+        else:
+            messages.success(self.request, "✓ Todo created successfully!")
+        
         return super().form_valid(form)
     
     def get_form_kwargs(self):
@@ -104,25 +124,25 @@ class TodoCreateView(LoginRequiredMixin, CreateView):
         return kwargs
 
 
-class TodoDetailView(LoginRequiredMixin, DetailView):
-    """Display todo details."""
-    model = Todo
-    template_name = 'todos/todo_detail.html'
-    context_object_name = 'todo'
+class EventDetailView(LoginRequiredMixin, DetailView):
+    """Display event details."""
+    model = Event
+    template_name = 'events/event_detail.html'
+    context_object_name = 'event'
     
     def get_queryset(self):
-        return Todo.objects.filter(user=self.request.user)
+        return Event.objects.filter(user=self.request.user)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Get linked timesheets
         context['linked_timesheets'] = self.object.timesheet_entries.select_related('client', 'category')
         
-        # Check if a timesheet already exists for this todo
+        # Check if a timesheet already exists for this event
         context['has_timesheet'] = self.object.timesheet_entries.exists()
         context['linked_timesheet'] = self.object.timesheet_entries.first()
         
-        # Get the todo's category
+        # Get the event's category
         matching_category = self.object.category
         
         # Add timesheet form with pre-filled initial data
@@ -131,7 +151,7 @@ class TodoDetailView(LoginRequiredMixin, DetailView):
             'hourly_rate': self.object.client.default_hourly_rate,
             'hours': self.object.estimated_hours,
             'date': timezone.now().date(),
-            'todo': self.object.id,
+            'event': self.object.id,
         }
         if matching_category:
             initial_data['category'] = matching_category.id
@@ -145,14 +165,14 @@ class TodoDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class TodoUpdateView(LoginRequiredMixin, UpdateView):
-    """Update an existing todo."""
-    model = Todo
-    form_class = TodoForm
-    template_name = 'todos/todo_form.html'
+class EventUpdateView(LoginRequiredMixin, UpdateView):
+    """Update an existing event."""
+    model = Event
+    form_class = EventForm
+    template_name = 'events/event_form.html'
     
     def get_queryset(self):
-        return Todo.objects.filter(user=self.request.user)
+        return Event.objects.filter(user=self.request.user)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -182,22 +202,22 @@ class TodoUpdateView(LoginRequiredMixin, UpdateView):
                 else:
                     # Delete the timesheet to maintain integrity
                     linked_timesheet.delete()
-                    messages.info(request, "Timesheet deleted. You can now edit the todo.")
+                    messages.info(request, "Timesheet deleted. You can now edit the event.")
                     return self.get(request, *args, **kwargs)
         
         # Check if trying to submit form while timesheet is linked
         linked_timesheet = self.object.timesheet_entries.first()
         if linked_timesheet and not unlink_timesheet:
-            messages.error(request, "Cannot edit this todo while a timesheet is linked. Please unlink it first.")
+            messages.error(request, "Cannot edit this event while a timesheet is linked. Please unlink it first.")
             return self.get(request, *args, **kwargs)
         
         return super().post(request, *args, **kwargs)
     
     def get_success_url(self):
-        return reverse_lazy('todos:todo_detail', kwargs={'pk': self.object.pk})
+        return reverse_lazy('events:event_detail', kwargs={'pk': self.object.pk})
     
     def form_valid(self, form):
-        messages.success(self.request, "Todo updated!")
+        messages.success(self.request, "Event updated!")
         return super().form_valid(form)
     
     def get_form_kwargs(self):
@@ -206,47 +226,47 @@ class TodoUpdateView(LoginRequiredMixin, UpdateView):
         return kwargs
 
 
-class TodoDeleteView(LoginRequiredMixin, DeleteView):
-    """Delete a todo."""
-    model = Todo
-    template_name = 'todos/todo_confirm_delete.html'
-    success_url = reverse_lazy('todos:todo_list')
+class EventDeleteView(LoginRequiredMixin, DeleteView):
+    """Delete an event."""
+    model = Event
+    template_name = 'events/event_confirm_delete.html'
+    success_url = reverse_lazy('events:event_list')
     
     def get_queryset(self):
-        return Todo.objects.filter(user=self.request.user)
+        return Event.objects.filter(user=self.request.user)
     
     def delete(self, request, *args, **kwargs):
-        todo = self.get_object()
-        todo_name = todo.category.name if todo.category else "Uncategorized"
-        messages.success(request, f"Todo '{todo_name}' deleted!")
+        event = self.get_object()
+        event_name = event.category.name if event.category else "Uncategorized"
+        messages.success(request, f"Event '{event_name}' deleted!")
         return super().delete(request, *args, **kwargs)
 
 
 @login_required
-def mark_todo_completed(request, pk):
-    """Mark a todo as completed."""
-    todo = get_object_or_404(Todo, pk=pk, user=request.user)
+def mark_event_completed(request, pk):
+    """Mark an event as completed."""
+    event = get_object_or_404(Event, pk=pk, user=request.user)
     try:
-        todo.mark_completed()
-        todo_name = todo.category.name if todo.category else "Uncategorized"
-        messages.success(request, f"Todo '{todo_name}' marked as completed!")
+        event.mark_completed()
+        event_name = event.category.name if event.category else "Uncategorized"
+        messages.success(request, f"Event '{event_name}' marked as completed!")
     except ValueError as e:
         messages.error(request, str(e))
-    return redirect('todos:todo_detail', pk=pk)
+    return redirect('events:event_detail', pk=pk)
 
 
 @login_required
-def mark_todo_cancelled(request, pk):
-    """Mark a todo as cancelled."""
-    todo = get_object_or_404(Todo, pk=pk, user=request.user)
+def mark_event_cancelled(request, pk):
+    """Mark an event as cancelled."""
+    event = get_object_or_404(Event, pk=pk, user=request.user)
     try:
-        todo.mark_cancelled()
-        todo_name = todo.category.name if todo.category else "Uncategorized"
-        messages.success(request, f"Todo '{todo_name}' cancelled!")
-        return redirect('todos:todo_list')
+        event.mark_cancelled()
+        event_name = event.category.name if event.category else "Uncategorized"
+        messages.success(request, f"Event '{event_name}' cancelled!")
+        return redirect('events:event_list')
     except ValueError as e:
         messages.error(request, str(e))
-        return redirect('todos:todo_detail', pk=pk)
+        return redirect('events:event_detail', pk=pk)
 
 @login_required
 def calendar_auth_start(request):
@@ -263,7 +283,7 @@ def calendar_auth_start(request):
             request,
             "Google Calendar is not configured. Please contact your administrator to set up OAuth credentials."
         )
-        return redirect('todos:todo_list')
+        return redirect('events:event_list')
     
     try:
         flow = get_oauth_flow()
@@ -275,9 +295,10 @@ def calendar_auth_start(request):
             prompt='consent'  # Force consent screen to get refresh token
         )
         
-        # Store state and code_verifier in session for verification
+        # Store state, code_verifier, AND username in session for verification
         request.session['oauth_state'] = state
         request.session['code_verifier'] = flow.code_verifier
+        request.session['oauth_user'] = request.user.username  # Store username to verify on callback
         request.session.modified = True
         request.session.save()  # Explicitly save the session
         
@@ -287,7 +308,7 @@ def calendar_auth_start(request):
     except Exception as e:
         logger.exception(f"Error initiating Google Calendar auth: {str(e)}")
         messages.error(request, f"Error initiating Google Calendar auth: {str(e)}")
-        return redirect('todos:todo_list')
+        return redirect('events:event_list')
 
 
 @login_required
@@ -299,6 +320,21 @@ def calendar_auth_callback(request):
     import logging
     
     logger = logging.getLogger(__name__)
+    
+    # CRITICAL: Verify that the current user matches the one who started the OAuth flow
+    oauth_user_started = request.session.get('oauth_user')
+    current_user = request.user.username
+    
+    if oauth_user_started and oauth_user_started != current_user:
+        error_msg = f"OAuth mismatch: Flow started as '{oauth_user_started}' but callback received as '{current_user}'. Session may have been compromised or browser context switched. Please try again."
+        logger.error(error_msg)
+        messages.error(request, "Authentication error: Please log in again and retry the Google Calendar connection.")
+        # Clear the stale OAuth session data
+        request.session.pop('oauth_state', None)
+        request.session.pop('code_verifier', None)
+        request.session.pop('oauth_user', None)
+        request.session.modified = True
+        return redirect('events:event_list')
     
     # Try to validate session state (CSRF protection)
     state = request.session.get('oauth_state')
@@ -312,7 +348,9 @@ def calendar_auth_callback(request):
     elif state != google_state:
         messages.error(request, "OAuth state mismatch. Please try again.")
         logger.error(f"OAuth state mismatch for {request.user.username}. Expected: {state}, got: {google_state}")
-        return redirect('todos:todo_list')
+        request.session.pop('oauth_user', None)
+        request.session.modified = True
+        return redirect('events:event_list')
     
     # Get authorization code
     code = request.GET.get('code')
@@ -320,7 +358,9 @@ def calendar_auth_callback(request):
         error = request.GET.get('error', 'Unknown error')
         messages.error(request, f"Authorization cancelled: {error}")
         logger.error(f"No authorization code received for {request.user.username}. Error: {error}")
-        return redirect('todos:todo_list')
+        request.session.pop('oauth_user', None)
+        request.session.modified = True
+        return redirect('events:event_list')
     
     try:
         logger.info(f"Starting token exchange for user {request.user.username}")
@@ -344,6 +384,17 @@ def calendar_auth_callback(request):
         logger.info(f"Expiry: {creds.expiry}")
         logger.info(f"Scopes granted: {creds.scopes}")
         
+        # Get the user's email from Google Calendar API
+        google_email = None
+        try:
+            from googleapiclient.discovery import build
+            service = build('calendar', 'v3', credentials=creds)
+            calendar = service.calendars().get(calendarId='primary').execute()
+            google_email = calendar.get('id')
+            logger.info(f"Retrieved Google email: {google_email}")
+        except Exception as e:
+            logger.warning(f"Could not retrieve email from Google: {e}")
+        
         # Save credentials to database
         cred_obj, created = GoogleCalendarCredential.objects.update_or_create(
             user=request.user,
@@ -353,6 +404,7 @@ def calendar_auth_callback(request):
                 'token_expiry': datetime.fromtimestamp(creds.expiry.timestamp(), tz=timezone.utc) if creds.expiry else None,
                 'sync_enabled': True,
                 'calendar_id': 'primary',
+                'email_address': google_email,
             }
         )
         
@@ -364,49 +416,63 @@ def calendar_auth_callback(request):
         # Clean up session
         request.session.pop('oauth_state', None)
         request.session.pop('code_verifier', None)
+        request.session.pop('oauth_user', None)
         request.session.modified = True
         request.session.save()
         
-        messages.success(request, "Google Calendar connected successfully! You now have permission to access Calendar and Contacts.")
-        return redirect('todos:todo_list')
+        messages.success(request, "Google Calendar connected successfully! You now have permission to access Calendar.")
+        return redirect('events:event_list')
         
     except Exception as e:
         logger.exception(f"Error during OAuth callback for {request.user.username}: {str(e)}")
+        # Clean up stale OAuth session data
+        request.session.pop('oauth_state', None)
+        request.session.pop('code_verifier', None)
+        request.session.pop('oauth_user', None)
+        request.session.modified = True
         messages.error(request, f"Error connecting to Google Calendar: {str(e)}")
-        return redirect('todos:todo_list')
+        return redirect('events:event_list')
 
 
 @login_required
-def sync_todos_to_calendar(request):
-    """Sync all todos to Google Calendar."""
-    from .calendar_utils import sync_all_todos_to_calendar, InvalidScopeError
-    from .models import GoogleCalendarCredential
+def sync_events_to_calendar(request):
+    """Sync all events to Google Calendar."""
+    from .calendar_utils import sync_all_events_to_calendar, InvalidScopeError
+    from .models import GoogleCalendarCredential, Event
     
     # Check if user has Google Calendar connected
     try:
         GoogleCalendarCredential.objects.get(user=request.user)
     except GoogleCalendarCredential.DoesNotExist:
         messages.error(request, "Please connect to Google Calendar first.")
-        return redirect('todos:calendar_auth_start')
+        return redirect('events:calendar_auth_start')
     
     try:
-        synced_count = sync_all_todos_to_calendar(request.user)
+        # Count unsynced events before sync
+        unsynced = Event.objects.filter(user=request.user).exclude(status='cancelled').filter(
+            due_date__isnull=False, synced_to_calendar=False
+        ).count()
+        
+        synced_count = sync_all_events_to_calendar(request.user)
         
         if synced_count > 0:
-            messages.success(request, f"Successfully synced {synced_count} todos to Google Calendar!")
+            if unsynced > 0:
+                messages.success(request, f"✓ Synced {synced_count} events to Google Calendar! {synced_count} are now marked as processed.")
+            else:
+                messages.info(request, f"ℹ Updated {synced_count} existing calendar events.")
         else:
-            messages.info(request, "No todos to sync. Please create a todo with a due date first.")
+            messages.info(request, "ℹ All events with due dates are already synced. Nothing new to push.")
     except InvalidScopeError:
         messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
-        return redirect('todos:calendar_auth_start')
+        return redirect('events:calendar_auth_start')
     
-    return redirect('todos:todo_list')
+    return redirect('events:event_list')
 
 
 @login_required
 def import_calendar_events(request):
     """Display Google Calendar events to import as timesheets."""
-    from .calendar_utils import get_google_calendar_service, get_google_contacts_list, InvalidScopeError
+    from .calendar_utils import get_google_calendar_service, InvalidScopeError
     from .models import GoogleCalendarCredential
     from datetime import datetime, timedelta, timezone
     
@@ -415,34 +481,31 @@ def import_calendar_events(request):
         GoogleCalendarCredential.objects.get(user=request.user)
     except GoogleCalendarCredential.DoesNotExist:
         messages.error(request, "Please connect to Google Calendar first.")
-        return redirect('todos:calendar_auth_start')
+        return redirect('events:calendar_auth_start')
     
     try:
         service = get_google_calendar_service(request.user)
     except InvalidScopeError:
         messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
-        return redirect('todos:calendar_auth_start')
+        return redirect('events:calendar_auth_start')
     
     if not service:
         messages.error(request, "Could not access Google Calendar. Please reconnect.")
-        return redirect('todos:todo_list')
+        return redirect('events:event_list')
     
     # Get date range from request or default to last 7 days and next 30 days
-    days_back = request.GET.get('days_back', 7)
-    days_forward = request.GET.get('days_forward', 30)
+    days_back = request.GET.get('days_back', 30)  # Default to 30 days of past work
     try:
         days_back = int(days_back)
-        days_forward = int(days_forward)
     except (ValueError, TypeError):
-        days_back = 7
-        days_forward = 30
+        days_back = 30
     
-    # Check if user wants to see synced todos
+    # Check if user wants to see synced events
     show_synced = request.GET.get('show_synced', False)
     
     now = datetime.now(tz=timezone.utc)
     start_date = now - timedelta(days=days_back)
-    end_date = now + timedelta(days=days_forward)
+    end_date = now  # Only query up to now (past events only)
     
     try:
         # Fetch events from Google Calendar
@@ -457,15 +520,57 @@ def import_calendar_events(request):
         
         all_events = events_result.get('items', [])
         
+        # Filter to only show events that have already ended (can't invoice future work)
+        past_events = []
+        future_events = []
+        
+        for event in all_events:
+            # Get event end time
+            if 'dateTime' in event.get('end', {}):
+                # Timed event
+                end_time_str = event['end']['dateTime']
+                try:
+                    end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+                except (ValueError, AttributeError):
+                    end_time = now
+            elif 'date' in event.get('end', {}):
+                # All-day event - treat as ending at end of that day
+                end_date_str = event['end']['date']
+                try:
+                    end_date_obj = datetime.strptime(end_date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                    end_time = end_date_obj.replace(hour=23, minute=59, second=59)
+                except ValueError:
+                    end_time = now
+            else:
+                end_time = now
+            
+            if end_time <= now:
+                past_events.append(event)
+            else:
+                future_events.append(event)
+        
+        # Build a consolidated summary of filtered events
+        future_count = len(future_events)
+        
         # Filter out synced events (marked with [Synced] prefix) unless user wants to see them
         if show_synced:
-            events = all_events
+            events = past_events
+            synced_count = 0
         else:
-            events = [e for e in all_events if not e.get('summary', '').startswith('[Synced]')]
+            events = [e for e in past_events if not e.get('summary', '').startswith('[Synced]')]
+            synced_count = len([e for e in past_events if e.get('summary', '').startswith('[Synced]')])
+        
+        # Show single consolidated message if there are filtered events
+        if future_count > 0 or synced_count > 0:
+            filtered_items = []
+            if future_count > 0:
+                filtered_items.append(f"⏳ {future_count} future event(s)")
+            if synced_count > 0:
+                filtered_items.append(f"🔄 {synced_count} already synced")
             
-            if len(all_events) > len(events):
-                hidden_count = len(all_events) - len(events)
-                messages.info(request, f"Hiding {hidden_count} previously synced event(s). Check 'Show synced todos' to include them.")
+            if filtered_items:
+                summary = "Hiding: " + ", ".join(filtered_items) + "."
+                messages.info(request, summary)
         
     except Exception as e:
         messages.error(request, f"Error fetching calendar events: {str(e)}")
@@ -481,11 +586,7 @@ def import_calendar_events(request):
     categories = WorkCategory.objects.filter(user=request.user).order_by('name')
     clients = Client.objects.filter(user=request.user).order_by('name')
     
-    # Fetch contacts from Google Contacts address book for enhanced matching
-    google_contacts = get_google_contacts_list(request.user)
-    logger.info(f"Fetched {len(google_contacts)} Google Contacts for {request.user.username}")
-    for contact in google_contacts:
-        logger.info(f"  Contact: {contact.get('name')} - Email: {contact.get('email')} - Address: {contact.get('address')}")
+
     
     # Check if user wants to hide already-imported events
     hide_imported = request.GET.get('hide_imported', False)
@@ -529,7 +630,7 @@ def import_calendar_events(request):
         logger.info(f"Processing event: {title}")
         logger.info(f"  Location: {location}, Organizer: {organizer_email}")
         
-        # Strategy 0: Match by client name found in location (quick check)
+        # Strategy 0: Match by client name found in location (quick check) - PRIORITY 1
         if location and not event['suggested_client_id']:
             for client in clients:
                 # Check if client name appears in location (case-insensitive)
@@ -538,27 +639,11 @@ def import_calendar_events(request):
                     event['suggested_client'] = client.name
                     event['match_strategy'] = 'location_name'
                     logger.info(f"  ✓ Matched by client name in location to: {client.name} (ID: {client.id})")
+                    # CLEAR embedded client details since we found a location match
+                    event['client_details'] = {}
                     break
         
-        # Strategy 1: Match by UUID from Google Contact (most reliable)
-        if not event['suggested_client_id']:
-            for contact in google_contacts:
-                if contact.get('client_uuid'):
-                    try:
-                        # Try to find client by UUID
-                        client = Client.objects.get(client_uuid=contact.get('client_uuid'), user=request.user)
-                        # Check if this contact matches the event (by organizer email or location)
-                        if ((organizer_email and organizer_email == contact.get('email')) or
-                            (location and contact.get('address') and location.lower() in contact['address'].lower())):
-                            event['suggested_client_id'] = client.id
-                            event['suggested_client'] = client.name
-                            event['match_strategy'] = 'google_contact_uuid'
-                            logger.info(f"  ✓ Matched by UUID to client: {client.name} (ID: {client.id}, UUID: {contact.get('client_uuid')})")
-                            break
-                    except Client.DoesNotExist:
-                        logger.warning(f"  UUID found in contact but no matching client: {contact.get('client_uuid')}")
-        
-        # Strategy 2: Match by location address
+        # Strategy 2: Match by location address - PRIORITY 2
         if location and not event['suggested_client_id']:
             for client in clients:
                 if client.address and location.lower() in client.address.lower():
@@ -566,42 +651,9 @@ def import_calendar_events(request):
                     event['suggested_client'] = client.name
                     event['match_strategy'] = 'location_address'
                     logger.info(f"  ✓ Matched by address to client: {client.name} (ID: {client.id})")
+                    # CLEAR embedded client details since we found a location match
+                    event['client_details'] = {}
                     break
-        
-        # Strategy 3: Match by Google Contact address
-        if location and not event['suggested_client_id']:
-            for contact in google_contacts:
-                if contact.get('address') and location.lower() in contact['address'].lower():
-                    logger.info(f"  Found matching Google Contact by address: {contact.get('name')}")
-                    # Try to find matching client
-                    for client in clients:
-                        if (client.name.lower() == contact.get('name', '').lower() or
-                            client.email == contact.get('email') or
-                            client.phone == contact.get('phone')):
-                            event['suggested_client_id'] = client.id
-                            event['suggested_client'] = client.name
-                            event['match_strategy'] = 'google_contact_address'
-                            logger.info(f"  ✓ Matched by Google Contact to client: {client.name} (ID: {client.id})")
-                            break
-                    if event['suggested_client_id']:
-                        break
-        
-        # Strategy 4: Match by event organizer email (from Google Contacts)
-        if organizer_email and not event['suggested_client_id']:
-            for contact in google_contacts:
-                if contact.get('email') == organizer_email:
-                    logger.info(f"  Found matching Google Contact by email: {contact.get('name')}")
-                    # Found matching contact, now find client
-                    for client in clients:
-                        if (client.name.lower() == contact.get('name', '').lower() or
-                            client.email == contact.get('email')):
-                            event['suggested_client_id'] = client.id
-                            event['suggested_client'] = client.name
-                            event['match_strategy'] = 'google_contact_email'
-                            logger.info(f"  ✓ Matched by organizer email to client: {client.name} (ID: {client.id})")
-                            break
-                    if event['suggested_client_id']:
-                        break
         
         # Strategy 5: Match by client name from title
         if not event['suggested_client_id'] and event.get('suggested_client'):
@@ -637,14 +689,13 @@ def import_calendar_events(request):
     context = {
         'events': events,
         'days_back': days_back,
-        'days_forward': days_forward,
         'categories': categories,
         'clients': clients,
         'show_synced': show_synced,
         'hide_imported': hide_imported,
     }
     
-    return render(request, 'todos/import_calendar_events.html', context)
+    return render(request, 'events/import_calendar_events.html', context)
 
 
 @login_required
@@ -664,7 +715,7 @@ def create_timesheets_from_events(request):
     
     if request.method != 'POST':
         logger.info(f"Not a POST request, redirecting to import_calendar_events")
-        return redirect('todos:import_calendar_events')
+        return redirect('events:import_calendar_events')
     
     logger.info(f"POST data keys: {list(request.POST.keys())}")
     logger.info(f"POST data: {dict(request.POST)}")
@@ -674,12 +725,12 @@ def create_timesheets_from_events(request):
         GoogleCalendarCredential.objects.get(user=request.user)
     except GoogleCalendarCredential.DoesNotExist:
         messages.error(request, "Please connect to Google Calendar first.")
-        return redirect('todos:calendar_auth_start')
+        return redirect('events:calendar_auth_start')
     
     service = get_google_calendar_service(request.user)
     if not service:
         messages.error(request, "Could not access Google Calendar.")
-        return redirect('todos:import_calendar_events')
+        return redirect('events:import_calendar_events')
     
     # Get selected events from POST
     selected_events = request.POST.getlist('events[]')
@@ -693,7 +744,7 @@ def create_timesheets_from_events(request):
     if not selected_events:
         logger.warning(f"No events selected")
         messages.error(request, "Please select at least one event.")
-        return redirect('todos:import_calendar_events')
+        return redirect('events:import_calendar_events')
     
     # Validate that each selected event has a category and client assigned
     from clients.models import Client
@@ -709,7 +760,7 @@ def create_timesheets_from_events(request):
         if not client_id:
             logger.error(f"VALIDATION FAILED - Event {event_id}: missing client ({client_id})")
             messages.error(request, f"Event {event_id}: Please select a client.")
-            return redirect('todos:import_calendar_events')
+            return redirect('events:import_calendar_events')
         
         # Handle category - either use existing or auto-create
         category = None
@@ -744,20 +795,20 @@ def create_timesheets_from_events(request):
             else:
                 logger.error(f"VALIDATION FAILED - Event {event_id}: no category selected and no suggested category name")
                 messages.error(request, f"Event {event_id}: Please select a work category.")
-                return redirect('todos:import_calendar_events')
+                return redirect('events:import_calendar_events')
         
         if not category:
             logger.error(f"VALIDATION FAILED - Event {event_id}: could not determine category")
             messages.error(request, f"Event {event_id}: Could not determine work category.")
-            return redirect('todos:import_calendar_events')
+            return redirect('events:import_calendar_events')
         
         # Validate client
         try:
-            client = Client.objects.get(id=client_id)
+            client = Client.objects.get(id=client_id, user=request.user)
         except Client.DoesNotExist:
             logger.error(f"Client {client_id} not found")
             messages.error(request, f"Invalid client selected for event {event_id}.")
-            return redirect('todos:import_calendar_events')
+            return redirect('events:import_calendar_events')
         
         event_configs[event_id] = {'category': category, 'client': client}
         logger.info(f"Event {event_id}: category={category.name}, client={client.name}")
@@ -861,177 +912,95 @@ def create_timesheets_from_events(request):
     
     return redirect('timesheets:timesheet_list')
 
+
 @login_required
-def sync_contacts_page(request):
-    """Display contacts sync options."""
-    from .models import GoogleCalendarCredential
+def find_available_slots_api(request):
+    """
+    AJAX endpoint to find available calendar slots.
     
-    # Check if user has Google Calendar connected
-    has_google_connected = GoogleCalendarCredential.objects.filter(user=request.user).exists()
+    Expected POST parameters:
+    - duration_hours: float (duration of the event in hours)
+    - num_slots: int (number of slots to find, default 5)
+    - days_ahead: int (how many days ahead to search, default 30)
     
-    if not has_google_connected:
-        messages.error(request, "Please connect to Google Calendar first to enable contacts sync.")
-        return redirect('todos:calendar_auth_start')
-    
-    from django.apps import apps
-    Client = apps.get_model('clients', 'Client')
-    clients_count = Client.objects.filter(user=request.user).count()
-    
-    context = {
-        'has_google_connected': has_google_connected,
-        'clients_count': clients_count,
+    Returns JSON:
+    {
+        'success': bool,
+        'slots': [
+            {'start': datetime_str, 'end': datetime_str, 'display': readable_str},
+            ...
+        ],
+        'error': error_message (if success=False)
     }
-    
-    return render(request, 'todos/sync_contacts.html', context)
-
-
-@login_required
-def sync_clients_to_contacts(request):
-    """Sync all clients to Google Contacts."""
+    """
+    import json
     import logging
+    from datetime import datetime
+    from django.http import JsonResponse
+    from .calendar_utils import find_available_slots
+    
     logger = logging.getLogger(__name__)
-    
-    from .calendar_utils import sync_all_clients_to_contacts, InvalidScopeError
-    from .models import GoogleCalendarCredential
-    
-    # Check if user has Google Calendar connected
-    try:
-        GoogleCalendarCredential.objects.get(user=request.user)
-    except GoogleCalendarCredential.DoesNotExist:
-        messages.error(request, "Please connect to Google Calendar first.")
-        return redirect('todos:calendar_auth_start')
-    
-    logger.info(f"Starting contacts sync for user {request.user.username}")
-    
-    try:
-        synced_count = sync_all_clients_to_contacts(request.user)
-        messages.success(request, f"Successfully synced {synced_count} clients to Google Contacts!")
-        logger.info(f"Successfully synced {synced_count} clients for {request.user.username}")
-    except InvalidScopeError:
-        logger.warning(f"Scope mismatch for {request.user.username}")
-        messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
-        return redirect('todos:calendar_auth_start')
-    except Exception as e:
-        logger.exception(f"Error syncing contacts for {request.user.username}: {e}")
-        messages.error(request, f"Error syncing contacts: {str(e)}")
-    
-    return redirect('todos:sync_contacts_page')
-
-@login_required
-def import_contacts_page(request):
-    """Display Google Contacts to import as clients."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    from .calendar_utils import get_google_contacts_list, InvalidScopeError
-    from .models import GoogleCalendarCredential
-    from clients.models import Client
-    
-    # Check if user has Google Calendar connected
-    try:
-        GoogleCalendarCredential.objects.get(user=request.user)
-    except GoogleCalendarCredential.DoesNotExist:
-        messages.error(request, "Please connect to Google Calendar first.")
-        return redirect('todos:calendar_auth_start')
-    
-    try:
-        google_contacts = get_google_contacts_list(request.user)
-    except InvalidScopeError:
-        messages.warning(request, "Google permissions were updated. Please reconnect your Google account to continue.")
-        return redirect('todos:calendar_auth_start')
-    except Exception as e:
-        logger.exception(f"Error fetching Google Contacts: {e}")
-        messages.error(request, f"Error fetching Google Contacts: {str(e)}")
-        return redirect('todos:sync_contacts_page')
-    
-    # Get existing client emails to show which are already created
-    existing_emails = set(Client.objects.filter(user=request.user).values_list('email', flat=True))
-    
-    # Filter out contacts that are already clients (by email)
-    available_contacts = []
-    for contact in google_contacts:
-        if contact.get('email') and contact['email'] not in existing_emails:
-            available_contacts.append(contact)
-    
-    logger.info(f"Found {len(available_contacts)} available contacts to import for {request.user.username}")
-    
-    context = {
-        'contacts': available_contacts,
-        'existing_count': len(existing_emails),
-    }
-    
-    return render(request, 'todos/import_contacts.html', context)
-
-
-@login_required
-def create_clients_from_contacts(request):
-    """Create new clients from selected Google Contacts."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    from django.apps import apps
     
     if request.method != 'POST':
-        return redirect('todos:import_contacts_page')
+        return JsonResponse({'success': False, 'error': 'Only POST requests allowed'}, status=405)
     
-    Client = apps.get_model('clients', 'Client')
-    
-    # Get selected contacts from POST data
-    selected_contacts = []
-    for key in request.POST.keys():
-        if key.startswith('contact_'):
-            email = request.POST.get(key)
-            hourly_rate = request.POST.get(f'rate_{email}', '0.00')
-            contact_name = request.POST.get(f'name_{email}', '')
-            selected_contacts.append({
-                'email': email,
-                'hourly_rate': hourly_rate,
-                'contact_name': contact_name,
+    try:
+        # Parse request data
+        data = json.loads(request.body)
+        duration_hours = float(data.get('duration_hours', 1))
+        num_slots = int(data.get('num_slots', 5))
+        days_ahead = int(data.get('days_ahead', 30))
+        
+        # Validate inputs
+        if duration_hours <= 0 or duration_hours > 8:
+            return JsonResponse({'success': False, 'error': 'Duration must be between 0 and 8 hours'})
+        
+        if num_slots <= 0 or num_slots > 20:
+            return JsonResponse({'success': False, 'error': 'Number of slots must be between 1 and 20'})
+        
+        if days_ahead <= 0 or days_ahead > 90:
+            return JsonResponse({'success': False, 'error': 'Days ahead must be between 1 and 90'})
+        
+        # Convert hours to minutes
+        duration_minutes = int(duration_hours * 60)
+        
+        # Find available slots
+        slots = find_available_slots(
+            user=request.user,
+            duration_minutes=duration_minutes,
+            num_slots=num_slots,
+            days_ahead=days_ahead
+        )
+        
+        if not slots:
+            return JsonResponse({
+                'success': False,
+                'error': 'No available slots found. Try extending the search period.',
+                'slots': []
             })
+        
+        # Format slots for display
+        formatted_slots = []
+        for start_dt, end_dt in slots:
+            formatted_slots.append({
+                'start': start_dt.isoformat(),
+                'end': end_dt.isoformat(),
+                'display': start_dt.strftime('%a, %b %d at %I:%M %p'),  # e.g., "Mon, Mar 10 at 02:00 PM"
+                'date_only': start_dt.date().isoformat(),  # For due_date field
+            })
+        
+        logger.info(f"Found {len(formatted_slots)} slots for {request.user.username} with {duration_minutes} min duration")
+        
+        return JsonResponse({
+            'success': True,
+            'slots': formatted_slots,
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Invalid JSON in request body'}, status=400)
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': f'Invalid input: {str(e)}'}, status=400)
+    except Exception as e:
+        logger.exception(f"Error finding available slots for {request.user.username}: {str(e)}")
+        return JsonResponse({'success': False, 'error': 'An error occurred while finding slots'}, status=500)
     
-    logger.info(f"Creating {len(selected_contacts)} clients for {request.user.username}")
-    
-    created_count = 0
-    failed_count = 0
-    
-    for contact_data in selected_contacts:
-        try:
-            # Fetch the full contact info from Google to get all details
-            from .calendar_utils import get_google_contacts_list
-            all_contacts = get_google_contacts_list(request.user)
-            contact_info = None
-            for c in all_contacts:
-                if c.get('email') == contact_data['email']:
-                    contact_info = c
-                    break
-            
-            if not contact_info:
-                logger.warning(f"Could not find contact {contact_data['email']}")
-                failed_count += 1
-                continue
-            
-            # Create client from contact
-            client = Client.objects.create(
-                user=request.user,
-                name=contact_info.get('name', contact_data['email']),
-                contact_name=contact_data['contact_name'] or contact_info.get('given_name', ''),
-                email=contact_data['email'],
-                phone=contact_info.get('phone', ''),
-                address=contact_info.get('address', ''),
-                default_hourly_rate=contact_data['hourly_rate'],
-            )
-            
-            logger.info(f"Created client: {client.name} ({client.email})")
-            created_count += 1
-            
-        except Exception as e:
-            logger.exception(f"Error creating client from contact {contact_data['email']}: {e}")
-            failed_count += 1
-    
-    if created_count > 0:
-        messages.success(request, f"Successfully imported {created_count} client{'s' if created_count != 1 else ''}!")
-    
-    if failed_count > 0:
-        messages.warning(request, f"Failed to import {failed_count} contact{'s' if failed_count != 1 else ''}.")
-    
-    return redirect('todos:import_contacts_page')

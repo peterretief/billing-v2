@@ -1,39 +1,60 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load static %}
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'events/websocket_sync.css' %}">
+{% endblock %}
 {% block content %}
+    <!-- Sync Notification Container -->
+    <div id="sync-notification" role="status" aria-live="polite"></div>
+
     <div class="container mt-4">
+        <!-- Linked Gmail Account Info -->
+        {% if google_calendar_connected and google_email %}
+            <div class="alert alert-info alert-dismissible fade show mb-3" role="alert">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Gmail Account Linked:</strong> {{ google_email }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endif %}
+        
         <div class="row mb-4 align-items-center">
             <div class="col-md-7">
-                <h2 class="fw-bold mb-1">My Todos</h2>
+                <h2 class="fw-bold mb-1">My Events</h2>
                 <p class="text-muted small">Manage your tasks and link them to timesheets.</p>
             </div>
-            <div class="col-md-5 text-md-end">
+            <div class="col-md-5 text-md-end d-flex gap-2 flex-wrap justify-content-md-end">
+                <a href="{% url 'core:working_hours_settings' %}"
+                   class="btn btn-outline-secondary btn-sm"
+                   title="Configure working hours for scheduling">
+                    <i class="bi bi-clock me-1"></i> Working Hours
+                </a>
                 {% if google_calendar_connected %}
-                    <a href="{% url 'todos:calendar_sync' %}"
-                       class="btn btn-outline-success btn-sm me-2"
-                       title="Push todos to Google Calendar">
+                    <a href="{% url 'events:calendar_sync' %}"
+                       class="btn btn-outline-success btn-sm"
+                       title="Push events to Google Calendar">
                         <i class="bi bi-cloud-upload me-1"></i> Push to Calendar
                     </a>
-                    <a href="{% url 'todos:import_calendar_events' %}"
-                       class="btn btn-outline-info btn-sm me-2"
+                    <a href="{% url 'events:import_calendar_events' %}"
+                       class="btn btn-outline-info btn-sm"
                        title="Import calendar events to create timesheets">
                         <i class="bi bi-calendar-download me-1"></i> Import Events
                     </a>
-                    <a href="{% url 'todos:sync_contacts_page' %}"
-                       class="btn btn-outline-secondary btn-sm me-2"
-                       title="Sync clients to Google Contacts">
-                        <i class="bi bi-person-check me-1"></i> Sync Contacts
-                    </a>
                 {% else %}
-                    <a href="{% url 'todos:calendar_auth_start' %}"
-                       class="btn btn-outline-info btn-sm me-2"
+                    <a href="{% url 'events:calendar_auth_start' %}"
+                       class="btn btn-outline-info btn-sm"
                        title="Connect your Google Calendar">
                         <i class="bi bi-google me-1"></i> Connect Google Calendar
                     </a>
                 {% endif %}
-                <a href="{% url 'todos:todo_create' %}"
+            </div>
+        </div>
+        <!-- Create Event Button -->
+        <div class="row mb-4">
+            <div class="col text-end">
+                <a href="{% url 'events:event_create' %}"
                    class="btn btn-primary shadow-sm fw-bold px-4">
-                    <i class="bi bi-plus-lg me-2"></i> Create Todo
+                    <i class="bi bi-plus-lg me-2"></i> Create Event
                 </a>
             </div>
         </div>
@@ -45,7 +66,7 @@
                         <input type="text"
                                class="form-control form-control-sm"
                                name="search"
-                               placeholder="Search todos..."
+                               placeholder="Search events..."
                                value="{{ search_query }}">
                     </div>
                     <div class="col-md-2">
@@ -67,7 +88,7 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <select class="form-select form-select-sm" name="client">
+                        <select class="form-select" name="client" style="min-width: 250px;">
                             <option value="">All Clients</option>
                             {% for client in clients %}
                                 <option value="{{ client.id }}"
@@ -80,72 +101,109 @@
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-sm btn-outline-primary w-100">Filter</button>
                     </div>
-                    <div class="col-md-1">
-                        <a href="?today=true" class="btn btn-sm btn-outline-info w-100" title="Show today's todos">
-                            <i class="bi bi-calendar-check"></i> Today
-                        </a>
-                    </div>
+                    {% if today_filter %}
+                        <div class="col-md-1">
+                            <a href="?today=false" class="btn btn-sm btn-info w-100" title="Show all events including past dates">
+                                <i class="bi bi-calendar-x"></i> All
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="col-md-1">
+                            <a href="?today=true" class="btn btn-sm btn-outline-info w-100" title="Show today and future events">
+                                <i class="bi bi-calendar-check"></i> Upcoming
+                            </a>
+                        </div>
+                    {% endif %}
                 </form>
             </div>
         </div>
-        <!-- Todos Grid -->
+        <!-- Events Grid -->
         <div class="row g-3">
-            {% for todo in todos %}
-                <div class="col-md-6 col-lg-4">
-                    <div class="card shadow-sm border-0 h-100 {% if todo.is_overdue %}border-danger{% endif %}">
+            {% for event in events %}
+                <div class="col-md-6 col-lg-4" data-event-id="{{ event.id }}">
+                    <div class="card shadow-sm border-0 h-100 {% if event.is_overdue %}border-danger{% endif %}">
                         <div class="card-body">
                             <!-- Header -->
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h5 class="card-title mb-0 flex-grow-1">{{ todo.category.name }}</h5>
-                                    <span class="badge bg-{{ todo.Priority|lower }}">{{ todo.get_priority_display }}</span>
+                                    <h5 class="card-title mb-0 flex-grow-1" data-field="title">{{ event.category.name }}</h5>
+                                    <span class="badge bg-{{ event.Priority|lower }}">{{ event.get_priority_display }}</span>
                                 </div>
-                                <span class="badge bg-{{ todo.Status|lower }} me-2">{{ todo.get_status_display }}</span>
-                                <span class="badge bg-info">{{ todo.client.name }}</span>
+                                <span class="badge bg-{{ event.Status|lower }} me-2" data-field="status">{{ event.get_status_display }}</span>
+                                <span class="badge bg-info">{{ event.client.name }}</span>
+                                {% if event.synced_to_calendar %}
+                                    <span class="badge bg-success" title="Synced to Google Calendar">
+                                        <i class="bi bi-cloud-check"></i> Synced
+                                    </span>
+                                {% elif event.due_date %}
+                                    <span class="badge bg-warning" title="Ready to sync">
+                                        <i class="bi bi-cloud"></i> Pending
+                                    </span>
+                                {% endif %}
                             </div>
                             <!-- Status Badge for Overdue -->
-                            {% if todo.is_overdue %}
+                            {% if event.is_overdue %}
                                 <div class="alert alert-danger alert-sm py-1 px-2 mb-3" role="alert">
                                     <small><i class="bi bi-exclamation-triangle me-1"></i> Overdue</small>
                                 </div>
                             {% endif %}
                             <!-- Description -->
-                            {% if todo.description %}
-                                <p class="card-text text-muted small mb-3">{{ todo.description|truncatewords:15 }}</p>
+                            {% if event.description %}
+                                <p class="card-text text-muted small mb-3">{{ event.description|truncatewords:15 }}</p>
                             {% endif %}
                             <!-- Hours Info -->
-                            {% if todo.estimated_hours %}
+                            {% if event.estimated_hours %}
                                 <div class="mb-3 p-2 bg-light rounded small">
                                     <div class="d-flex justify-content-between">
                                         <span>Estimated:</span>
-                                        <strong>{{ todo.estimated_hours }}h</strong>
+                                        <strong>{{ event.estimated_hours }}h</strong>
                                     </div>
                                     <div class="d-flex justify-content-between">
                                         <span>Linked:</span>
-                                        <strong>{{ todo.get_linked_hours }}h</strong>
+                                        <strong>{{ event.get_linked_hours }}h</strong>
                                     </div>
-                                    {% if todo.remaining_hours %}
+                                    {% if event.remaining_hours %}
                                         <div class="d-flex justify-content-between">
                                             <span>Remaining:</span>
-                                            <strong>{{ todo.remaining_hours }}h</strong>
+                                            <strong>{{ event.remaining_hours }}h</strong>
                                         </div>
                                     {% endif %}
                                 </div>
                             {% endif %}
-                            <!-- Due Date -->
-                            {% if todo.due_date %}
-                                <small class="text-muted d-block mb-3">
-                                    <i class="bi bi-calendar-event me-1"></i>
-                                    Due: {{ todo.due_date|date:"M d, Y" }}
-                                </small>
-                            {% endif %}
+                            <!-- Due Date & Calendar Times -->
+                            <div class="mb-3 small">
+                                {% if event.due_date %}
+                                    <small class="text-muted d-block" data-field="due_date">
+                                        <i class="bi bi-calendar-event me-1"></i>
+                                        Due: {{ event.due_date|date:"M d, Y" }}
+                                    </small>
+                                {% endif %}
+                                {% if event.calendar_start_time %}
+                                    <small class="text-muted d-block" data-field="calendar_start_time">
+                                        <i class="bi bi-clock me-1"></i>
+                                        From: {{ event.calendar_start_time|date:"H:i" }}
+                                    </small>
+                                {% endif %}
+                                {% if event.calendar_end_time %}
+                                    <small class="text-muted d-block" data-field="calendar_end_time">
+                                        <i class="bi bi-clock me-1"></i>
+                                        To: {{ event.calendar_end_time|date:"H:i" }}
+                                    </small>
+                                {% endif %}
+                                {% if not event.calendar_start_time and not event.calendar_end_time %}
+                                    <small class="text-warning d-block">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        Not synced with calendar
+                                    </small>
+                                {% endif %}
+                            </div>
                             <!-- Actions -->
                             <div class="btn-group btn-group-sm w-100" role="group">
-                                <a href="{% url 'todos:todo_detail' todo.pk %}"
+                                <a href="{% url 'events:event_detail' event.pk %}"
                                    class="btn btn-outline-primary flex-grow-1">
                                     <i class="bi bi-eye me-1"></i> View
                                 </a>
-                                <a href="{% url 'todos:todo_edit' todo.pk %}"
+                                <a href="{% url 'events:event_edit' event.pk %}"
                                    class="btn btn-outline-secondary flex-grow-1">
                                     <i class="bi bi-pencil me-1"></i> Edit
                                 </a>
@@ -158,7 +216,7 @@
                     <div class="text-center py-5 text-muted">
                         <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
                         <p>
-                            No todos found. <a href="{% url 'todos:todo_create' %}">Create one to get started</a>
+                            No events found. <a href="{% url 'events:event_create' %}">Create one to get started</a>
                         </p>
                     </div>
                 </div>
@@ -193,4 +251,9 @@
             </nav>
         {% endif %}
     </div>
+
+    <!-- WebSocket Sync Listener - Only load for authenticated users -->
+    {% if user.is_authenticated %}
+        <script src="{% static 'events/websocket_sync.js' %}"></script>
+    {% endif %}
 {% endblock %}

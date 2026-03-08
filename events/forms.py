@@ -1,9 +1,9 @@
 from django import forms
-from .models import Todo
+from .models import Event
 from timesheets.models import WorkCategory
 
 
-class TodoForm(forms.ModelForm):
+class EventForm(forms.ModelForm):
     # Custom field for "Select or add new" category
     category_text = forms.CharField(
         label="Work Category",
@@ -17,8 +17,8 @@ class TodoForm(forms.ModelForm):
     )
     
     class Meta:
-        model = Todo
-        fields = ['category', 'description', 'client', 'status', 'priority', 'due_date', 'estimated_hours']
+        model = Event
+        fields = ['category', 'description', 'client', 'status', 'priority', 'due_date', 'estimated_hours', 'suggested_start_time']
         widgets = {
             'category': forms.HiddenInput(),  # Hidden, will be set by category_text
             'description': forms.Textarea(attrs={
@@ -26,7 +26,10 @@ class TodoForm(forms.ModelForm):
                 'rows': 4,
                 'placeholder': 'Add description or notes...'
             }),
-            'client': forms.Select(attrs={'class': 'form-select'}),
+            'client': forms.Select(attrs={
+                'class': 'form-select',
+                'style': 'width: 100%; min-width: 350px;'
+            }),
             'status': forms.Select(attrs={'class': 'form-select'}),
             'priority': forms.Select(attrs={'class': 'form-select'}),
             'due_date': forms.DateInput(attrs={
@@ -38,6 +41,7 @@ class TodoForm(forms.ModelForm):
                 'step': '0.25',
                 'placeholder': 'Estimated hours to complete'
             }),
+            'suggested_start_time': forms.HiddenInput(),  # Hidden field for suggested time from slot finder
         }
     
     def __init__(self, *args, **kwargs):
@@ -49,16 +53,16 @@ class TodoForm(forms.ModelForm):
         if user:
             self.fields['client'].queryset = self.fields['client'].queryset.filter(user=user)
             
-            # Pre-populate category_text if editing existing todo
+            # Pre-populate category_text if editing existing event
             if self.instance and self.instance.category:
                 self.fields['category_text'].initial = self.instance.category.name
                 self.fields['category'].initial = self.instance.category.id
     def save(self, commit=True):
-        """Save the todo: handle category creation and store description"""
-        todo = super().save(commit=False)
+        """Save the event: handle category creation and store description"""
+        event = super().save(commit=False)
         
         if self.user:
-            todo.user = self.user
+            event.user = self.user
             
             # Get or create category from category_text
             category_name = self.cleaned_data.get('category_text', '').strip()
@@ -67,11 +71,11 @@ class TodoForm(forms.ModelForm):
                     user=self.user,
                     name=category_name,
                 )
-                todo.category = category
+                event.category = category
                 
                 # Optionally store description in metadata (for future enhancement)
-                # For now, it's stored in todo.description field
+                # For now, it's stored in event.description field
         
         if commit:
-            todo.save()
-        return todo
+            event.save()
+        return event

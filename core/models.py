@@ -192,6 +192,38 @@ class UserProfile(models.Model):
             return self.annual_revenue_target
         return self.monthly_target * 12
 
+    # Working Hours & Scheduling
+    work_start_time = models.TimeField(
+        default="09:00",
+        help_text="Start of working day (default 9:00 AM)"
+    )
+    work_end_time = models.TimeField(
+        default="17:00",
+        help_text="End of working day (default 5:00 PM)"
+    )
+    work_days = models.JSONField(
+        default=list,
+        help_text="Days you work (0=Monday, 6=Sunday). Default is Mon-Fri"
+    )
+    break_minutes = models.IntegerField(
+        default=15,
+        help_text="Buffer time between appointments (in minutes)"
+    )
+
+    def get_work_days(self):
+        """Get work days, with Monday-Friday as default."""
+        if not self.work_days:
+            return [0, 1, 2, 3, 4]  # Mon-Fri
+        return self.work_days
+
+    def get_work_start_time(self):
+        """Get work start time as string HH:MM."""
+        return self.work_start_time.strftime("%H:%M")
+
+    def get_work_end_time(self):
+        """Get work end time as string HH:MM."""
+        return self.work_end_time.strftime("%H:%M")
+
     def __str__(self):
         return f"Profile: {self.user.username}"
 

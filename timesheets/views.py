@@ -30,9 +30,9 @@ from .forms import TimesheetEntryForm, WorkCategoryForm
 # Internal App Imports
 from .models import TimesheetEntry, WorkCategory
 
-# Try importing Todo from todos app (optional, for todo-based category creation)
+# Try importing Event from events app (optional, for event-based category creation)
 try:
-    from todos.models import Todo
+    from events.models import Event
 except ImportError:
     Todo = None
 
@@ -316,6 +316,35 @@ def log_time(request):
             if todo_id and Todo:
                 try:
                     todo = Todo.objects.get(id=todo_id, user=request.user)
+                    
+                    # Check if todo's scheduled time has already passed (can't log time for future work)
+                    from django.utils import timezone
+                    from datetime import datetime
+                    
+                    now = timezone.now()
+                    can_create_timesheet = True
+                    
+                    if todo.suggested_start_time:
+                        # Check if the suggested start time has passed
+                        if now < todo.suggested_start_time:
+                            messages.error(
+                                request, 
+                                f"⏳ Cannot create timesheet yet. This todo is scheduled for {todo.suggested_start_time.strftime('%a, %b %d at %I:%M %p')}. You can only log time after it's completed."
+                            )
+                            can_create_timesheet = False
+                    elif todo.due_date:
+                        # Fall back to due_date if no suggested time
+                        # Assume due_date is "available for timesheet" only if it's today or in the past
+                        today = now.date()
+                        if todo.due_date > today:
+                            messages.error(
+                                request,
+                                f"⏳ Cannot create timesheet yet. This todo is due on {todo.due_date.strftime('%a, %b %d')}. You can only log time after it's completed."
+                            )
+                            can_create_timesheet = False
+                    
+                    if not can_create_timesheet:
+                        return redirect("todos:todo_detail", pk=todo.pk)
                     
                     # Check if a timesheet entry already exists for this todo
                     if TimesheetEntry.objects.filter(todo=todo).exists():

@@ -26,6 +26,7 @@ from .forms import (
     StaffCreateAndAddUserForm,
     UserGroupForm,
     UserProfileForm,
+    WorkingHoursForm,
 )
 from .models import (
     GroupMember,
@@ -691,3 +692,29 @@ def audit_history(request):
     }
 
     return render(request, "core/audit_history.html", context)
+
+
+@login_required
+def working_hours_settings(request):
+    """View for managing user's working hours and availability settings."""
+    # Get or create user profile
+    profile = get_object_or_404(UserProfile, user=request.user)
+    
+    if request.method == "POST":
+        form = WorkingHoursForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            # Redirect to todo list with success message
+            from django.contrib import messages
+            messages.success(request, "Working hours updated successfully.")
+            return redirect("todos:todo_list")
+    else:
+        form = WorkingHoursForm(instance=profile)
+    
+    context = {
+        "form": form,
+        "page_title": "Working Hours & Availability",
+        "profile": profile,
+    }
+    
+    return render(request, "core/settings/working_hours.html", context)
