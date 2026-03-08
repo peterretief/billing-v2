@@ -653,6 +653,20 @@ def _update_event_from_calendar(event, gc_event):
     if new_calendar_end and new_calendar_end != event.calendar_end_time:
         event.calendar_end_time = new_calendar_end
     
+    # Calculate estimated_hours from calendar duration
+    if new_calendar_start and new_calendar_end:
+        duration = new_calendar_end - new_calendar_start
+        estimated_hours = duration.total_seconds() / 3600  # Convert to hours
+        
+        # Only update if it changed significantly (more than 1 minute difference)
+        if event.estimated_hours is None or abs((event.estimated_hours or 0) - estimated_hours) > (1/60):
+            changes['estimated_hours'] = {
+                'from': float(event.estimated_hours) if event.estimated_hours else None,
+                'to': round(estimated_hours, 2),
+            }
+            event.estimated_hours = round(estimated_hours, 2)
+            logger.info(f"Updated estimated_hours for event {event.id}: {event.estimated_hours} hours (from {duration})")
+    
     return changes
 
 
