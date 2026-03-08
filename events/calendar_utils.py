@@ -157,6 +157,11 @@ def sync_event_to_calendar(user, todo: Event, service=None):
         'summary': f"[Synced] {todo_title}",
         'description': ''.join(description_parts),
         'status': 'cancelled' if todo.status == 'cancelled' else 'confirmed',
+        'extendedProperties': {
+            'private': {
+                'app_uuid': str(todo.calendar_uuid) if todo.calendar_uuid else str(todo.id),
+            }
+        }
     }
     
     # Add client address as location (enables Google Maps integration)
@@ -613,6 +618,35 @@ def _extract_date_from_calendar(event_data):
         dt = _extract_datetime_from_calendar(event_data)
         return dt.date() if dt else None
     except:
+        return None
+
+
+def _extract_uuid_from_calendar(event_data):
+    """Extract app UUID from Google Calendar event's extended properties."""
+    try:
+        extended_props = event_data.get('extendedProperties', {})
+        private_props = extended_props.get('private', {})
+        app_uuid_str = private_props.get('app_uuid')
+        
+        if app_uuid_str:
+            import uuid
+            return uuid.UUID(app_uuid_str)
+    except Exception as e:
+        logger.debug(f"Could not extract UUID from calendar event: {str(e)}")
+    
+    return None
+
+
+def _find_event_by_calendar_uuid(user, calendar_uuid):
+    """Find app Event by its calendar UUID."""
+    from events.models import Event
+    
+    if not calendar_uuid:
+        return None
+    
+    try:
+        return Event.objects.get(user=user, calendar_uuid=calendar_uuid)
+    except Event.DoesNotExist:
         return None
 
 

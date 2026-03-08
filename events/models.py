@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+import uuid
 from core.models import TenantModel
 from clients.models import Client
 
@@ -139,6 +140,13 @@ class Event(TenantModel):
         blank=True,
         null=True,
         help_text="Google Calendar event ID (to prevent duplicates)"
+    )
+    calendar_uuid = models.UUIDField(
+        default=uuid.uuid4,
+        unique=False,
+        null=True,
+        blank=True,
+        help_text="Unique identifier synced to Google Calendar for robust tracking"
     )
     synced_to_calendar = models.BooleanField(
         default=False,
