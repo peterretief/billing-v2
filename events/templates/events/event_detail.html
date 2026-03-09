@@ -66,11 +66,34 @@
                                                 <i class="bi bi-check-circle me-1"></i> Complete
                                             </button>
                                         {% else %}
-                                            <a href="{% url 'events:event_complete' event.pk %}"
+                                            <a id="completeEventBtn"
+                                               href="{% url 'events:event_complete' event.pk %}"
                                                class="btn btn-outline-success"
                                                onclick="return confirm('Mark this event as completed?');">
                                                 <i class="bi bi-check-circle me-1"></i> Complete
                                             </a>
+                                            <script>
+                                                document.addEventListener('DOMContentLoaded', function() {
+                                                    const btn = document.getElementById('completeEventBtn');
+                                                    if (!btn) return;
+                                                    
+                                                    {% if event.calendar_end_time %}
+                                                        const eventEnd = new Date('{{ event.calendar_end_time|date:"c" }}').getTime();
+                                                        const now = new Date().getTime();
+                                                        if (eventEnd > now) {
+                                                            btn.classList.remove('btn-outline-success');
+                                                            btn.classList.add('btn-outline-secondary');
+                                                            btn.style.pointerEvents = 'none';
+                                                            btn.style.opacity = '0.6';
+                                                            btn.title = 'Cannot complete until event finishes on calendar';
+                                                            btn.onclick = function(e) {
+                                                                e.preventDefault();
+                                                                return false;
+                                                            };
+                                                        }
+                                                    {% endif %}
+                                                });
+                                            </script>
                                         {% endif %}
                                     {% endif %}
                                     {% if linked_timesheet and linked_timesheet.is_billed %}
@@ -158,11 +181,10 @@
                             </div>
                             {% if event.calendar_end_time %}
                                 {% load tz %}
-                                <div class="alert alert-danger alert-sm py-2 px-3 mb-4" role="alert" id="future-event-warning" style="display: none;">
+                                <div class="alert alert-info alert-sm py-2 px-3 mb-4" role="alert" id="future-event-warning" style="display: none;">
                                     <small>
-                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                        <strong>⚠️ Future Event</strong> — This calendar event is scheduled for the future. 
-                                        <strong>You cannot create a timesheet yet</strong> until the event has completed on your calendar.
+                                        <i class="bi bi-calendar me-1"></i>
+                                        <strong>Upcoming Event</strong> — You can log time once this calendar event completes.
                                     </small>
                                 </div>
                                 <script>
@@ -329,9 +351,9 @@
                                         const now = new Date().getTime();
                                         if (eventEnd > now) {
                                             btn.disabled = true;
-                                            btn.title = 'Cannot log time yet - this event is scheduled for the future';
-                                            btn.classList.remove('btn-outline-success');
-                                            btn.classList.add('btn-secondary');
+                                            btn.title = 'Available after the event completes on your calendar';
+                                            btn.style.opacity = '0.5';
+                                            btn.style.cursor = 'not-allowed';
                                         }
                                     {% endif %}
                                 });

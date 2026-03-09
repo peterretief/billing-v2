@@ -211,6 +211,17 @@ class Event(TenantModel):
     
     def mark_completed(self):
         """Mark this event as completed."""
+        # Check calendar completion gate - event must have finished on calendar
+        if self.calendar_end_time:
+            if timezone.now() < self.calendar_end_time:
+                gap_seconds = (self.calendar_end_time - timezone.now()).total_seconds()
+                gap_hours = gap_seconds / 3600
+                raise ValueError(
+                    f"Cannot complete this event yet. "
+                    f"The calendar event is still running ({gap_hours:.1f} hours remaining). "
+                    f"It ends on {self.calendar_end_time.strftime('%Y-%m-%d %H:%M')}."
+                )
+        
         # Check if completion is allowed
         linked_timesheet = self.timesheet_entries.first()
         if linked_timesheet and linked_timesheet.is_billed:
