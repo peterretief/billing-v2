@@ -25,23 +25,15 @@ class TimesheetEntryForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
-        print(f"[DEBUG FORM] Initializing TimesheetEntryForm")
-        print(f"[DEBUG FORM] User: {user}")
-        print(f"[DEBUG FORM] Initial data: {self.initial}")
-        
         # Filter categories by current user if available
         if user:
             cats = WorkCategory.objects.filter(user=user)
             self.fields['category'].queryset = cats
-            print(f"[DEBUG FORM] Set category queryset for user {user.username}: {list(cats.values_list('id', 'name'))}")
-            if 'category' in self.initial:
-                print(f"[DEBUG FORM] Category in initial: {self.initial['category']}")
         else:
             # Try to get from instance
             if self.instance and self.instance.pk:
                 cats = WorkCategory.objects.filter(user=self.instance.user)
                 self.fields['category'].queryset = cats
-                print(f"[DEBUG FORM] Set category queryset from instance user: {list(cats.values_list('id', 'name'))}")
         
         # Disable client field if timesheet is already linked to an invoice
         if self.instance and self.instance.pk and self.instance.invoice_id:
@@ -53,15 +45,25 @@ class TimesheetEntryForm(forms.ModelForm):
         # Validate calendar completion gate if event is linked
         # Rule: Event can only be linked to timesheet if it has completed on the calendar
         event = cleaned_data.get('todo')
+        import sys
+        print(f"[FORM VALIDATION] Event in form: {event}", file=sys.stderr)
+        print(f"[FORM VALIDATION] Cleaned data keys: {cleaned_data.keys()}", file=sys.stderr)
+        
         if event:
+            print(f"[FORM VALIDATION] Validating event: {event.id} - {event.description}", file=sys.stderr)
             result = event.validate_timesheet_readiness()
+            print(f"[FORM VALIDATION] Result: {result}", file=sys.stderr)
+            
             if not result['is_ready']:
                 error_msg = f"Cannot create timesheet"
                 if result['issues']:
                     error_msg += ":\n• " + "\n• ".join(result['issues'])
                 if result['recommendations']:
                     error_msg += "\n\nHow to fix:\n• " + "\n• ".join(result['recommendations'])
+                print(f"[FORM VALIDATION] BLOCKING: {error_msg}", file=sys.stderr)
                 raise forms.ValidationError(error_msg)
+        else:
+            print(f"[FORM VALIDATION] No event linked (todo is None)", file=sys.stderr)
         
         # Prevent changing client if timesheet is already in an invoice (business rule from TimesheetManager)
         if self.instance and self.instance.pk and self.instance.invoice_id:

@@ -315,19 +315,30 @@ def log_time(request):
             if entry.todo:
                 result = entry.todo.validate_timesheet_readiness()
                 if not result['is_ready']:
-                    error_msg = "Cannot create timesheet"
+                    # Validation failed - show errors and re-render form
+                    error_msg = "❌ Cannot create timesheet"
                     if result['issues']:
                         error_msg += ":\n• " + "\n• ".join(result['issues'])
                     if result['recommendations']:
                         error_msg += "\n\nHow to fix:\n• " + "\n• ".join(result['recommendations'])
                     messages.error(request, error_msg)
+                    # Return back to timesheet list which will show the error
                     return redirect("timesheets:timesheet_list")
             
             entry.save()
             messages.success(request, f"✓ Logged {entry.hours} hours on {entry.date}")
             return redirect("timesheets:timesheet_list")
         else:
-            messages.error(request, "Please correct the errors below.")
+            # Form validation failed - add detailed error messages
+            for field, errors in form.errors.items():
+                if field == '__all__':
+                    for error in errors:
+                        messages.error(request, f"❌ {error}")
+                else:
+                    for error in errors:
+                        messages.error(request, f"❌ {field}: {error}")
+            
+            # Re-render form with errors
             return redirect("timesheets:timesheet_list")
 
     return redirect("timesheets:timesheet_list")
