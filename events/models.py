@@ -304,6 +304,11 @@ class Event(TenantModel):
         issues = []
         recommendations = []
         
+        # Check if event was deleted on calendar
+        if self.calendar_end_time is None and self.synced_to_calendar and self.sync_status == 'failed':
+            issues.append("This event was deleted on Google Calendar")
+            recommendations.append("This event can no longer be linked to timesheets as it was removed from your calendar")
+        
         # Calendar completion
         if self.calendar_end_time:
             if timezone.now() < self.calendar_end_time:

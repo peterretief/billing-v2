@@ -526,6 +526,8 @@ def import_calendar_events(request):
         
         for event in all_events:
             # Get event end time
+            end_time = None
+            
             if 'dateTime' in event.get('end', {}):
                 # Timed event
                 end_time_str = event['end']['dateTime']
@@ -534,17 +536,6 @@ def import_calendar_events(request):
                     end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
                 else:
                     end_time = datetime.fromisoformat(end_time_str)
-                
-                # Check if event has ended
-                if end_time <= now:
-                    past_events.append(event)
-                else:
-                    future_events.append(event)
-                end_time_str = event['end']['dateTime']
-                try:
-                    end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
-                except (ValueError, AttributeError):
-                    end_time = now
             elif 'date' in event.get('end', {}):
                 # All-day event - treat as ending at end of that day
                 end_date_str = event['end']['date']
@@ -556,6 +547,7 @@ def import_calendar_events(request):
             else:
                 end_time = now
             
+            # Categorize event based on end time
             if end_time <= now:
                 past_events.append(event)
             else:
@@ -895,44 +887,74 @@ def create_timesheets_from_events(request):
             from django.utils import timezone
             now_tz = timezone.now()
             
-            # Check if we have end time from the calendar event
-            event_data = request.POST.get(f'event_{event_id}_data')
+            # Check if the calendar event has actually ended
             calendar_event_ended = False
-            if event_data:
+            start_time = event.get('start', {})
+            end_time_obj = event.get('end', {})
+            
+            # Parse end time from calendar event
+            if 'dateTime' in end_time_obj:
+                end_time_str = end_time_obj['dateTime']
                 try:
-                    import json
-                    event_info = json.loads(event_data)
-                    end_time_str = event_info.get('end_time')
-                    if end_time_str:
-                        # Parse the end time
-                        from datetime import datetime
-                        if end_time_str.endswith('Z'):
-                            end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
-                        else:
-                            end_time = datetime.fromisoformat(end_time_str)
-                        calendar_event_ended = end_time <= now_tz
-                except:
-                    pass
+                    if end_time_str.endswith('Z'):
+                        end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+                    else:
+                        end_time = datetime.fromisoformat(end_time_str)
+                    calendar_event_ended = end_time <= now_tz
+                except Exception as e:
+                    logger.warning(f"Could not parse end time for event {event_id}: {e}")
+            elif 'date' in end_time_obj:
+                # All-day event - treat as ended if today or in past
+                end_date_str = end_time_obj['date']
+                try:
+                    end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                    calendar_event_ended = end_date <= now_tz
+                except Exception as e:
+                    logger.warning(f"Could not parse end date for event {event_id}: {e}")
             
             if not calendar_event_ended:
                 logger.warning(f"Calendar event {event_id} hasn't completed yet. Skipping.")
                 errors.append(f"'{title}' - Calendar event hasn't finished yet. Only completed calendar events can be imported.")
                 continue
             
-            # Create timesheet entry
-            # Store raw metadata - let formatted_metadata property handle LaTeX escaping
-            entry = TimesheetEntry.objects.create(
+            # Create timesheet entry (prevent duplicates by checking google_calendar_event_id)
+            # Use get_or_create to avoid duplicates if the same calendar event is imported twice
+            entry, created = TimesheetEntry.objects.get_or_create(
                 user=request.user,
-                client=client,
-                category=category,
-                date=event_date,
-                hours=duration_hours,
-                hourly_rate=hourly_rate,
-                metadata={'event_title': title, 'event_description': description},
-                google_calendar_event_id=event_id  # Store event ID for deduplication
+                google_calendar_event_id=event_id,  # Use event ID as unique key
+                defaults={
+                    'client': client,
+                    'category': category,
+                    'date': event_date,
+                    'hours': duration_hours,
+                    'hourly_rate': hourly_rate,
+                    'metadata': {'event_title': title, 'event_description': description},
+                }
             )
-            created_count += 1
-            logger.info(f"Created timesheet entry {entry.id} with {duration_hours}h at ${hourly_rate}/hr")
+            
+            if created:
+                created_count += 1
+                logger.info(f"Created new timesheet entry {entry.id} with {duration_hours}h at ${hourly_rate}/hr")
+                
+                # Auto-mark the corresponding app Event as complete ONLY if calendar event has ended
+                from .models import Event
+                if calendar_event_ended:  # Only if event date has passed
+                    try:
+                        app_event = Event.objects.get(
+                            user=request.user,
+                            google_calendar_event_id=event_id
+                        )
+                        if not app_event.is_completed:
+                            app_event.mark_completed()
+                            logger.info(f"Auto-marked event {app_event.id} as complete")
+                    except Event.DoesNotExist:
+                        logger.info(f"No corresponding app event found for calendar event {event_id}, skipping auto-completion")
+                    except Exception as e:
+                        logger.warning(f"Could not auto-mark event as complete: {e}")
+                else:
+                    logger.info(f"Calendar event {event_id} is in future, skipping auto-completion")
+            else:
+                logger.info(f"Timesheet entry {entry.id} already exists for event {event_id}, skipping")
 
             
         except Exception as e:

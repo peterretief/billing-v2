@@ -69,6 +69,10 @@ class TimesheetEntry(TenantModel):
         help_text="Google Calendar event ID if imported from calendar"
     )
 
+    class Meta:
+        # Prevent duplicate imports: (user, google_calendar_event_id) must be unique when event_id is provided
+        unique_together = [['user', 'google_calendar_event_id']]
+
     @property
     def formatted_metadata(self):
         """

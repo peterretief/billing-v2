@@ -864,6 +864,29 @@ def sync_event_bidirectional(user, event, service=None):
         logger.error(f"No Google Calendar credentials for user {user.username}")
         return False
     except Exception as e:
+        # Check if this is a 404 - means event was deleted on calendar
+        error_str = str(e)
+        if '404' in error_str or 'notFound' in error_str:
+            logger.warning(f"Event {event.id} was deleted on Google Calendar")
+            event.sync_status = 'failed'
+            event.synced_to_calendar = False  # Mark as no longer synced
+            event.save(update_fields=['sync_status', 'synced_to_calendar'])
+            
+            EventSyncLog.objects.create(
+                event=event,
+                sync_direction='pull',
+                status='error',
+                error_message='Event was deleted on Google Calendar',
+            )
+            
+            # Check if there are any linked timesheets
+            if event.timesheet_entries.exists():
+                logger.error(
+                    f"Warning: Event {event.id} was deleted on calendar but has "
+                    f"{event.timesheet_entries.count()} linked timesheets!"
+                )
+            return False
+        
         logger.exception(f"Error syncing event {event.id}: {str(e)}")
         event.sync_status = 'failed'
         event.save(update_fields=['sync_status'])
