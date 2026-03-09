@@ -529,6 +529,18 @@ def import_calendar_events(request):
             if 'dateTime' in event.get('end', {}):
                 # Timed event
                 end_time_str = event['end']['dateTime']
+                # Parse ISO format datetime
+                if end_time_str.endswith('Z'):
+                    end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+                else:
+                    end_time = datetime.fromisoformat(end_time_str)
+                
+                # Check if event has ended
+                if end_time <= now:
+                    past_events.append(event)
+                else:
+                    future_events.append(event)
+                end_time_str = event['end']['dateTime']
                 try:
                     end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
                 except (ValueError, AttributeError):
@@ -878,6 +890,34 @@ def create_timesheets_from_events(request):
             # Get client's default hourly rate or use 0 as fallback
             hourly_rate = client.default_hourly_rate if hasattr(client, 'default_hourly_rate') and client.default_hourly_rate else 0
             logger.info(f"Using hourly_rate={hourly_rate} for client {client.name}")
+            
+            # IMPORTANT: Validate completion gate - only create timesheet if calendar event has ended
+            from django.utils import timezone
+            now_tz = timezone.now()
+            
+            # Check if we have end time from the calendar event
+            event_data = request.POST.get(f'event_{event_id}_data')
+            calendar_event_ended = False
+            if event_data:
+                try:
+                    import json
+                    event_info = json.loads(event_data)
+                    end_time_str = event_info.get('end_time')
+                    if end_time_str:
+                        # Parse the end time
+                        from datetime import datetime
+                        if end_time_str.endswith('Z'):
+                            end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
+                        else:
+                            end_time = datetime.fromisoformat(end_time_str)
+                        calendar_event_ended = end_time <= now_tz
+                except:
+                    pass
+            
+            if not calendar_event_ended:
+                logger.warning(f"Calendar event {event_id} hasn't completed yet. Skipping.")
+                errors.append(f"'{title}' - Calendar event hasn't finished yet. Only completed calendar events can be imported.")
+                continue
             
             # Create timesheet entry
             # Store raw metadata - let formatted_metadata property handle LaTeX escaping

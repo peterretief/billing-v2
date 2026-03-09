@@ -310,95 +310,20 @@ def log_time(request):
         if form.is_valid():
             entry = form.save(commit=False)
             entry.user = request.user
-
-            # Handle todo-based category creation
-            todo_id = request.POST.get("todo")
-            if todo_id and Todo:
-                try:
-                    todo = Todo.objects.get(id=todo_id, user=request.user)
-                    
-                    # Check if todo's scheduled time has already passed (can't log time for future work)
-                    from django.utils import timezone
-                    from datetime import datetime
-                    
-                    now = timezone.now()
-                    can_create_timesheet = True
-                    
-                    if todo.suggested_start_time:
-                        # Check if the suggested start time has passed
-                        if now < todo.suggested_start_time:
-                            messages.error(
-                                request, 
-                                f"⏳ Cannot create timesheet yet. This todo is scheduled for {todo.suggested_start_time.strftime('%a, %b %d at %I:%M %p')}. You can only log time after it's completed."
-                            )
-                            can_create_timesheet = False
-                    elif todo.due_date:
-                        # Fall back to due_date if no suggested time
-                        # Assume due_date is "available for timesheet" only if it's today or in the past
-                        today = now.date()
-                        if todo.due_date > today:
-                            messages.error(
-                                request,
-                                f"⏳ Cannot create timesheet yet. This todo is due on {todo.due_date.strftime('%a, %b %d')}. You can only log time after it's completed."
-                            )
-                            can_create_timesheet = False
-                    
-                    if not can_create_timesheet:
-                        return redirect("todos:todo_detail", pk=todo.pk)
-                    
-                    # Check if a timesheet entry already exists for this todo
-                    if TimesheetEntry.objects.filter(todo=todo).exists():
-                        messages.error(request, f"A timesheet entry already exists for this todo. Please edit that entry instead.")
-                        return redirect("todos:todo_detail", pk=todo.pk)
-                    
-                    # Use the todo's category directly
-                    if todo.category:
-                        entry.category = todo.category
-                    
-                    entry.todo = todo
-                except Todo.DoesNotExist:
-                    pass
-            else:
-                # Manually handle category from POST (try regular field first, then backup)
-                category_id = request.POST.get("category") or request.POST.get("category_hidden")
-                if category_id:
-                    entry.category_id = category_id
-                else:
-                    entry.category = None
-
-            # Set default hourly rate if missing
-            if not entry.hourly_rate or entry.hourly_rate == 0:
-                entry.hourly_rate = entry.client.default_hourly_rate
-
-            # Handle Metadata
-            meta_data = {
-                k.replace("meta_", ""): v for k, v in request.POST.items() if k.startswith("meta_") and v.strip()
-            }
             
-            # Add todo info to metadata if available
-            if todo_id and Todo:
-                try:
-                    todo = Todo.objects.get(id=todo_id, user=request.user)
-                    todo_label = todo.category.name if todo.category else "Uncategorized"
-                    if todo.description:
-                        todo_label += f" - {todo.description}"
-                    meta_data["Todo"] = todo_label
-                except Todo.DoesNotExist:
-                    pass
-            
-            entry.metadata = meta_data
-
-            entry.save()
-
-            messages.success(request, f"Logged {entry.hours}h for {entry.client.name}.")
-            
-            # Redirect to the todo if this was logged from a todo
+            # Check calendar completion gate one more time before saving
             if entry.todo:
-                response = redirect("todos:todo_detail", pk=entry.todo.pk)
-            else:
-                response = redirect("timesheets:timesheet_list")
-            response["HX-Trigger"] = "timesheetAdded"
-            return response
+                is_ready, reason, recommendations = entry.todo.validate_timesheet_readiness()
+                if not is_ready:
+                    error_msg = f"Cannot create timesheet: {reason}\n\n"
+                    if recommendations:
+                        error_msg += "How to fix:\n" + "\n".join(f"• {rec}" for rec in recommendations)
+                    messages.error(request, error_msg)
+                    return redirect("timesheets:timesheet_list")
+            
+            entry.save()
+            messages.success(request, f"✓ Logged {entry.hours} hours on {entry.date}")
+            return redirect("timesheets:timesheet_list")
         else:
             messages.error(request, "Please correct the errors below.")
             return redirect("timesheets:timesheet_list")

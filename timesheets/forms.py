@@ -50,6 +50,17 @@ class TimesheetEntryForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         
+        # Validate calendar completion gate if event is linked
+        # Rule: Event can only be linked to timesheet if it has completed on the calendar
+        event = cleaned_data.get('todo')
+        if event:
+            is_ready, reason, recommendations = event.validate_timesheet_readiness()
+            if not is_ready:
+                error_msg = f"Cannot create timesheet: {reason}"
+                if recommendations:
+                    error_msg += "\n\nHow to fix:\n" + "\n".join(f"• {rec}" for rec in recommendations)
+                raise forms.ValidationError(error_msg)
+        
         # Prevent changing client if timesheet is already in an invoice (business rule from TimesheetManager)
         if self.instance and self.instance.pk and self.instance.invoice_id:
             if cleaned_data.get("client") != self.instance.client:
