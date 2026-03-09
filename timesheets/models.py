@@ -140,9 +140,11 @@ class TimesheetEntry(TenantModel):
         event = self.todo
         
         # Check completion gate
-        is_ready, reason, recommendations = event.validate_timesheet_readiness()
-        if not is_ready:
-            error_msg = f"Cannot create timesheet: {reason}\n"
-            if recommendations:
-                error_msg += "Fix: " + "; ".join(recommendations)
+        result = event.validate_timesheet_readiness()
+        if not result['is_ready']:
+            error_msg = "Cannot create timesheet"
+            if result['issues']:
+                error_msg += ":\n• " + "\n• ".join(result['issues'])
+            if result['recommendations']:
+                error_msg += "\n\nFix:\n• " + "\n• ".join(result['recommendations'])
             raise ValidationError(error_msg)

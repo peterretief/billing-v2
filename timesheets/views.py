@@ -313,11 +313,13 @@ def log_time(request):
             
             # Check calendar completion gate one more time before saving
             if entry.todo:
-                is_ready, reason, recommendations = entry.todo.validate_timesheet_readiness()
-                if not is_ready:
-                    error_msg = f"Cannot create timesheet: {reason}\n\n"
-                    if recommendations:
-                        error_msg += "How to fix:\n" + "\n".join(f"• {rec}" for rec in recommendations)
+                result = entry.todo.validate_timesheet_readiness()
+                if not result['is_ready']:
+                    error_msg = "Cannot create timesheet"
+                    if result['issues']:
+                        error_msg += ":\n• " + "\n• ".join(result['issues'])
+                    if result['recommendations']:
+                        error_msg += "\n\nHow to fix:\n• " + "\n• ".join(result['recommendations'])
                     messages.error(request, error_msg)
                     return redirect("timesheets:timesheet_list")
             
