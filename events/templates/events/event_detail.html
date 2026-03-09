@@ -156,6 +156,26 @@
                                     </div>
                                 </div>
                             </div>
+                            {% if event.calendar_end_time %}
+                                {% load tz %}
+                                <div class="alert alert-danger alert-sm py-2 px-3 mb-4" role="alert" id="future-event-warning" style="display: none;">
+                                    <small>
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        <strong>⚠️ Future Event</strong> — This calendar event is scheduled for the future. 
+                                        <strong>You cannot create a timesheet yet</strong> until the event has completed on your calendar.
+                                    </small>
+                                </div>
+                                <script>
+                                    // Check if event is in the future
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                        const eventEnd = new Date('{{ event.calendar_end_time|date:"c" }}').getTime();
+                                        const now = new Date().getTime();
+                                        if (eventEnd > now) {
+                                            document.getElementById('future-event-warning').style.display = 'block';
+                                        }
+                                    });
+                                </script>
+                            {% endif %}
                             <div class="alert alert-info alert-sm py-2 px-3 mb-4" role="alert">
                                 <small>
                                     <i class="bi bi-info-circle me-1"></i>
@@ -293,11 +313,29 @@
                             </button>
                         {% else %}
                             <button type="button"
+                                    id="logTimeBtn"
                                     class="btn btn-sm btn-outline-success w-100 mb-2"
                                     data-bs-toggle="modal"
                                     data-bs-target="#logTimeModal">
                                 <i class="bi bi-clock-history me-1"></i> Log Time
                             </button>
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    const btn = document.getElementById('logTimeBtn');
+                                    if (!btn) return;
+                                    
+                                    {% if event.calendar_end_time %}
+                                        const eventEnd = new Date('{{ event.calendar_end_time|date:"c" }}').getTime();
+                                        const now = new Date().getTime();
+                                        if (eventEnd > now) {
+                                            btn.disabled = true;
+                                            btn.title = 'Cannot log time yet - this event is scheduled for the future';
+                                            btn.classList.remove('btn-outline-success');
+                                            btn.classList.add('btn-secondary');
+                                        }
+                                    {% endif %}
+                                });
+                            </script>
                         {% endif %}
                         <a href="{% url 'events:event_list' %}"
                            class="btn btn-sm btn-outline-secondary w-100 mb-2">
