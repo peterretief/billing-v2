@@ -8,3 +8,4 @@ class BillingScheduleConfig(AppConfig):
     def ready(self):
         # This import MUST be inside the ready() method to avoid circular imports
         import billing_schedule.signals
+        import billing_schedule.tasks  # Ensure Celery discovers the tasks

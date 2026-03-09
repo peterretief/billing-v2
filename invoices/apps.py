@@ -8,3 +8,4 @@ class InvoicesConfig(AppConfig):
     def ready(self):
         # The # noqa: F401 stops Ruff from deleting this "unused" import
         import invoices.signals  # noqa: F401
+        import invoices.tasks  # noqa: F401

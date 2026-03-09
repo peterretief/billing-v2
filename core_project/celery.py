@@ -11,5 +11,5 @@ app = Celery("core_project")
 # This includes CELERY_BEAT_SCHEDULE which is defined in settings.py
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
-# Discover tasks from invoices, billing_schedule, items and events apps
-app.autodiscover_tasks(["invoices", "billing_schedule", "items", "events"])
+# Discover tasks from all apps that have tasks
+app.autodiscover_tasks(["invoices", "billing_schedule", "items", "events", "notifications", "clients"])

@@ -5,11 +5,16 @@ from celery.schedules import crontab
 from dotenv import load_dotenv
 
 # Celery Beat schedule - runs daily billing task at 00:01 Africa/Johannesburg time
+
+from celery.schedules import crontab
+
+
 CELERY_BEAT_SCHEDULE = {
     "daily-billing-policy-queue": {
         "task": "billing_schedule.tasks.process_daily_billing_queue",
         "schedule": crontab(minute=1, hour=0),  # Run at 00:01 daily
     },
+
     "sync-all-users-events-with-calendar": {
         "task": "events.tasks.sync_all_users_events_with_calendar",
         "schedule": crontab(minute="*/5"),  # Run every 5 minutes
@@ -164,8 +169,16 @@ REDIS_PASSWORD = os.environ.get("REDIS_PASSWORD", "")
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 REDIS_PORT = os.environ.get("REDIS_PORT", "6379")
 REDIS_DB = os.environ.get("REDIS_DB", "0")
-CELERY_BROKER_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}" if REDIS_PASSWORD else f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
-CELERY_RESULT_BACKEND = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}" if REDIS_PASSWORD else f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+CELERY_BROKER_URL = (
+    f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    if REDIS_PASSWORD
+    else f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+)
+CELERY_RESULT_BACKEND = (
+    f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    if REDIS_PASSWORD
+    else f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+)
 CELERY_TASK_ALWAYS_EAGER = False  # Set to False to actually use Redis
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
@@ -180,7 +193,9 @@ CHANNEL_LAYERS = {
                 (
                     REDIS_HOST,
                     int(REDIS_PORT),
-                ) if not REDIS_PASSWORD else f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}"
+                )
+                if not REDIS_PASSWORD
+                else f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}"
             ],
         },
     },

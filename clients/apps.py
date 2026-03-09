@@ -8,3 +8,4 @@ class ClientsConfig(AppConfig):
     def ready(self):
         # The # noqa: F401 stops Ruff from deleting this "unused" import
         import clients.signals  # noqa: F401
+        import clients.tasks  # noqa: F401
