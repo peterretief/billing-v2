@@ -114,9 +114,35 @@ class TimesheetEntry(TenantModel):
 
     def save(self, *args, **kwargs):
         """Normalize Decimal fields to prevent precision mismatches during grouping."""
+        # Validate completion gate before saving
+        self.clean()
+        
         # Ensure consistent 2 decimal place representation
         if self.hours:
             self.hours = Decimal(str(self.hours)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         if self.hourly_rate:
             self.hourly_rate = Decimal(str(self.hourly_rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         super().save(*args, **kwargs)
+    
+    def clean(self):
+        """
+        Validate timesheet against calendar integration rules.
+        
+        Rule: Events can only be linked to timesheets if they have completed on calendar.
+        See: docs/CALENDAR_INTEGRATION_RULES.md - Rule 1: Completion Status Gate
+        """
+        from django.core.exceptions import ValidationError
+        
+        # Only validate if linked to an event
+        if not self.todo:
+            return
+        
+        event = self.todo
+        
+        # Check completion gate
+        is_ready, reason, recommendations = event.validate_timesheet_readiness()
+        if not is_ready:
+            error_msg = f"Cannot create timesheet: {reason}\n"
+            if recommendations:
+                error_msg += "Fix: " + "; ".join(recommendations)
+            raise ValidationError(error_msg)
