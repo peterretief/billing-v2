@@ -23,6 +23,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "events.tasks.cleanup_old_sync_logs",
         "schedule": crontab(minute=0, hour=2),  # Run at 02:00 daily
     },
+    "check-completed-calendar-events": {
+        "task": "events.tasks.check_completed_calendar_events",
+        "schedule": crontab(minute="*/15"),  # Run every 15 minutes
+    },
 }
 
 

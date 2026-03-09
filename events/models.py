@@ -255,6 +255,73 @@ class Event(TenantModel):
             'hours': linked_timesheet.hours,
         }
     
+    def can_create_timesheet_entry(self):
+        """
+        Check if a timesheet entry can be created for this event.
+        
+        Rule: Event can only be linked to timesheet if it has completed on the calendar.
+        See: docs/CALENDAR_INTEGRATION_RULES.md - Rule 1
+        
+        Returns: (is_allowed: bool, reason: str)
+        """
+        # 1. Calendar completion check
+        if self.calendar_end_time:
+            if timezone.now() < self.calendar_end_time:
+                remaining = (self.calendar_end_time - timezone.now()).total_seconds() / 60  # minutes
+                return False, f"Calendar event hasn't finished yet ({remaining:.0f} min remaining)"
+        
+        # 2. Status check
+        if self.status != self.Status.COMPLETED:
+            return False, f"Event status is '{self.status}', must be 'completed'"
+        
+        # 3. Invoice check
+        if self.timesheet_entries.filter(is_billed=True).exists():
+            return False, "Event already has invoiced timesheet entries"
+        
+        return True, "Ready to create timesheet entry"
+    
+    def validate_timesheet_readiness(self):
+        """
+        Get comprehensive validation report for timesheet creation.
+        
+        Returns: {
+            'is_ready': bool,
+            'issues': [list of issues],
+            'recommendations': [list of fixes]
+        }
+        """
+        issues = []
+        recommendations = []
+        
+        # Calendar completion
+        if self.calendar_end_time:
+            if timezone.now() < self.calendar_end_time:
+                gap = (self.calendar_end_time - timezone.now()).total_seconds() / 60
+                issues.append(f"Calendar event hasn't finished yet ({gap:.0f} min remaining)")
+                recommendations.append(
+                    f"Check in at {self.calendar_end_time.strftime('%Y-%m-%d %H:%M')}"
+                )
+        
+        # Status validation
+        if self.status != 'completed':
+            issues.append(f"Event status is '{self.status}', not 'completed'")
+            if self.status in ['backlog', 'todo']:
+                recommendations.append("Move event to 'In Progress' → 'Completed'")
+            elif self.status == 'in_progress':
+                recommendations.append("Mark as Completed")
+        
+        # Invoice check
+        if self.timesheet_entries.filter(is_billed=True).exists():
+            issues.append("Event has already been invoiced")
+            recommendations.append("Cannot create new timesheet entries for invoiced events")
+        
+        return {
+            'is_ready': len(issues) == 0,
+            'issues': issues,
+            'recommendations': recommendations,
+        }
+    
+    
     @property
     def is_overdue(self):
         """Check if event is overdue."""

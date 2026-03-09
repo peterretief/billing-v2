@@ -172,3 +172,96 @@ def cleanup_old_sync_logs():
     except Exception as e:
         logger.exception(f"Error cleaning up sync logs: {str(e)}")
         return False
+
+
+@shared_task
+def check_completed_calendar_events():
+    """
+    Find calendar events that have ended and mark corresponding app events as completed.
+    
+    Implementation of Calendar Integration Rule #1:
+    "An event can only be linked to a timesheet if it has completed on the calendar"
+    
+    This task checks if calendar_end_time has passed and auto-marks the event as completed.
+    Runs every 15 minutes via Celery Beat.
+    
+    See: docs/CALENDAR_INTEGRATION_RULES.md for full architecture
+    """
+    from .models import Event, EventSyncLog
+    
+    try:
+        now = timezone.now()
+        
+        # Find events that are synced from calendar but not yet marked completed
+        candidates = Event.objects.filter(
+            calendar_end_time__isnull=False,  # Has calendar sync
+            calendar_end_time__lt=now,  # Calendar event has ended
+        ).exclude(
+            status='completed'  # Not already completed
+        ).exclude(
+            status='cancelled'  # Skip cancelled
+        )
+        
+        completed_count = 0
+        error_count = 0
+        
+        for event in candidates:
+            try:
+                # Double-check status (in case another process updated it)
+                if event.status == 'completed':
+                    continue
+                
+                # Mark as completed with calendar end time as source of truth
+                old_status = event.status
+                event.status = Event.Status.COMPLETED
+                event.completed_at = event.calendar_end_time
+                event.save()
+                
+                # Log the completion
+                EventSyncLog.objects.create(
+                    event=event,
+                    sync_direction='pull',
+                    status='success',
+                    synced_fields=['status', 'completed_at'],
+                    changes={
+                        'status': {'old': old_status, 'new': 'completed'},
+                        'completed_at': str(event.calendar_end_time)
+                    },
+                    notes=f"Auto-completed: calendar event ended at {event.calendar_end_time}"
+                )
+                
+                completed_count += 1
+                logger.info(f"Auto-completed event {event.id}: {event}")
+                
+            except Exception as e:
+                error_count += 1
+                logger.error(f"Error auto-completing event {event.id}: {str(e)}")
+                
+                # Log the failure
+                try:
+                    EventSyncLog.objects.create(
+                        event=event,
+                        sync_direction='pull',
+                        status='error',
+                        error_message=str(e),
+                        notes="Failed to auto-complete calendar event"
+                    )
+                except:
+                    pass
+        
+        result = {
+            'completed': completed_count,
+            'errors': error_count,
+            'candidates_checked': candidates.count()
+        }
+        
+        logger.info(
+            f"check_completed_calendar_events: {completed_count} completed, "
+            f"{error_count} errors, {candidates.count()} total candidates"
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.exception(f"Error in check_completed_calendar_events: {str(e)}")
+        return {'completed': 0, 'errors': 1, 'candidates_checked': 0}

@@ -8,6 +8,11 @@ Organized documentation for the Billing v2 system.
 - [Google Calendar Setup](../GOOGLE_CALENDAR_SETUP.md) — Integrating Google Calendar sync
 - [Reply-to Email Setup](../REPLY_TO_EMAIL_SETUP.md) — Configuring email reply handling
 
+## Calendar & Events Integration
+
+- [Calendar Integration Rules](CALENDAR_INTEGRATION_RULES.md) — **START HERE** — Architecture for linking app events, calendar events, and timesheets
+- [Calendar Completion Implementation](CALENDAR_COMPLETION_IMPLEMENTATION.py) — Code templates for auto-completion detection
+
 ## Billing & Invoices
 
 - [Invoice Cancellation Rules](INVOICE_CANCELLATION_RULES.md) — When and how invoices can be cancelled
