@@ -23,3 +23,13 @@ staticfiles/
 *.pdf
 *.deb
 tmp/
+
+# Debug & Temporary files (prevent accidental commits)
+*_DEBUG.md
+*_TEMP.md
+*_ANALYSIS.md
+*_REPORT.md
+debug_*.py
+outfile
+runtest
+*.pyc.orig
