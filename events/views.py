@@ -1,17 +1,17 @@
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib import messages
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.utils import timezone
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 
-from timesheets.models import WorkCategory
 from timesheets.forms import TimesheetEntryForm
+from timesheets.models import WorkCategory
 
-from .models import Event
 from .forms import EventForm
+from .models import Event
 
 
 class EventListView(LoginRequiredMixin, ListView):
@@ -271,9 +271,11 @@ def mark_event_cancelled(request, pk):
 @login_required
 def calendar_auth_start(request):
     """Initiate Google Calendar OAuth flow."""
-    from .calendar_utils import get_oauth_flow
-    from django.conf import settings
     import logging
+
+    from django.conf import settings
+
+    from .calendar_utils import get_oauth_flow
     
     logger = logging.getLogger(__name__)
     
@@ -314,10 +316,11 @@ def calendar_auth_start(request):
 @login_required
 def calendar_auth_callback(request):
     """Handle Google Calendar OAuth callback."""
+    import logging
+    from datetime import datetime, timezone
+
     from .calendar_utils import get_oauth_flow
     from .models import GoogleCalendarCredential
-    from datetime import datetime, timezone
-    import logging
     
     logger = logging.getLogger(__name__)
     
@@ -437,8 +440,8 @@ def calendar_auth_callback(request):
 @login_required
 def sync_events_to_calendar(request):
     """Sync all events to Google Calendar."""
-    from .calendar_utils import sync_all_events_to_calendar, InvalidScopeError
-    from .models import GoogleCalendarCredential, Event
+    from .calendar_utils import InvalidScopeError, sync_all_events_to_calendar
+    from .models import Event, GoogleCalendarCredential
     
     # Check if user has Google Calendar connected
     try:
@@ -472,9 +475,10 @@ def sync_events_to_calendar(request):
 @login_required
 def import_calendar_events(request):
     """Display Google Calendar events to import as timesheets."""
-    from .calendar_utils import get_google_calendar_service, InvalidScopeError
-    from .models import GoogleCalendarCredential
     from datetime import datetime, timedelta, timezone
+
+    from .calendar_utils import InvalidScopeError, get_google_calendar_service
+    from .models import GoogleCalendarCredential
     
     # Check if user has Google Calendar connected
     try:
@@ -581,9 +585,10 @@ def import_calendar_events(request):
         events = []
     
     # Parse event titles and extract client/category suggestions
-    from timesheets.models import WorkCategory, TimesheetEntry
-    from clients.models import Client
     import logging
+
+    from clients.models import Client
+    from timesheets.models import TimesheetEntry, WorkCategory
     logger = logging.getLogger(__name__)
     
     # Get work categories and clients for the user
@@ -671,7 +676,7 @@ def import_calendar_events(request):
         if event['suggested_client_id']:
             logger.info(f"  Final suggested_client_id: {event['suggested_client_id']} (type: {type(event['suggested_client_id']).__name__})")
         else:
-            logger.info(f"  No client match found for event")
+            logger.info("  No client match found for event")
         
         # Store location for display
         event['display_location'] = location
@@ -705,20 +710,22 @@ def import_calendar_events(request):
 @login_required
 def create_timesheets_from_events(request):
     """Create timesheet entries from selected calendar events."""
+    import logging
+    from datetime import datetime, timezone
+
+    from timesheets.models import TimesheetEntry, WorkCategory
+
     from .calendar_utils import get_google_calendar_service
     from .models import GoogleCalendarCredential
-    from timesheets.models import TimesheetEntry, WorkCategory
-    from datetime import datetime, timezone
-    import logging
     
     logger = logging.getLogger(__name__)
     
-    logger.info(f"=== CREATE_TIMESHEETS_FROM_EVENTS START ===")
+    logger.info("=== CREATE_TIMESHEETS_FROM_EVENTS START ===")
     logger.info(f"Request method: {request.method}")
     logger.info(f"User: {request.user}")
     
     if request.method != 'POST':
-        logger.info(f"Not a POST request, redirecting to import_calendar_events")
+        logger.info("Not a POST request, redirecting to import_calendar_events")
         return redirect('events:import_calendar_events')
     
     logger.info(f"POST data keys: {list(request.POST.keys())}")
@@ -739,14 +746,14 @@ def create_timesheets_from_events(request):
     # Get selected events from POST
     selected_events = request.POST.getlist('events[]')
     
-    logger.info(f"=== SELECTED EVENTS DEBUG ===")
+    logger.info("=== SELECTED EVENTS DEBUG ===")
     logger.info(f"Total POST keys: {list(request.POST.keys())}")
     logger.info(f"All events[] values: {request.POST.getlist('events[]')}")
     logger.info(f"Selected events count: {len(selected_events)}")
     logger.info(f"Selected events: {selected_events}")
     
     if not selected_events:
-        logger.warning(f"No events selected")
+        logger.warning("No events selected")
         messages.error(request, "Please select at least one event.")
         return redirect('events:import_calendar_events')
     
@@ -771,7 +778,7 @@ def create_timesheets_from_events(request):
         
         # Check if this is a "create new" marker (from suggested category in dropdown)
         if category_id and category_id.startswith('create_new_'):
-            logger.info(f"  'Create new' category marker detected")
+            logger.info("  'Create new' category marker detected")
             category_id = None  # Treat as empty so it falls through to auto-create
         
         if category_id:
@@ -857,7 +864,7 @@ def create_timesheets_from_events(request):
             elif 'date' in start_time:
                 try:
                     event_date = datetime.fromisoformat(start_time['date']).date()
-                    logger.info(f"All-day event: using default 8 hours")
+                    logger.info("All-day event: using default 8 hours")
                 except Exception as e:
                     logger.warning(f"Error parsing date for event {event_id}: {e}")
                     pass
@@ -997,8 +1004,9 @@ def find_available_slots_api(request):
     """
     import json
     import logging
-    from datetime import datetime
+
     from django.http import JsonResponse
+
     from .calendar_utils import find_available_slots
     
     logger = logging.getLogger(__name__)

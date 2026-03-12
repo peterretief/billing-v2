@@ -2,7 +2,7 @@ from django.db import transaction
 
 from core.models import BillingAuditLog
 from core.utils import get_anomaly_status
-from invoices.models import Invoice, InvoiceItem
+from invoices.models import Invoice
 
 from .models import TimesheetEntry
 

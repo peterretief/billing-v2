@@ -8,11 +8,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect
-from django.urls import reverse, reverse_lazy
+from django.template.loader import render_to_string
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
+from core.models import AuditHistory, BillingAuditLog
+from core.utils import get_anomaly_status
 from invoices.models import Invoice
 
 from .forms import ItemForm
@@ -108,8 +111,10 @@ def generate_invoice_from_items(request):
         messages.warning(request, "Select items first.")
         return redirect("items:item_list")
 
+    # Validation gate: Ensure user has completed business profile setup
+    # Profile data is used by invoicing system for company details (name, address, tax ID, etc)
     try:
-        profile = request.user.profile
+        profile = request.user.profile  # noqa: F841
     except AttributeError:
         messages.error(request, "Please set up your Business Profile before generating invoices.")
         return redirect("core:edit_profile")
@@ -162,9 +167,6 @@ def generate_invoice_from_items(request):
 
             # Add audit logging
             try:
-                from core.models import BillingAuditLog, AuditHistory
-                from core.utils import get_anomaly_status
-
                 is_anomaly, comment, audit_context = get_anomaly_status(request.user, invoice)
                 BillingAuditLog.objects.create(
                     user=request.user,
@@ -188,11 +190,16 @@ def generate_invoice_from_items(request):
                 )
                 if is_anomaly:
                     flagged_count += 1
+                    alert_message = render_to_string(
+                        "items/audit_warning_message.html",
+                        {
+                            "invoice": invoice,
+                            "comment": comment,
+                        }
+                    )
                     messages.warning(
                         request,
-                        mark_safe(
-                            f"⚠️ Invoice #{invoice.number} flagged: {comment} <a href='{reverse('invoices:billing_audit_report')}' class='alert-link'>Review in Audit</a>"
-                        ),
+                        mark_safe(alert_message),
                         extra_tags="safe",
                     )
             except Exception as e:

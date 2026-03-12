@@ -3,8 +3,9 @@ Tests for Celery task discovery and registration.
 Ensures all expected tasks are properly registered with Celery.
 """
 
-from django.test import TestCase
 from django.apps import apps
+from django.test import TestCase
+
 from core_project.celery import app as celery_app
 
 

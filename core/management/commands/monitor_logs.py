@@ -1,6 +1,8 @@
-from django.core.management.base import BaseCommand
-from pathlib import Path
 import sys
+from pathlib import Path
+
+from django.core.management.base import BaseCommand
+
 
 class Command(BaseCommand):
     help = 'Monitor logs for errors and send alerts'

@@ -8,7 +8,7 @@ Fixes invoices that have delivery logs but is_emailed=False by:
 """
 
 from django.core.management.base import BaseCommand
-from django.utils import timezone
+
 from invoices.models import Invoice
 
 

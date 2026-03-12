@@ -2,14 +2,14 @@
 Tests for quote rejection functionality and workflow transitions.
 """
 
-from decimal import Decimal
-from django.test import TestCase
-from django.utils import timezone
-from django.contrib.auth import get_user_model
 from datetime import timedelta
 
-from invoices.models import Invoice
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.utils import timezone
+
 from clients.models import Client as ClientModel
+from invoices.models import Invoice
 
 User = get_user_model()
 

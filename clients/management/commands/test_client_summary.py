@@ -6,10 +6,11 @@ Usage:
     python manage.py test_client_summary [--user USERNAME] [--client-id ID]
 """
 
-from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
+
 from clients.models import Client
-from clients.summary import ClientSummary, AllClientsSummary
+from clients.summary import AllClientsSummary, ClientSummary
 
 User = get_user_model()
 

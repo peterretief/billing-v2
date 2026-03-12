@@ -7,18 +7,18 @@ Tests for quote workflow functionality including:
 - Invoice deletion resetting is_billed flags
 """
 
-from decimal import Decimal
-from django.test import TestCase, Client
-from django.urls import reverse
-from django.utils import timezone
-from django.contrib.auth import get_user_model
 from datetime import timedelta
+from decimal import Decimal
 
-from invoices.models import Invoice, InvoiceEmailStatusLog
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.utils import timezone
+
 from clients.models import Client as ClientModel
+from core.models import User
+from invoices.models import Invoice
 from items.models import Item
 from timesheets.models import TimesheetEntry
-from core.models import User
 
 User = get_user_model()
 

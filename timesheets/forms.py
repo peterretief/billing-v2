@@ -55,7 +55,7 @@ class TimesheetEntryForm(forms.ModelForm):
             print(f"[FORM VALIDATION] Result: {result}", file=sys.stderr)
             
             if not result['is_ready']:
-                error_msg = f"Cannot create timesheet"
+                error_msg = "Cannot create timesheet"
                 if result['issues']:
                     error_msg += ":\n• " + "\n• ".join(result['issues'])
                 if result['recommendations']:
@@ -63,7 +63,7 @@ class TimesheetEntryForm(forms.ModelForm):
                 print(f"[FORM VALIDATION] BLOCKING: {error_msg}", file=sys.stderr)
                 raise forms.ValidationError(error_msg)
         else:
-            print(f"[FORM VALIDATION] No event linked (todo is None)", file=sys.stderr)
+            print("[FORM VALIDATION] No event linked (todo is None)", file=sys.stderr)
         
         # Prevent changing client if timesheet is already in an invoice (business rule from TimesheetManager)
         if self.instance and self.instance.pk and self.instance.invoice_id:

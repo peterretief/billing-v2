@@ -4,12 +4,13 @@ Provides methods to gather quotes, timesheets, items, invoices, and other metric
 """
 
 from decimal import Decimal
-from django.db.models import Sum, Count, Q, F
+
+from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
-from invoices.models import Invoice, CreditNote, Payment
-from timesheets.models import TimesheetEntry
+from invoices.models import CreditNote, Invoice, Payment
 from items.models import Item
+from timesheets.models import TimesheetEntry
 
 
 class ClientSummary:
@@ -181,7 +182,6 @@ class ClientSummary:
 
     def get_outstanding(self):
         """Get outstanding balance: unpaid PENDING/OVERDUE invoices using manager."""
-        from invoices.models import Invoice
         
         outstanding_amount = Invoice.objects.get_client_outstanding(self.client)
         

@@ -22,7 +22,9 @@ class PaymentValidationTest(TestCase):
     def setUp(self):
         """Create test user, client, and invoice."""
         from datetime import timedelta
+
         from django.utils import timezone
+
         from items.models import Item
         
         self.user = User.objects.create_user(username="testuser", password="testpass")
@@ -96,7 +98,6 @@ class ReconciliationCalcuationTest(TestCase):
 
     def setUp(self):
         """Create test data."""
-        from datetime import timedelta
         from items.models import Item
         
         self.user = User.objects.create_user(username="testuser", password="testpass")

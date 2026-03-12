@@ -4,11 +4,13 @@ Verifies that daily billing queue task actually executed.
 Run as cron job: 0 8 * * * python manage.py check_celery_health
 """
 
+import logging
+from datetime import timedelta
+
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
-from datetime import timedelta
+
 from core.models import BillingAuditLog
-import logging
 
 logger = logging.getLogger(__name__)
 

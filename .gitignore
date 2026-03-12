@@ -33,3 +33,6 @@ debug_*.py
 outfile
 runtest
 *.pyc.orig
+
+# Celery
+celerybeat-schedule

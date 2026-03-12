@@ -1,19 +1,20 @@
 """Google Calendar integration utilities."""
-import os
 import logging
+import os
 from datetime import datetime, timedelta, timezone
+
+from django.conf import settings
+from django.utils import timezone as django_timezone
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
-from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
-from django.conf import settings
-from django.utils import timezone as django_timezone
 
 # Allow HTTP for localhost development (remove in production!)
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = 'true'
 
-from .models import GoogleCalendarCredential, Event, EventSyncLog
+from .models import Event, EventSyncLog, GoogleCalendarCredential
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,6 @@ def get_google_calendar_service(user):
 
 def get_oauth_flow():
     """Create and return Google OAuth flow."""
-    from google_auth_oauthlib.flow import Flow
     
     # Build client config from environment variables
     client_config = {
@@ -314,8 +314,9 @@ def find_available_slots(user, duration_minutes, start_date=None, num_slots=5, d
     logger = logging.getLogger(__name__)
     
     try:
-        from .models import Event
         from core.models import UserProfile
+
+        from .models import Event
         
         # Get user's working hours configuration
         try:
@@ -784,7 +785,6 @@ def sync_event_bidirectional(user, event, service=None):
     - Sync scheduling FROM calendar, metadata TO calendar
     - No merging needed—different systems own different fields
     """
-    from .models import EventSyncLog
     
     # New event—just sync app → calendar
     if not event.google_calendar_event_id:

@@ -4,7 +4,7 @@ from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q, Sum
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import DetailView, ListView
@@ -16,7 +16,7 @@ from timesheets.forms import TimesheetEntryForm
 
 from .forms import ClientForm
 from .models import Client
-from .summary import ClientSummary, AllClientsSummary
+from .summary import AllClientsSummary, ClientSummary
 
 # views.py
 

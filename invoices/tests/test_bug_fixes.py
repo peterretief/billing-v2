@@ -12,7 +12,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from clients.models import Client
-from core.models import BillingAuditLog, UserProfile
+from core.models import UserProfile
 from invoices.models import CreditNote, Invoice, Payment
 from items.models import Item
 

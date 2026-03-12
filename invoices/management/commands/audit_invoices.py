@@ -6,8 +6,8 @@ Usage:
     python manage.py audit_invoices --all
 """
 
-from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand, CommandError
 
 from invoices.audit import InvoiceAudit
 

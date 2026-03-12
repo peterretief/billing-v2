@@ -1,8 +1,10 @@
+import uuid
+
 from django.db import models
 from django.utils import timezone
-import uuid
-from core.models import TenantModel
+
 from clients.models import Client
+from core.models import TenantModel
 
 
 class EventManager(models.Manager):

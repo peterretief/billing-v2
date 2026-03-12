@@ -1,16 +1,17 @@
 #!/usr/bin/env python
 """Debug script to test invoice grouping in all contexts"""
 import os
-import sys
-import django
 from datetime import timedelta
 from decimal import Decimal
+
+import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core_project.settings')
 django.setup()
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+
 from clients.models import Client
 from invoices.models import Invoice
 from invoices.utils import build_invoice_items_list, render_invoice_tex
@@ -111,7 +112,7 @@ def test_grouping():
     # Check that Consulting is 5.00 hours
     consulting_item = next((i for i in items if "Consulting" in i["description"]), None)
     if consulting_item and "5.00" in consulting_item["quantity"]:
-        print(f"✅ Consulting correctly grouped to 5.00 hours")
+        print("✅ Consulting correctly grouped to 5.00 hours")
     else:
         print(f"❌ Consulting NOT grouped: {consulting_item}")
     
@@ -133,9 +134,9 @@ def test_grouping():
     # Count how many times "hourly_rate" appears in tex (should be 2 for 2 items)
     hourly_rate_count = tex_content.count("150.00") + tex_content.count("200.00")
     if hourly_rate_count >= 2:
-        print(f"✅ LaTeX contains rate information")
+        print("✅ LaTeX contains rate information")
     else:
-        print(f"❌ LaTeX missing rate information")
+        print("❌ LaTeX missing rate information")
     
     # Check for ungrouped entries (should NOT see 3.00 or 2.00 individually)
     if "3.00" not in tex_content and "2.00" not in tex_content:

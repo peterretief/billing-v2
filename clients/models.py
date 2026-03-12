@@ -1,6 +1,6 @@
 import re
-from decimal import Decimal
 import uuid
+from decimal import Decimal
 
 from django.db import models
 from django.db.models import DecimalField, Q, Sum

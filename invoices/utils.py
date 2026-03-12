@@ -1,5 +1,7 @@
+import logging
 import os
 import subprocess
+from collections import defaultdict
 from decimal import ROUND_HALF_UP, Decimal
 from tempfile import TemporaryDirectory
 
@@ -7,9 +9,6 @@ from django.conf import settings
 from django.core.mail import EmailMessage, get_connection
 from django.template.loader import render_to_string
 from django.utils.timezone import now
-
-from collections import defaultdict
-import logging
 
 # --- Helper Functions ---
 

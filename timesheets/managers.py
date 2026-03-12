@@ -1,6 +1,6 @@
 # timesheets/managers.py
-from django.db import models
 from django.db.models import F, Sum
+
 from core.managers import TenantManager
 
 

@@ -6,7 +6,6 @@ from django.db import IntegrityError
 from invoices.models import Invoice
 from invoices.tasks import generate_recurring_monthly_invoices
 
-
 if __name__ == "__main__":
     print("--- Starting Billing Test Script ---")
 

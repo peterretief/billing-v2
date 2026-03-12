@@ -4,11 +4,12 @@ Management command to make existing data comply with new business rules:
 2. Report on data integrity issues (payment > invoice amount)
 """
 
-from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
 from decimal import Decimal
 
-from invoices.models import Invoice, CreditNote, Payment
+from django.core.management.base import BaseCommand
+from django.db import transaction
+
+from invoices.models import CreditNote, Invoice
 
 
 class Command(BaseCommand):

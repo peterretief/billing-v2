@@ -3,7 +3,7 @@ import re
 import uuid
 
 from django.db import models
-from django.db.models.signals import post_save, pre_save, post_delete
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
@@ -124,7 +124,7 @@ def recalculate_invoice_on_payment_delete(sender, instance, **kwargs):
         if invoice:
             # Use the manager to recalculate invoice status and totals
             Invoice.objects.update_totals(invoice)
-    except Exception as e:
+    except Exception:
         pass  # Silently fail to avoid blocking the deletion
 
 
@@ -190,10 +190,10 @@ def reset_items_on_invoice_delete(sender, instance, **kwargs):
     This prevents confusion from orphaned, already-billed items appearing in the list.
     """
     try:
+        import logging
+
         from items.models import Item
         from timesheets.models import TimesheetEntry
-        
-        import logging
         logger = logging.getLogger(__name__)
         
         # Delete all items linked to this invoice

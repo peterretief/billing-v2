@@ -5,20 +5,22 @@ Monitors email_status.log and other logs for errors/failures
 Sends alerts and daily summaries
 """
 
+import json
 import os
+import re
 import sys
-import django
 from datetime import datetime, timedelta
 from pathlib import Path
-import json
-import re
+
+import django
 
 # Setup Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core_project.settings')
 django.setup()
 
-from django.core.mail import send_mail
 from django.conf import settings
+from django.core.mail import send_mail
+
 from invoices.models import Invoice, InvoiceEmailStatusLog
 
 # Configuration
@@ -149,8 +151,9 @@ class LogMonitor:
 
     def check_pending_invoices(self):
         """Check for invoices stuck in PENDING status"""
-        from django.utils import timezone
         from datetime import timedelta
+
+        from django.utils import timezone
 
         stuck_invoices = Invoice.objects.filter(
             status='PENDING',

@@ -16,5 +16,5 @@ def generate_notifications_async(user_id):
         generate_notifications(user)
     except User.DoesNotExist:
         pass  # Silently ignore missing users
-    except Exception as e:
+    except Exception:
         pass  # Celery will retry on failure

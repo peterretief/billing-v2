@@ -2,17 +2,14 @@ import logging
 
 from celery import shared_task
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
 # Core imports for billing logic
 from invoices.models import Invoice
-from items.models import Item
-
-from django.db import transaction
 from invoices.utils import email_invoice_to_client
 from items.models import Item
-
 
 logger = logging.getLogger(__name__)
 

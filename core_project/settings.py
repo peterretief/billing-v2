@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 # Celery Beat schedule - runs daily billing task at 00:01 Africa/Johannesburg time
 
-from celery.schedules import crontab
 
 
 CELERY_BEAT_SCHEDULE = {

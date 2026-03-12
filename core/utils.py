@@ -127,7 +127,7 @@ def get_anomaly_status(user, invoice):
                 # Show if multiple delivery attempts failed
                 failure_count = len([s for s in delivery_logs if s in failed_statuses])
                 if failure_count > 1:
-                    comments.append(f"❌ EMAIL DELIVERY: HARD BOUNCE - Invalid email address")
+                    comments.append("❌ EMAIL DELIVERY: HARD BOUNCE - Invalid email address")
                 else:
                     comments.append(f"⚠️ EMAIL DELIVERY: {latest_email.status.upper().replace('_', ' ')}")
     

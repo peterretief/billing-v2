@@ -35,6 +35,7 @@ def email_item_invoice_to_client(invoice):
     - Logs failures with full error context
     """
     import logging
+
     from invoices.models import InvoiceEmailStatusLog
     
     logger = logging.getLogger(__name__)

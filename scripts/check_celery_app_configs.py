@@ -8,10 +8,9 @@ Use in CI/CD pipeline to prevent Celery task autodiscovery failures:
 Run: python scripts/check_celery_app_configs.py
 """
 
+import ast
 import os
 import sys
-import ast
-import re
 
 
 def check_app_config(app_path):

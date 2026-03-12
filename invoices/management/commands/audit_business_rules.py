@@ -6,12 +6,11 @@ Audit script to check entire app for inconsistencies with new business rules:
 4. All financial data integrity checks
 """
 
-from django.core.management.base import BaseCommand
-from django.db.models import Sum, Q
 from decimal import Decimal
 
-from invoices.models import Invoice, Payment, CreditNote
-from clients.models import Client
+from django.core.management.base import BaseCommand
+
+from invoices.models import CreditNote, Invoice, Payment
 
 
 class Command(BaseCommand):
@@ -250,7 +249,7 @@ class Command(BaseCommand):
             if count > 0:
                 by_status[status[1]] = count
 
-        self.stdout.write(f"\n  By Status:")
+        self.stdout.write("\n  By Status:")
         for status, count in by_status.items():
             self.stdout.write(f"    • {status}: {count}")
 

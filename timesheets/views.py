@@ -21,7 +21,6 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.generic import ListView
 
-import items
 from clients.models import Client
 from invoices.models import Invoice
 
@@ -463,7 +462,7 @@ def generate_invoice_bulk(request):
 
             # 6. Add audit logging
             try:
-                from core.models import BillingAuditLog, AuditHistory
+                from core.models import AuditHistory, BillingAuditLog
                 from core.utils import get_anomaly_status
 
                 is_anomaly, comment, audit_context = get_anomaly_status(request.user, invoice)

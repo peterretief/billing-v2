@@ -151,8 +151,8 @@ class InvoiceDetailViewTest(TestCase):
 
     def test_pdf_generation_with_grouped_timesheets(self):
         """Test that PDF generation also groups timesheets by category."""
+
         from invoices.utils import generate_invoice_pdf
-        from collections import defaultdict
         
         # Create categories
         consulting = WorkCategory.objects.create(user=self.user, name="Consulting")

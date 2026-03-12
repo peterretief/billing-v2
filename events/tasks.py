@@ -1,15 +1,16 @@
 """
 Celery tasks for Google Calendar integration and event syncing.
 """
-from celery import shared_task
-from core.models import User
-from django.utils import timezone
-from datetime import timedelta
-from django.db import models
 import logging
-import json
+from datetime import timedelta
+
 from asgiref.sync import async_to_sync
+from celery import shared_task
 from channels.layers import get_channel_layer
+from django.db import models
+from django.utils import timezone
+
+from core.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,8 @@ def sync_user_events_with_calendar(self, user_id):
     - Calendar owns: scheduling (due_date, start_time)
     - App owns: metadata (description, category, status, etc)
     """
+    from .calendar_utils import get_google_calendar_service, sync_event_bidirectional
     from .models import Event
-    from .calendar_utils import sync_event_bidirectional, get_google_calendar_service
     
     try:
         user = User.objects.get(id=user_id)

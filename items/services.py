@@ -103,8 +103,8 @@ def import_recurring_to_invoices(user):
 
             # Audit logging using the new comprehensive audit function
             try:
-                from core.utils import get_anomaly_status
                 from core.models import AuditHistory
+                from core.utils import get_anomaly_status
 
                 is_anomaly, comment, audit_context = get_anomaly_status(user, invoice)
                 BillingAuditLog.objects.create(

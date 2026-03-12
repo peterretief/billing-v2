@@ -7,15 +7,11 @@ Usage:
 """
 
 from datetime import date
-from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
-from django.db.models import Sum
-from django.db.models.functions import Coalesce
 
 from clients.models import Client
-from invoices.models import CreditNote, Invoice, Payment
 from invoices.reconciliation import ClientReconciliation
 
 User = get_user_model()

@@ -1,6 +1,8 @@
 from django import forms
-from .models import Event
+
 from timesheets.models import WorkCategory
+
+from .models import Event
 
 
 class EventForm(forms.ModelForm):

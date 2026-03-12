@@ -7,11 +7,12 @@ Usage:
     python manage.py audit_timesheet_completion --export timesheets.csv
 """
 
-from django.core.management.base import BaseCommand, CommandError
-from django.utils import timezone
-from timesheets.models import TimesheetEntry
-from datetime import timedelta
 import csv
+
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+from timesheets.models import TimesheetEntry
 
 
 class Command(BaseCommand):
@@ -66,7 +67,7 @@ class Command(BaseCommand):
         
         # Report
         self.stdout.write(f"\n{'='*80}")
-        self.stdout.write(f"TIMESHEET COMPLETION AUDIT")
+        self.stdout.write("TIMESHEET COMPLETION AUDIT")
         self.stdout.write(f"{'='*80}\n")
         self.stdout.write(f"Total timesheets linked to events: {all_linked.count()}")
         self.stdout.write(f"Timesheets linked to FUTURE events: {len(problematic)}\n")

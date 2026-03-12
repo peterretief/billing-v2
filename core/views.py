@@ -11,7 +11,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
 from django.core.mail import send_mail
-from django.db.models import Sum
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -199,7 +198,6 @@ def email_status_rows(request):
 def recurring_invoices_report(request):
     """View for displaying logs of recurring invoices that have been sent."""
     from core.models import BillingAuditLog
-    from invoices.models import InvoiceEmailStatusLog
     
     # Get all auto-generated invoices (recurring billing actions)
     billing_logs = BillingAuditLog.objects.filter(
@@ -358,7 +356,6 @@ def portfolio_summary(request):
         return redirect("invoices:dashboard")
 
     # Get users added by this staff member (their "tenants")
-    from clients.models import Client
     tenants = request.user.added_users.all().select_related("profile")
     currency_groups = {}
 
@@ -644,9 +641,11 @@ def audit_settings(request):
 @login_required
 def audit_history(request):
     """View for displaying audit history and comparison statistics."""
-    from core.models import AuditHistory
     from decimal import Decimal
+
     from django.db import models
+
+    from core.models import AuditHistory
 
     # Get all audit decisions for this user
     all_audit_records = AuditHistory.objects.filter(user=request.user).select_related("invoice").order_by(

@@ -6,13 +6,14 @@ consistently exclude/include the right types of invoices.
 """
 
 from decimal import Decimal
-from django.test import TestCase
+
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
+from django.test import TestCase
 
+from clients.models import Client
 from invoices.models import Invoice, Payment
 from invoices.reconciliation import ClientReconciliation
-from clients.models import Client
 
 User = get_user_model()
 
@@ -44,6 +45,7 @@ class InvoiceReportingConsistencyTest(TestCase):
     def create_invoice(self, amount=1000, status="PENDING", is_quote=False):
         """Helper to create a test invoice"""
         from datetime import timedelta
+
         from django.utils import timezone
         today = timezone.now().date()
         inv = Invoice.objects.create(

@@ -6,8 +6,6 @@ from django.contrib.auth import get_user_model
 
 from items.services import import_recurring_to_invoices
 
-from .models import BillingPolicy
-
 logger = logging.getLogger(__name__)
 
 

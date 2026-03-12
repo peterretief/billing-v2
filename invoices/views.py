@@ -140,8 +140,6 @@ def get_payment_modal(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk, user=request.user)
 
     # Get available credit balance for the client
-    from django.db.models import Sum
-    from django.db.models.functions import Coalesce
 
     from invoices.models import Coupon, CreditNote
 
@@ -619,7 +617,7 @@ def bulk_post(request):
         
         if select_all_matching:
             # Reconstruct queryset with the same filters from the list view
-            from django.db.models import Case, When, Q, BooleanField
+            from django.db.models import BooleanField, Case, Q, When
             today = timezone.now().date()
             
             invoice_queryset = (
@@ -945,7 +943,6 @@ def record_vat_payment(request):
 @login_required
 def vat_payment_history_modal(request):
     """Get full VAT payment history with summary and detailed timeline."""
-    from datetime import date
     
     # Get tax summary
     tax_summary = Invoice.objects.get_tax_summary(request.user)
@@ -1309,7 +1306,7 @@ def send_invoice(request, pk):
         doc_type = "Quote" if invoice.is_quote else "Invoice"
         messages.success(request, f"✓ {doc_type} #{invoice.number} sent to {invoice.client.email}")
     else:
-        messages.error(request, f"Failed to send invoice. Check email settings.")
+        messages.error(request, "Failed to send invoice. Check email settings.")
     
     return redirect("invoices:dashboard")
 
@@ -1321,7 +1318,6 @@ def client_statement(request, client_id):
     Generate a year-end or custom date range statement for a client.
     Shows all recurring (queued) invoices and their payments with totals.
     """
-    from datetime import datetime
     
     client = get_object_or_404(Client, id=client_id, user=request.user)
     

@@ -21,7 +21,7 @@ class BrevoSenderService:
             api_response = self.api_instance.create_sender(sender=sender_data)
             # Returns the ID of the new sender
             return api_response.id
-        except ApiException as e:
+        except ApiException:
             return None
 
     def get_sender_status(self, sender_id):

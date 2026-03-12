@@ -892,7 +892,6 @@ class CreditNoteManager(models.Manager):
     
     def get_client_credit_by_type(self, client):
         """Get credit notes breakdown by type for a client."""
-        from django.db.models import CharField, Value
         return self.filter(client=client).values("note_type").annotate(
             total=Coalesce(Sum("amount"), Decimal("0.00")),
             available=Coalesce(Sum("balance"), Decimal("0.00"))

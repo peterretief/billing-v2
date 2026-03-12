@@ -10,7 +10,7 @@ from django.utils import timezone
 from clients.models import Client
 from core.models import TenantModel
 
-from .managers import InvoiceManager, PaymentManager, CreditNoteManager
+from .managers import CreditNoteManager, InvoiceManager, PaymentManager
 
 # invoices/models.py
 

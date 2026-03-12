@@ -1,7 +1,7 @@
-from clients.models import Client
+
 from clients.forms import ClientForm
+from clients.models import Client
 from core.tests import BaseBillingTest
-from django.core.exceptions import ValidationError
 
 
 class ClientUniquenessTest(BaseBillingTest):

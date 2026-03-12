@@ -11,7 +11,9 @@ Double-entry verification ensures that:
 """
 
 from decimal import Decimal
-from django.db.models import Sum, Q
+
+from django.db.models import Sum
+
 from invoices.models import Invoice, Payment
 
 

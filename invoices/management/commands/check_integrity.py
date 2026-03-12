@@ -7,7 +7,7 @@ Run before deployments or on a schedule.
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
-from django.db.models import Sum, Q
+from django.db.models import Sum
 
 from invoices.models import Invoice, Payment
 from items.models import Item
@@ -163,8 +163,9 @@ class Command(BaseCommand):
         """Check for duplicate payments (same amount, same invoice, same day)."""
         self.stdout.write("\n🔄 Checking for duplicate payments...")
         
-        from django.db.models import Count
         from datetime import timedelta
+
+        from django.db.models import Count
         from django.utils import timezone
         
         today = timezone.now().date()

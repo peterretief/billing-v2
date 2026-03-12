@@ -14,9 +14,8 @@ Usage:
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
-from django.db.models import Q, Sum
 
-from invoices.models import Invoice, Payment
+from invoices.models import Invoice
 from items.models import Item
 
 

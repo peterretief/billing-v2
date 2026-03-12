@@ -9,13 +9,14 @@ Tests that:
 
 from datetime import timedelta
 from decimal import Decimal
-from django.test import TestCase
-from django.core.exceptions import ValidationError
+
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.test import TestCase
 from django.utils import timezone
 
 from clients.models import Client
-from invoices.models import Invoice, Payment, CreditNote
+from invoices.models import CreditNote, Invoice, Payment
 from items.models import Item
 
 User = get_user_model()

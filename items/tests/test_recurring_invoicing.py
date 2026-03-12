@@ -9,7 +9,6 @@ from django.utils import timezone
 from billing_schedule.models import BillingPolicy
 from clients.models import Client
 from core.models import UserProfile
-from invoices.models import Invoice
 from items.models import Item
 from items.services import import_recurring_to_invoices
 
