@@ -122,14 +122,32 @@
                                     {% if not today %}
                                         <span class="badge bg-danger">DATE VAR MISSING</span>
                                     {% elif item.last_billed_date and item.last_billed_date.month == today.month and item.last_billed_date.year == today.year %}
-                                        <span class="badge bg-success shadow-sm px-3 py-2"
-                                              title="Billed on {{ item.last_billed_date|date:'Y-m-d' }}">
-                                            <i class="bi bi-check-circle-fill me-1"></i> BILLED
-                                        </span>
+                                        {% with related_invoices=item.invoice_set.filter|dictsort:"date_issued" %}
+                                            {% if related_invoices %}
+                                                {% with latest_invoice=related_invoices|last %}
+                                                    {% if latest_invoice.status == "PENDING" or latest_invoice.delivery_logs.count > 0 %}
+                                                        <span class="badge bg-success shadow-sm px-3 py-2"
+                                                              title="Sent {{ item.last_billed_date|date:'b d' }}. Next: {% if item.billing_policy %}{{ item.billing_policy.run_day }}{% else %}1{% endif %} of next month">
+                                                            <i class="bi bi-check-circle-fill me-1"></i> SENT (Next: {% if item.billing_policy %}{{ item.billing_policy.run_day }}{% else %}1{% endif %})
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning shadow-sm px-3 py-2"
+                                                              title="Queued this month but not yet sent. Will send on next cycle.">
+                                                            <i class="bi bi-exclamation-triangle me-1"></i> QUEUED (Unsent)
+                                                        </span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            {% else %}
+                                                <span class="badge bg-white text-dark border px-3 py-2"
+                                                      title="Ready to be billed on next cycle">
+                                                    <i class="bi bi-hourglass-split me-1"></i> READY
+                                                </span>
+                                            {% endif %}
+                                        {% endwith %}
                                     {% else %}
                                         <span class="badge bg-white text-dark border px-3 py-2"
-                                              title="Not yet billed this month">
-                                            <i class="bi bi-hourglass-split me-1"></i> PENDING
+                                              title="Ready to be billed on next cycle">
+                                            <i class="bi bi-hourglass-split me-1"></i> READY
                                         </span>
                                     {% endif %}
                                 </td>

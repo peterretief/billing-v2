@@ -76,8 +76,8 @@ def send_invoice_async(invoice_id):
         logger.debug(f"send_invoice_async for {invoice.id}: billed_items={billed_items_count}, billed_timesheets={billed_ts_count}")
         
         with transaction.atomic():
-            invoice.status = "PENDING"
-            invoice.save()
+            # FIX: Only mark items as billed, don't touch invoice status yet
+            # Status will be set by email_invoice_to_client only after successful send
             invoice.billed_items.all().update(is_billed=True)
             
             # Update last_billed_date for recurring items
@@ -89,14 +89,12 @@ def send_invoice_async(invoice_id):
                 description__in=item_desc
             ).update(last_billed_date=timezone.now().date())
             
-            # Send the invoice
+            # Send the invoice - this will handle all status updates on success
             if email_invoice_to_client(invoice):
                 logger.info(f"Invoice {invoice.id} sent successfully to {invoice.client.email}")
                 return {"status": "success", "invoice_id": invoice_id, "email": invoice.client.email}
             else:
-                # Revert status to DRAFT on email failure
-                invoice.status = "DRAFT"
-                invoice.save()
+                # Email failed - invoice remains in DRAFT state
                 logger.error(f"Failed to send invoice {invoice.id}")
                 return {"status": "failed", "invoice_id": invoice_id, "reason": "email_send_failed"}
                 

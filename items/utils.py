@@ -97,12 +97,14 @@ def email_item_invoice_to_client(invoice):
         )
         logger.info(f"Created delivery log {log.id} with message_id={log.brevo_message_id}")
 
-        # Update invoice status
+        # FIX: Only update invoice status AFTER successful email send and tracking log created
         invoice.last_generated = now()
         invoice.status = "PENDING"
         invoice.is_emailed = True
         invoice.emailed_at = now()
         invoice.save(update_fields=["last_generated", "status", "is_emailed", "emailed_at"])
+        
+        logger.info(f"Invoice {invoice.id} marked as PENDING after confirmed email send")
         return True
         
     except Exception as e:

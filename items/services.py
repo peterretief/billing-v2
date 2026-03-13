@@ -141,16 +141,12 @@ def import_recurring_to_invoices(user):
 
     for inv in new_invoices:
         try:
+            # FIX: Update last_billed_date BEFORE sending email to prevent nightly re-sends
+            # This ensures even if email fails, we don't retry sending the same invoice today
+            templates.filter(client=inv.client).update(last_billed_date=today.date())
+            
+            # Send invoice - email_item_invoice_to_client handles all status updates on success
             if email_item_invoice_to_client(inv):
-                inv.status = "PENDING"
-                inv.is_emailed = True
-                inv.emailed_at = today
-                inv.save()
-
-                # IMPORTANT: Update the master template's date so it doesn't fire again today
-                # We filter by client and policy to be precise
-                templates.filter(client=inv.client).update(last_billed_date=today.date())
-
                 logger.info(f"Successfully sent invoice {inv.id} to {inv.client.name}")
                 processed_invoices.append(inv)
             else:
