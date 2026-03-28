@@ -28,11 +28,13 @@ class InvoiceGroupingDecimalPrecisionTests(BaseBillingTest):
             name="Consulting"
         )
         # Create invoice
+        from datetime import timedelta
         self.invoice = Invoice.objects.create(
             user=self.user,
             client=self.client_obj,
-            date=timezone.now().date(),
-            status="Draft",
+            date_issued=timezone.now().date(),
+            due_date=timezone.now().date() + timedelta(days=30),
+            status="DRAFT",
         )
 
     def test_grouping_with_same_rate_different_precisions(self):
@@ -76,9 +78,9 @@ class InvoiceGroupingDecimalPrecisionTests(BaseBillingTest):
         # Verify the grouped item has correct totals
         item = items[0]
         self.assertEqual(item["description"], "Consulting")
-        self.assertEqual(item["quantity"], Decimal("9.75"))  # 5.00 + 4.75
-        self.assertEqual(item["unit_price"], Decimal("250.00"))
-        self.assertEqual(item["row_subtotal"], Decimal("2437.50"))  # 9.75 * 250
+        self.assertEqual(Decimal(item["quantity"]), Decimal("9.75"))  # 5.00 + 4.75
+        self.assertEqual(Decimal(item["unit_price"]), Decimal("250.00"))
+        self.assertEqual(Decimal(item["row_subtotal"].replace(",", "")), Decimal("2437.50"))  # 9.75 * 250
 
     def test_grouping_preserves_ungrouped_when_rates_differ(self):
         """
@@ -110,12 +112,12 @@ class InvoiceGroupingDecimalPrecisionTests(BaseBillingTest):
         self.assertEqual(len(items), 2, "Different rates should not be grouped")
         
         # First item
-        self.assertEqual(items[0]["quantity"], Decimal("5.00"))
-        self.assertEqual(items[0]["unit_price"], Decimal("250.00"))
-        
+        self.assertEqual(Decimal(items[0]["quantity"]), Decimal("5.00"))
+        self.assertEqual(Decimal(items[0]["unit_price"]), Decimal("250.00"))
+
         # Second item
-        self.assertEqual(items[1]["quantity"], Decimal("4.75"))
-        self.assertEqual(items[1]["unit_price"], Decimal("300.00"))
+        self.assertEqual(Decimal(items[1]["quantity"]), Decimal("4.75"))
+        self.assertEqual(Decimal(items[1]["unit_price"]), Decimal("300.00"))
 
     def test_grouping_with_three_different_decimal_representations(self):
         """
@@ -151,9 +153,9 @@ class InvoiceGroupingDecimalPrecisionTests(BaseBillingTest):
         
         # Verify totals
         item = items[0]
-        self.assertEqual(item["quantity"], Decimal("3.00"))
-        self.assertEqual(item["unit_price"], Decimal("250.00"))
-        self.assertEqual(item["row_subtotal"], Decimal("750.00"))
+        self.assertEqual(Decimal(item["quantity"]), Decimal("3.00"))
+        self.assertEqual(Decimal(item["unit_price"]), Decimal("250.00"))
+        self.assertEqual(Decimal(item["row_subtotal"]), Decimal("750.00"))
 
     def test_grouping_multiple_categories_with_same_rate(self):
         """
@@ -226,5 +228,5 @@ class InvoiceGroupingDecimalPrecisionTests(BaseBillingTest):
         # Both should normalize to 250.00 and group together
         self.assertEqual(len(items), 1)
         item = items[0]
-        self.assertEqual(item["quantity"], Decimal("8.00"))
-        self.assertEqual(item["unit_price"], Decimal("250.00"))
+        self.assertEqual(Decimal(item["quantity"]), Decimal("8.00"))
+        self.assertEqual(Decimal(item["unit_price"]), Decimal("250.00"))

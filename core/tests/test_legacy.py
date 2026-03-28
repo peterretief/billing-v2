@@ -12,6 +12,8 @@ from clients.models import Client
 from core.models import UserProfile
 from invoices.models import Invoice
 
+from decimal import Decimal
+
 User = get_user_model()
 
 
@@ -76,3 +78,74 @@ class AssetsTestCase(TestCase):
                 if os.path.exists(os.path.join(settings.STATIC_ROOT, file_path)):
                     found = True
             self.assertTrue(found, f"{file_path} is missing from static folders!")
+
+
+class InvoiceItemIntegrityTests(BaseBillingTest):
+    def test_invoice_total_matches_items(self):
+        """Invoice total_amount should match sum of item totals after linking items."""
+        from items.models import Item
+        from invoices.models import Invoice
+
+        invoice = self.create_test_invoice(status="DRAFT")
+        # Create and link items
+        item1 = Item.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            invoice=invoice,
+            description="Service A",
+            quantity=2,
+            unit_price=Decimal("100.00"),
+        )
+        item2 = Item.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            invoice=invoice,
+            description="Service B",
+            quantity=1,
+            unit_price=Decimal("250.00"),
+        )
+        # Recalculate totals
+        invoice.sync_totals()
+        invoice.save()
+        expected_total = item1.total + item2.total
+        self.assertEqual(invoice.total_amount, expected_total)
+
+    def test_no_item_duplication_on_relink(self):
+        """An item cannot be linked to multiple invoices (should only belong to one)."""
+        from items.models import Item
+        from invoices.models import Invoice
+
+        invoice1 = self.create_test_invoice(status="DRAFT")
+        invoice2 = self.create_test_invoice(status="DRAFT")
+        item = Item.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            invoice=invoice1,
+            description="Unique Service",
+            quantity=1,
+            unit_price=Decimal("100.00"),
+        )
+        # Try to link to another invoice
+        item.invoice = invoice2
+        item.save()
+        self.assertEqual(item.invoice, invoice2)
+        self.assertEqual(invoice1.billed_items.count(), 0)
+        self.assertEqual(invoice2.billed_items.count(), 1)
+
+    def test_no_zero_total_invoices_with_items(self):
+        """No invoice with items should have total_amount=0 after sync_totals."""
+        from items.models import Item
+        from invoices.models import Invoice
+
+        invoice = self.create_test_invoice(status="DRAFT")
+        item = Item.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            invoice=invoice,
+            description="Service",
+            quantity=1,
+            unit_price=Decimal("100.00"),
+        )
+        invoice.sync_totals()
+        invoice.save()
+        self.assertNotEqual(invoice.total_amount, 0)

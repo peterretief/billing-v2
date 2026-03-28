@@ -21,7 +21,7 @@ class ClientFormUniquenessTest(BaseBillingTest):
         data = {
             "name": "Test Client",
             "client_code": "TEST",
-            "email": "test@example.com",
+            "email": "client1@example.org",
             "phone": "555-1234",
             "payment_terms": 14,
             "default_hourly_rate": "100.00",
@@ -75,7 +75,7 @@ class ClientFormUniquenessTest(BaseBillingTest):
             data=self._get_form_data(
                 name=self.client_obj.name,
                 client_code="NEWCODE",  # Different code
-                email=self.client_obj.email or "test@example.com",
+                email=self.client_obj.email or "client1@example.org",
                 phone=self.client_obj.phone or "555-5555",
             ),
             instance=self.client_obj,

@@ -114,7 +114,7 @@ class EventCreateView(LoginRequiredMixin, CreateView):
             else:
                 messages.success(self.request, "✓ Event created successfully!")
         else:
-            messages.success(self.request, "✓ Todo created successfully!")
+            messages.success(self.request, "✓ Event created successfully!")
         
         return super().form_valid(form)
     

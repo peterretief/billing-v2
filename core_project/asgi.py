@@ -19,14 +19,15 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core_project.settings")
 django_asgi_app = get_asgi_application()
 
 # Import routing after Django setup
-from events import routing
+# from events import routing
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": AllowedHostsOriginValidator(
         AuthMiddlewareStack(
             URLRouter(
-                routing.websocket_urlpatterns
+                # routing.websocket_urlpatterns
+                []
             )
         )
     ),

@@ -45,14 +45,37 @@ def get_anomaly_status(user, invoice):
     if triggers.get("detect_math_error", True):
         audit_context["checks_run"].append("detect_math_error")
         from decimal import Decimal
-        line_items = invoice.billed_items.all()
-        if line_items.exists():
-            calculated_sum = sum(Decimal(str(item.total)) for item in line_items)
-            invoice_total = Decimal(str(invoice.total_amount))
-            if calculated_sum != invoice_total:
-                is_flagged = True
-                diff = invoice_total - calculated_sum
-                comments.append(f"❌ MATH ERROR: Line items sum to {calculated_sum} but total is {invoice_total} (diff: {diff})")
+        
+        calculated_sum = Decimal("0.00")
+        
+        # Add billed items
+        if hasattr(invoice, "billed_items") and invoice.billed_items.exists():
+            calculated_sum += sum(Decimal(str(item.total)) for item in invoice.billed_items.all())
+            
+        # Add billed timesheets
+        if hasattr(invoice, "billed_timesheets") and invoice.billed_timesheets.exists():
+            calculated_sum += sum(Decimal(str(ts.total_value)) for ts in invoice.billed_timesheets.all())
+            
+        # Add custom lines
+        if hasattr(invoice, "custom_lines"):
+            calculated_sum += sum(Decimal(str(line.total)) for line in invoice.custom_lines.all())
+            
+        # Calculate expected total with VAT
+        vat_rate = Decimal(str(getattr(profile, "vat_rate", 15.00) or 15.00))
+        is_registered = getattr(profile, "is_vat_registered", False)
+        
+        expected_total = calculated_sum
+        if is_registered:
+            expected_total += (calculated_sum * (vat_rate / Decimal("100.00")))
+            
+        # Compare with invoice total (round both to 2 decimal places)
+        expected_total = expected_total.quantize(Decimal("0.01"))
+        invoice_total = Decimal(str(invoice.total_amount)).quantize(Decimal("0.01"))
+        
+        if expected_total != invoice_total:
+            is_flagged = True
+            diff = invoice_total - expected_total
+            comments.append(f"❌ MATH ERROR: Line items sum to {expected_total} but total is {invoice_total} (diff: {diff})")
 
     # 2. STRUCTURAL: Zero or no items — always a problem
     if triggers.get("detect_no_items", True):

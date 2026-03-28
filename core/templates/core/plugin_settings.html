@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-puzzle me-2"></i>Plugin Management</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Customize your workspace by enabling or disabling optional modules. 
+                        Core features like Clients and Invoicing are always enabled.
+                    </p>
+                    <hr>
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle me-1"></i> Save Plugin Settings
+                            </button>
+                            <a href="{% url 'invoices:dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-4">
+                <h5><i class="bi bi-info-circle me-2"></i>How it works</h5>
+                <ul class="mb-0">
+                    <li><strong>Discovery:</strong> New apps are automatically detected if they are marked as plugins.</li>
+                    <li><strong>Dynamic Menus:</strong> When you enable a plugin, its menu items will appear in your sidebar.</li>
+                    <li><strong>Self-Contained:</strong> Each plugin maintains its own logic and database tables.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

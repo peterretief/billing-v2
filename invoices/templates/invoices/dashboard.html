@@ -25,19 +25,24 @@
         <div class="row g-4">
             <div class="col-lg-8">
                 <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <div class="card border-0 shadow-sm bg-info text-white p-3"
-                             data-bs-toggle="tooltip"
-                             data-bs-title="Recurring items queued for future billing cycles">
-                            <small class="text-uppercase opacity-75">Queued Items</small>
-                            <h3 class="fw-bold mb-0">
-                                {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ queued_items_value|floatformat:2|intcomma }}
-                            </h3>
-                            {% if queued_items_count %}
-                                <small class="d-block text-info-50 mt-2">{{ queued_items_count }} queued item{{ queued_items_count|pluralize }}</small>
-                            {% endif %}
-                        </div>
-                    </div>
+                    {% for plugin in ENABLED_PLUGINS %}
+                        {% if plugin.app_label == 'items' %}
+                            <div class="col-md-4">
+                                <div class="card border-0 shadow-sm bg-info text-white p-3"
+                                     data-bs-toggle="tooltip"
+                                     data-bs-title="Recurring items queued for future billing cycles">
+                                    <small class="text-uppercase opacity-75">Queued Items</small>
+                                    <h3 class="fw-bold mb-0">
+                                        {{ target_tenant.currency|default:GLOBAL_CURRENCY }}{{ queued_items_value|floatformat:2|intcomma }}
+                                    </h3>
+                                    {% if queued_items_count %}
+                                        <small class="d-block text-info-50 mt-2">{{ queued_items_count }} queued item{{ queued_items_count|pluralize }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                    
                     <div class="col-md-4">
                         <div class="card border-0 shadow-sm bg-primary text-white p-3"
                              data-bs-toggle="tooltip"
@@ -48,7 +53,15 @@
                             </h3>
                             {% if unbilled_ts_count or unbilled_items_count %}
                                 <small class="d-block text-primary-50 mt-2">
-                                    {{ unbilled_ts_count }} timesheet{{ unbilled_ts_count|pluralize }}, {{ unbilled_items_count }} item{{ unbilled_items_count|pluralize }}
+                                    {% for plugin in ENABLED_PLUGINS %}
+                                        {% if plugin.app_label == 'timesheets' %}
+                                            {{ unbilled_ts_count }} timesheet{{ unbilled_ts_count|pluralize }}
+                                        {% endif %}
+                                        {% if plugin.app_label == 'items' %}
+                                            {% if not forloop.first %}, {% endif %}
+                                            {{ unbilled_items_count }} item{{ unbilled_items_count|pluralize }}
+                                        {% endif %}
+                                    {% endfor %}
                                 </small>
                             {% endif %}
                         </div>
@@ -335,14 +348,26 @@
                                class="btn btn-white border text-start">
                                 <i class="bi bi-people me-2"></i> Client List
                             </a>
-                            <a href="{% url 'timesheets:timesheet_list' %}"
-                               class="btn btn-white border text-start">
-                                <i class="bi bi-clock-history me-2"></i> Timesheets
-                            </a>
-                            <a href="{% url 'items:item_list' %}"
-                               class="btn btn-white border text-start">
-                                <i class="bi bi-box-seam me-2"></i> Items
-                            </a>
+                            
+                            {% for plugin in ENABLED_PLUGINS %}
+                                {% if plugin.app_label == 'timesheets' %}
+                                    <a href="{% url 'timesheets:timesheet_list' %}"
+                                       class="btn btn-white border text-start">
+                                        <i class="bi bi-clock-history me-2"></i> Timesheets
+                                    </a>
+                                {% elif plugin.app_label == 'items' %}
+                                    <a href="{% url 'items:item_list' %}"
+                                       class="btn btn-white border text-start">
+                                        <i class="bi bi-box-seam me-2"></i> Items
+                                    </a>
+                                {% elif plugin.app_label == 'inventory' %}
+                                    <a href="{% url 'inventory:item_list' %}"
+                                       class="btn btn-white border text-start">
+                                        <i class="bi bi-archive me-2"></i> Inventory
+                                    </a>
+                                {% endif %}
+                            {% endfor %}
+
                             <a href="{% url 'core:recurring_invoices_report' %}"
                                class="btn btn-white border text-start">
                                 <i class="bi bi-arrow-repeat me-2 text-info"></i> Recurring Invoice Log

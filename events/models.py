@@ -94,7 +94,6 @@ class Event(TenantModel):
     
     class Status(models.TextChoices):
         BACKLOG = "backlog", "Backlog"
-        TODO = "todo", "To Do"
         IN_PROGRESS = "in_progress", "In Progress"
         COMPLETED = "completed", "Completed"
         CANCELLED = "cancelled", "Cancelled"
@@ -118,7 +117,7 @@ class Event(TenantModel):
     )
     description = models.TextField(blank=True, default="", help_text="Description (saved to category)")
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="events")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.BACKLOG)
     priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.MEDIUM)
     
     due_date = models.DateField(null=True, blank=True)
@@ -200,7 +199,6 @@ class Event(TenantModel):
         ordering = ["-created_at"]
         verbose_name = "Event"
         verbose_name_plural = "Events"
-        db_table = "todos_todo"  # Use existing table from original todos app
         indexes = [
             models.Index(fields=['user', 'google_calendar_event_id']),
             models.Index(fields=['user', 'sync_status']),
@@ -323,7 +321,7 @@ class Event(TenantModel):
         # Status validation
         if self.status != 'completed':
             issues.append(f"Event status is '{self.status}', not 'completed'")
-            if self.status in ['backlog', 'todo']:
+            if self.status in ['backlog']:
                 recommendations.append("Move event to 'In Progress' → 'Completed'")
             elif self.status == 'in_progress':
                 recommendations.append("Mark as Completed")
@@ -408,7 +406,6 @@ class GoogleCalendarCredential(TenantModel):
         verbose_name = "Google Calendar Credential"
         verbose_name_plural = "Google Calendar Credentials"
         unique_together = ('user',)
-        db_table = "todos_googlecalendarcredential"  # Use existing table from original todos app
     
     def __str__(self):
         return f"Google Calendar - {self.user.username}"

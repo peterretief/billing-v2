@@ -111,7 +111,7 @@ def get_oauth_flow():
     return flow
 
 
-def sync_event_to_calendar(user, todo: Event, service=None):
+def sync_event_to_calendar(user, event: Event, service=None):
     """
     Sync a single event to Google Calendar.
     Creates or updates a calendar event.
@@ -135,124 +135,124 @@ def sync_event_to_calendar(user, todo: Event, service=None):
     calendar_id = creds_obj.calendar_id or 'primary'
     
     # Build event data with marker so we can filter them in import view
-    todo_title = f"{todo.category.name if todo.category else 'Event'} - {todo.client.name}" if todo.client else f"{todo.category.name if todo.category else 'Event'}"
+    event_title = f"{event.category.name if event.category else 'Event'} - {event.client.name}" if event.client else f"{event.category.name if event.category else 'Event'}"
     
     # Build description with client details if available
     description_parts = []
-    if todo.description:
-        description_parts.append(todo.description)
+    if event.description:
+        description_parts.append(event.description)
     
     # Add client contact information to description
-    if todo.client:
-        client_info = f"\n\n--- CLIENT DETAILS ---\nName: {todo.client.name}"
-        if todo.client.contact_name:
-            client_info += f"\nContact: {todo.client.contact_name}"
-        if todo.client.phone:
-            client_info += f"\nPhone: {todo.client.phone}"
-        if todo.client.email:
-            client_info += f"\nEmail: {todo.client.email}"
+    if event.client:
+        client_info = f"\n\n--- CLIENT DETAILS ---\nName: {event.client.name}"
+        if event.client.contact_name:
+            client_info += f"\nContact: {event.client.contact_name}"
+        if event.client.phone:
+            client_info += f"\nPhone: {event.client.phone}"
+        if event.client.email:
+            client_info += f"\nEmail: {event.client.email}"
         description_parts.append(client_info)
     
-    event = {
-        'summary': f"[Synced] {todo_title}",
+    calendar_event = {
+        'summary': f"[Synced] {event_title}",
         'description': ''.join(description_parts),
-        'status': 'cancelled' if todo.status == 'cancelled' else 'confirmed',
+        'status': 'cancelled' if event.status == 'cancelled' else 'confirmed',
         'extendedProperties': {
             'private': {
-                'app_uuid': str(todo.calendar_uuid) if todo.calendar_uuid else str(todo.id),
+                'app_uuid': str(event.calendar_uuid) if event.calendar_uuid else str(event.id),
             }
         }
     }
     
     # Add client address as location (enables Google Maps integration)
-    if todo.client and todo.client.address:
-        event['location'] = todo.client.address
+    if event.client and event.client.address:
+        calendar_event['location'] = event.client.address
     
     # Add date/time if due_date is set
     # Create as TIMED events (not all-day) so they're draggable in Google Calendar
-    if todo.suggested_start_time:
+    if event.suggested_start_time:
         # Use the suggested start time from slot finder
-        start_datetime = todo.suggested_start_time
+        start_datetime = event.suggested_start_time
         # Calculate end time based on estimated_hours or default to 1 hour
-        duration_minutes = int((todo.estimated_hours or 1) * 60) if todo.estimated_hours else 60
+        duration_minutes = int((event.estimated_hours or 1) * 60) if event.estimated_hours else 60
         end_datetime = start_datetime + timedelta(minutes=duration_minutes)
         
-        event['start'] = {
+        calendar_event['start'] = {
             'dateTime': start_datetime.isoformat(),
             'timeZone': 'Africa/Johannesburg',
         }
-        event['end'] = {
+        calendar_event['end'] = {
             'dateTime': end_datetime.isoformat(),
             'timeZone': 'Africa/Johannesburg',
         }
-        logger.debug(f"Event {todo.id} using suggested time: {start_datetime} - {end_datetime}")
-    elif todo.due_date:
+        logger.debug(f"Event {event.id} using suggested time: {start_datetime} - {end_datetime}")
+    elif event.due_date:
         # Set to 9:00 AM on the due date (user can drag to adjust time)
-        start_datetime = datetime.combine(todo.due_date, datetime.min.time().replace(hour=9))
+        start_datetime = datetime.combine(event.due_date, datetime.min.time().replace(hour=9))
         end_datetime = start_datetime.replace(hour=10)  # 1-hour default duration
         
-        event['start'] = {
+        calendar_event['start'] = {
             'dateTime': start_datetime.isoformat(),
             'timeZone': 'Africa/Johannesburg',  # Default timezone, user can adjust
         }
-        event['end'] = {
+        calendar_event['end'] = {
             'dateTime': end_datetime.isoformat(),
             'timeZone': 'Africa/Johannesburg',
         }
-        logger.debug(f"Event {todo.id} has due date: {todo.due_date}, creating timed event at 9:00 AM")
+        logger.debug(f"Event {event.id} has due date: {event.due_date}, creating timed event at 9:00 AM")
     else:
         # If no due date, use today at 2:00 PM
         today = django_timezone.now().date()
         start_datetime = datetime.combine(today, datetime.min.time().replace(hour=14))
         end_datetime = start_datetime.replace(hour=15)
         
-        event['start'] = {
+        calendar_event['start'] = {
             'dateTime': start_datetime.isoformat(),
             'timeZone': 'Africa/Johannesburg',
         }
-        event['end'] = {
+        calendar_event['end'] = {
             'dateTime': end_datetime.isoformat(),
             'timeZone': 'Africa/Johannesburg',
         }
-        logger.debug(f"Event {todo.id} has no due date, using today at 2:00 PM: {today}")
+        logger.debug(f"Event {event.id} has no due date, using today at 2:00 PM: {today}")
     
     # Check if event already exists in calendar
     # For now, create a new event (can enhance with sync tracking)
     try:
-        if todo.google_calendar_event_id:
+        if event.google_calendar_event_id:
             # Event already synced - update it instead of creating duplicate
             updated_event = service.events().update(
                 calendarId=calendar_id,
-                eventId=todo.google_calendar_event_id,
-                body=event
+                eventId=event.google_calendar_event_id,
+                body=calendar_event
             ).execute()
             event_id = updated_event.get('id')
             # Also update the calendar times and etag in database
-            todo.calendar_start_time = _extract_datetime_from_calendar(updated_event)
-            todo.calendar_end_time = _extract_end_datetime_from_calendar(updated_event)
-            todo.google_calendar_etag = updated_event.get('etag')
-            todo.save(update_fields=['calendar_start_time', 'calendar_end_time', 'google_calendar_etag'])
-            logger.info(f"Updated calendar event {event_id} for todo {todo.id}")
+            event.calendar_start_time = _extract_datetime_from_calendar(updated_event)
+            event.calendar_end_time = _extract_end_datetime_from_calendar(updated_event)
+            event.google_calendar_etag = updated_event.get('etag')
+            event.save(update_fields=['calendar_start_time', 'calendar_end_time', 'google_calendar_etag'])
+            logger.info(f"Updated calendar event {event_id} for event {event.id}")
         else:
             # New event - create and store the event ID
             created_event = service.events().insert(
                 calendarId=calendar_id,
-                body=event
+                body=calendar_event
             ).execute()
             event_id = created_event.get('id')
             
             # Store the event ID, extracted times, and etag to prevent duplicates on future syncs
-            todo.google_calendar_event_id = event_id
-            todo.calendar_start_time = _extract_datetime_from_calendar(created_event)
-            todo.calendar_end_time = _extract_end_datetime_from_calendar(created_event)
-            todo.google_calendar_etag = created_event.get('etag')
-            todo.save(update_fields=['google_calendar_event_id', 'calendar_start_time', 'calendar_end_time', 'google_calendar_etag'])
+            event.google_calendar_event_id = event_id
+            event.calendar_start_time = _extract_datetime_from_calendar(created_event)
+            event.calendar_end_time = _extract_end_datetime_from_calendar(created_event)
+            event.google_calendar_etag = created_event.get('etag')
+            event.save(update_fields=['google_calendar_event_id', 'calendar_start_time', 'calendar_end_time', 'google_calendar_etag'])
             
-            logger.info(f"Created calendar event {event_id} for todo {todo.id}")
+            logger.info(f"Created calendar event {event_id} for event {event.id}")
         
         return event_id
     except Exception as e:
-        logger.exception(f"Error syncing todo {todo.id} to calendar: {str(e)}")
+        logger.exception(f"Error syncing event {event.id} to calendar: {str(e)}")
         return None
 
 
@@ -272,26 +272,26 @@ def sync_all_events_to_calendar(user):
         logger.error(f"Could not get Google Calendar service for {user.username}")
         return 0
     
-    # Only sync todos with due_date set (exclude backlog/undated items)
-    todos = Event.objects.filter(user=user).exclude(status='cancelled').filter(due_date__isnull=False)
-    logger.info(f"Found {todos.count()} todos with due dates to sync for {user.username}")
+    # Only sync events with due_date set (exclude backlog/undated items)
+    events = Event.objects.filter(user=user).exclude(status='cancelled').filter(due_date__isnull=False)
+    logger.info(f"Found {events.count()} events with due dates to sync for {user.username}")
     
     synced_count = 0
     
-    for todo in todos:
+    for event in events:
         try:
-            if sync_event_to_calendar(user, todo, service):
+            if sync_event_to_calendar(user, event, service):
                 synced_count += 1
                 # Mark as synced
-                todo.synced_to_calendar = True
-                todo.save(update_fields=['synced_to_calendar'])
-                logger.info(f"Synced todo {todo.id}: {todo.description}")
+                event.synced_to_calendar = True
+                event.save(update_fields=['synced_to_calendar'])
+                logger.info(f"Synced event {event.id}: {event.description}")
             else:
-                logger.warning(f"Failed to sync todo {todo.id}: {todo.description}")
+                logger.warning(f"Failed to sync event {event.id}: {event.description}")
         except Exception as e:
-            logger.exception(f"Error syncing todo {todo.id}: {str(e)}")
+            logger.exception(f"Error syncing event {event.id}: {str(e)}")
     
-    logger.info(f"Sync complete. Synced {synced_count} todos for {user.username}")
+    logger.info(f"Sync complete. Synced {synced_count} events for {user.username}")
     return synced_count
 
 

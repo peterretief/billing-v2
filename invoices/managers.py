@@ -3,12 +3,15 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import models
-from django.db.models import DecimalField, OuterRef, Subquery, Sum
+from django.db.models import DecimalField, F, OuterRef, Subquery, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 
-class InvoiceQuerySet(models.QuerySet):
+from core.managers import TenantQuerySet, TenantManager
+
+
+class InvoiceQuerySet(TenantQuerySet):
     """
     Base QuerySet for Invoice model providing common filtering and calculation patterns.
     
@@ -33,11 +36,11 @@ class InvoiceQuerySet(models.QuerySet):
         """
         from .models import Payment
 
-        # Subquery to sum payments for each invoice
+        # Subquery to sum both cash and credits for each invoice
         pay_sub = (
             Payment.objects.filter(invoice=OuterRef("pk"))
             .values("invoice")
-            .annotate(total=Sum("amount"))
+            .annotate(total=Sum(F("amount") + F("credit_applied")))
             .values("total")
         )
 
@@ -69,27 +72,34 @@ class InvoiceQuerySet(models.QuerySet):
         Key Calculation: Uses with_totals() to get annotated_paid, then aggregates
         both total_amount (billed) and annotated_paid (collected payments).
         
-        Exclusions: Excludes all Quotes (is_quote=False filter) and DRAFT invoices
+        Exclusions:
+            - Quotes (is_quote=True): Never included in financial totals.
+            - DRAFT invoices: Not sent, not part of any totals.
+            - CANCELLED invoices: Excluded from totals, as they are void and should not affect revenue or outstanding calculations.
+        
+        Rationale:
+            - CANCELLED invoices are excluded to prevent inflating revenue and to match business rules and reporting expectations.
+            - If payments exist on CANCELLED invoices, a credit note should be generated (handled elsewhere).
         
         Returns: Dict with keys:
             - 'billed': Sum of total_amount (Decimal)
             - 'paid': Sum of annotated_paid (Decimal)
-            
+        
         Used By:
             - Dashboard Cards showing total billed and paid
             - InvoiceManager.get_user_stats() for user statistics
             - Client payment tracking
-            
+        
         Note: This is what the Dashboard Cards use for overall metrics
         """
-        # This is what the Dashboard Cards use (exclude quotes and DRAFT)
-        return self.exclude(is_quote=True).exclude(status="DRAFT").with_totals().aggregate(
+        # Exclude quotes, DRAFT, and CANCELLED invoices from totals for correct financial reporting
+        return self.exclude(is_quote=True).exclude(status__in=["DRAFT", "CANCELLED"]).with_totals().aggregate(
             billed=Coalesce(Sum("total_amount"), Decimal("0.00")),
             paid=Coalesce(Sum("annotated_paid"), Decimal("0.00")),
         )
 
 
-class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
+class InvoiceManager(TenantManager.from_queryset(InvoiceQuerySet)):
     """
     Manager for Invoice model consolidating all invoice-related business logic and calculations.
     
@@ -146,14 +156,12 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         subtotal = Decimal("0.00")
 
         # A. Primary Source: Billed Items
-        has_items = False
         if hasattr(invoice, "billed_items") and invoice.billed_items.exists():
             items = invoice.billed_items.all()
             subtotal += sum((item.quantity * item.unit_price for item in items), Decimal("0.00"))
-            has_items = True
 
         # B. Fallback Source: Timesheets
-        if not has_items and hasattr(invoice, "billed_timesheets"):
+        if hasattr(invoice, "billed_timesheets") and invoice.billed_timesheets.exists():
             timesheets = invoice.billed_timesheets.all()
             subtotal += sum((ts.hours * ts.hourly_rate for ts in timesheets), Decimal("0.00"))
 
@@ -176,15 +184,19 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         # to avoid stale in-memory values
         from django.db.models import Sum
 
-        total_paid = invoice.payments.aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
+        totals = invoice.payments.aggregate(
+            cash=Coalesce(Sum("amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_applied"), Decimal("0.00"))
+        )
+        total_paid = totals["cash"] + totals["credits"]
 
         balance = invoice.total_amount - total_paid
 
         # Only auto-change to PAID if:
-        # 1. Invoice is PENDING
+        # 1. Invoice is PENDING or OVERDUE
         # 2. Invoice has a non-zero total (not just created empty)
         # 3. Balance is fully paid (balance <= 0)
-        if invoice.status == "PENDING" and invoice.total_amount > 0 and balance <= 0:
+        if invoice.status in ["PENDING", "OVERDUE"] and invoice.total_amount > 0 and balance <= 0:
             invoice.status = "PAID"
 
         invoice.save(update_fields=["subtotal_amount", "tax_amount", "total_amount", "status"])
@@ -240,25 +252,24 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
     def get_dashboard_stats(self, user):
         """
         Gathers comprehensive invoice statistics for dashboard display.
-        
-        Summary Data: Returns dict with 4 key metrics:
-        
-        Returns:
-            {
-                'total_billed': Decimal - Sum of ALL invoice totals (includes DRAFT, PENDING, PAID, etc)
-                'total_paid': Decimal - Sum of all payments received
-                'total_outstanding': Decimal - total_billed minus total_paid  
-                'invoice_count': int - Total number of invoices (excluding quotes)
-            }
-        
-        Scope: ALL invoices (not filtered like get_total_outstanding which excludes DRAFT/PAID)
-        because dashboard wants to show TOTAL revenue, not just "at risk" amounts.
-        
-        Used By:
-            - Dashboard main stats cards
-            - Financial overview pages
-            - Revenue reporting
+        Returns a dict with:
+            - total_billed: Sum of all invoice totals (excludes DRAFT, CANCELLED, and quotes)
+            - total_paid: Sum of all payments received (excludes DRAFT, CANCELLED, and quotes)
+            - total_outstanding: total_billed minus total_paid
+            - invoice_count: Total number of invoices (excludes DRAFT, CANCELLED, and quotes)
         """
+        qs = self.filter(user=user, is_quote=False).exclude(status__in=["DRAFT", "CANCELLED"])
+        totals = qs.with_totals().aggregate(
+            billed=Coalesce(Sum("total_amount"), Decimal("0.00")),
+            paid=Coalesce(Sum("annotated_paid"), Decimal("0.00")),
+        )
+        invoice_count = qs.count()
+        return {
+            "total_billed": totals["billed"],
+            "total_paid": totals["paid"],
+            "total_outstanding": totals["billed"] - totals["paid"],
+            "invoice_count": invoice_count,
+        }
 
     def get_tax_summary(self, user):
         """
@@ -753,7 +764,7 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
         return total
 
 
-class PaymentManager(models.Manager):
+class PaymentManager(TenantManager):
     """
     Manager for Payment model - consolidates all payment-related calculations.
     
@@ -767,7 +778,7 @@ class PaymentManager(models.Manager):
         """
         Calculates total amount paid TOWARD a specific invoice.
         
-        Scope: Sums all Payment.amount records linked to this invoice
+        Scope: Sums all Payment records (cash + credits) linked to this invoice
         
         Parameters:
             invoice (Invoice): The invoice to calculate for
@@ -779,16 +790,17 @@ class PaymentManager(models.Manager):
             - Invoice detail pages to show payment history
             - Outstanding calculation (total_amount - paid = balance)
         """
-        total = self.filter(invoice=invoice).aggregate(
-            total=Coalesce(Sum("amount"), Decimal("0.00"))
-        )["total"]
-        return total
+        res = self.filter(invoice=invoice).aggregate(
+            cash=Coalesce(Sum("amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_applied"), Decimal("0.00"))
+        )
+        return res["cash"] + res["credits"]
     
     def get_client_total_paid(self, client):
         """
         Calculates total amount paid BY a specific client across all their invoices.
         
-        Scope: Sums all payments from all invoices for this client
+        Scope: Sums all payments (cash + credits) from all invoices for this client
         
         Parameters:
             client (Client): The client to calculate for
@@ -800,16 +812,17 @@ class PaymentManager(models.Manager):
             - clients/summary.py for ClientSummary object
             - Client relationship analytics
         """
-        total = self.filter(invoice__client=client).aggregate(
-            total=Coalesce(Sum("amount"), Decimal("0.00"))
-        )["total"]
-        return total
+        res = self.filter(invoice__client=client).aggregate(
+            cash=Coalesce(Sum("amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_applied"), Decimal("0.00"))
+        )
+        return res["cash"] + res["credits"]
     
     def get_user_total_received(self, user):
         """
         Calculates total revenue collected by a user from all invoices.
         
-        Scope: Sums all payments from all invoices across all clients for this user
+        Scope: Sums all payments (cash + credits) from all invoices across all clients for this user
         
         Parameters:
             user (User): The user to calculate for
@@ -821,10 +834,11 @@ class PaymentManager(models.Manager):
             - Financial summary and KPI tracking
             - Income statement line items
         """
-        total = self.filter(invoice__user=user).aggregate(
-            total=Coalesce(Sum("amount"), Decimal("0.00"))
-        )["total"]
-        return total
+        res = self.filter(invoice__user=user).aggregate(
+            cash=Coalesce(Sum("amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_applied"), Decimal("0.00"))
+        )
+        return res["cash"] + res["credits"]
     
     def get_user_total_credit_applied(self, user):
         """Get total credit applied across all payments for a user."""
@@ -834,32 +848,41 @@ class PaymentManager(models.Manager):
         return total
 
     def get_client_payments_before_date(self, client, before_date):
-        """Get total payments for a client before a date."""
-        total = self.filter(
+        """Get total payments (cash + credits) for a client before a date."""
+        res = self.filter(
             invoice__client=client,
             date_paid__lt=before_date
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-        return total
+        ).aggregate(
+            cash=Coalesce(Sum("amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_applied"), Decimal("0.00"))
+        )
+        return res["cash"] + res["credits"]
 
     def get_client_payments_after_date(self, client, after_date):
-        """Get total payments for a client on or after a date."""
-        total = self.filter(
+        """Get total payments (cash + credits) for a client on or after a date."""
+        res = self.filter(
             invoice__client=client,
             date_paid__gte=after_date
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-        return total
+        ).aggregate(
+            cash=Coalesce(Sum("amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_applied"), Decimal("0.00"))
+        )
+        return res["cash"] + res["credits"]
 
     def get_client_payments_in_range(self, client, start_date, end_date):
-        """Get total payments for a client in a date range."""
-        total = self.filter(
+        """Get total payments (cash + credits) for a client in a date range."""
+        res = self.filter(
             invoice__client=client,
             date_paid__gte=start_date,
             date_paid__lt=end_date
-        ).aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"]
-        return total
+        ).aggregate(
+            cash=Coalesce(Sum("amount"), Decimal("0.00")),
+            credits=Coalesce(Sum("credit_applied"), Decimal("0.00"))
+        )
+        return res["cash"] + res["credits"]
 
 
-class CreditNoteManager(models.Manager):
+class CreditNoteManager(TenantManager):
     """Manager for CreditNote model - consolidates all credit note calculations."""
     
     def get_client_credit_balance(self, client):

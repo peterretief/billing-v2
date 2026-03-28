@@ -9,5 +9,6 @@
         "editor.formatOnSave": false,
         "editor.defaultFormatter": "none"
     },
-    "prettier.ignoreUnknown": true
+    "prettier.ignoreUnknown": true,
+    "geminicodeassist.outlines.automaticOutlineGeneration": true
 }

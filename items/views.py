@@ -38,16 +38,45 @@ class ItemListView(LoginRequiredMixin, ListView):
         ).order_by("-date")
 
     def get_context_data(self, **kwargs):
+        # 1. Start with the original data (one_off_items, queued_items, etc.)
         ctx = super().get_context_data(**kwargs)
-
-        # Pass 'today' allows the template to compare months for the green tick
+        
+        # 2. Add your existing core view data
         ctx["today"] = timezone.now()
+        ctx["queued_items"] = Item.objects.filter(
+            user=self.request.user, 
+            is_recurring=True
+        ).order_by("-date", "-id")
 
-        # BOTTOM TABLE: Persistent cycle items (Templates)
-        ctx["queued_items"] = Item.objects.filter(user=self.request.user, is_recurring=True).order_by("-date", "-id")
+        # 3. Safely handle the Plugin/Integration check
+        from integrations.models import IntegrationSettings
+        settings = IntegrationSettings.objects.filter(user=self.request.user).first()
+        
+        # Default to False so the template doesn't crash if settings are missing
+        ctx["inventory_enabled"] = False 
+
+        if settings and settings.inventory_enabled:
+            from inventory.models import InventoryItem
+            from clients.models import Client
+            
+            # Fetch the inventory-specific data
+            ctx["inventory_items"] = InventoryItem.objects.filter(
+                user=self.request.user, 
+                current_stock__gt=0
+            )
+            ctx["active_clients"] = Client.objects.filter(
+                user=self.request.user
+            ).order_by('name')
+            
+            # This is what your {% if %} tag is looking for!
+            ctx["inventory_enabled"] = True
+            
+            print("--- SUCCESS: Inventory Data Loaded into Context ---")
+        else:
+            # This helps you debug in the terminal why the button is missing
+            print(f"--- NOTICE: Inventory disabled or Settings missing for {self.request.user} ---")
 
         return ctx
-
 
 # items/views.py
 
@@ -254,3 +283,54 @@ def trigger_billing(request):
     # Standard Redirect Fallback
     messages.add_message(request, getattr(messages, msg_class.upper()), msg)
     return redirect("invoices:dashboard")
+
+@login_required
+def create_item_from_inventory(request):
+    from django.shortcuts import get_object_or_404
+    from decimal import Decimal, InvalidOperation
+    from clients.models import Client
+    from inventory.models import InventoryItem
+    from integrations.models import ItemInventoryLink
+    
+    if request.method != "POST":
+        return redirect("items:item_list")
+        
+    client_id = request.POST.get('client_id')
+    inventory_item_id = request.POST.get('inventory_item_id')
+    try:
+        quantity = Decimal(request.POST.get('quantity', '1.0'))
+    except InvalidOperation:
+        messages.error(request, "Invalid quantity.")
+        return redirect('items:item_list')
+        
+    if not client_id or not inventory_item_id:
+        messages.error(request, "Client and Inventory Item are required.")
+        return redirect('items:item_list')
+        
+    client = get_object_or_404(Client, pk=client_id, user=request.user)
+    inv_item = get_object_or_404(InventoryItem, pk=inventory_item_id, user=request.user)
+    
+# Check if sell_price is actually set
+    if inv_item.sell_price is None:
+        messages.error(request, f"Cannot add '{inv_item.name}': It has no Sell Price defined in Inventory.")
+        return redirect('items:item_list')
+
+    billing_item = Item.objects.create(
+        user=request.user,
+        client=client,
+        description=f"{inv_item.name} ({inv_item.sku})",
+        quantity=quantity,
+        unit_price=inv_item.sell_price,
+        is_billed=False
+    )
+    
+    ItemInventoryLink.objects.create(
+        user=request.user,
+        item=billing_item,
+        inventory_item=inv_item,
+        quantity_multiplier=1.0,
+        auto_decrement=True
+    )
+    
+    messages.success(request, f"Created unbilled item {quantity} x {inv_item.name} for {client.name}.")
+    return redirect('items:item_list')

@@ -11,15 +11,6 @@ from core.models import TenantModel
 from .managers import TimesheetManager  # Import your new file
 
 
-# Global default categories editable by staff
-class DefaultWorkCategory(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    metadata_schema = models.JSONField(default=list, blank=True, help_text="List of extra field names")
-
-    def __str__(self):
-        return self.name
-
-
 def get_unbilled_total(self):
     from timesheets.models import TimesheetEntry
 
@@ -29,6 +20,15 @@ def get_unbilled_total(self):
         )["total"]
         or 0
     )
+
+
+# Global default categories editable by staff
+class DefaultWorkCategory(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+    metadata_schema = models.JSONField(default=list, blank=True, help_text="List of extra field names")
+
+    def __str__(self):
+        return self.name
 
 
 class WorkCategory(TenantModel):
@@ -45,7 +45,7 @@ class WorkCategory(TenantModel):
 class TimesheetEntry(TenantModel):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="timesheets")
     category = models.ForeignKey(WorkCategory, on_delete=models.SET_NULL, null=True, blank=True)
-    todo = models.ForeignKey("events.Event", on_delete=models.SET_NULL, null=True, blank=True, related_name="timesheet_entries")
+    #event = models.ForeignKey("events.Event", on_delete=models.SET_NULL, null=True, blank=True, related_name="timesheet_entries")
     date = models.DateField(default=timezone.now)
     hours = models.DecimalField(max_digits=6, decimal_places=2)
     hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
@@ -61,17 +61,17 @@ class TimesheetEntry(TenantModel):
     metadata = models.JSONField(default=dict, blank=True)
     
     # Track which Google Calendar event this was imported from (for deduplication)
-    google_calendar_event_id = models.CharField(
-        max_length=255, 
-        blank=True, 
-        null=True, 
-        db_index=True,
-        help_text="Google Calendar event ID if imported from calendar"
-    )
+    #google_calendar_event_id = models.CharField(
+    #    max_length=255, 
+    #    blank=True, 
+    #    null=True, 
+    #    db_index=True,
+    #    help_text="Google Calendar event ID if imported from calendar"
+    #)
 
-    class Meta:
-        # Prevent duplicate imports: (user, google_calendar_event_id) must be unique when event_id is provided
-        unique_together = [['user', 'google_calendar_event_id']]
+    #class Meta:
+    #    # Prevent duplicate imports: (user, google_calendar_event_id) must be unique when event_id is provided
+    #    unique_together = [['user', 'google_calendar_event_id']]
 
     @property
     def formatted_metadata(self):
@@ -138,17 +138,18 @@ class TimesheetEntry(TenantModel):
         from django.core.exceptions import ValidationError
         
         # Only validate if linked to an event
-        if not self.todo:
-            return
+        #if not self.event:
+        #    return
         
-        event = self.todo
+        #event = self.event
         
         # Check completion gate
-        result = event.validate_timesheet_readiness()
-        if not result['is_ready']:
-            error_msg = "Cannot create timesheet"
-            if result['issues']:
-                error_msg += ":\n• " + "\n• ".join(result['issues'])
-            if result['recommendations']:
-                error_msg += "\n\nFix:\n• " + "\n• ".join(result['recommendations'])
-            raise ValidationError(error_msg)
+        #result = event.validate_timesheet_readiness()
+        #if not result['is_ready']:
+        #    error_msg = "Cannot create timesheet"
+        #    if result['issues']:
+        #        error_msg += ":\n• " + "\n• ".join(result['issues'])
+        #    if result['recommendations']:
+        #        error_msg += "\n\nFix:\n• " + "\n• ".join(result['recommendations'])
+        #    raise ValidationError(error_msg)
+

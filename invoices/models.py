@@ -12,6 +12,8 @@ from core.models import TenantModel
 
 from .managers import CreditNoteManager, InvoiceManager, PaymentManager
 
+from django.core.exceptions import PermissionDenied
+
 # invoices/models.py
 
 
@@ -333,23 +335,6 @@ class Payment(TenantModel):
 
     objects = PaymentManager()
 
-    #    def clean(self):
-    #        super().clean()
-    #        if self.invoice.status == 'DRAFT':
-    #            raise ValidationError(
-    #                "Cannot add a payment to a 'Draft' invoice. "
-    #                "Please mark the invoice as 'Sent' or 'Pending' first."
-    #        )
-
-    # def clean(self):
-    #     super().clean()
-    #     if self.invoice.status == 'DRAFT':
-    #         raise ValidationError(
-    #             "Cannot add a payment to a 'Draft' invoice. "
-    #             "Please mark the invoice as 'Sent' or 'Pending' first.",
-    #             line_errors=[]  # Satisfies the required argument
-    #    )
-
     def clean(self):
         super().clean()
         if self.invoice.status == "DRAFT":
@@ -401,6 +386,9 @@ class Payment(TenantModel):
     # invoices/models.py (Payment)
 
     def save(self, *args, **kwargs):
+        if self.invoice.user != self.user:
+            raise PermissionDenied("You cannot apply a payment to an invoice you do not own.")
+
         # 1. Run the validation (clean)
         self.full_clean()
 

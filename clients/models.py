@@ -7,9 +7,10 @@ from django.db.models import DecimalField, Q, Sum
 from django.db.models.functions import Coalesce
 
 from core.models import TenantModel
+from core.managers import TenantQuerySet, TenantManager
 
 
-class ClientQuerySet(models.QuerySet):
+class ClientQuerySet(TenantQuerySet):
     def with_balances(self):
         """This makes .with_balances() available on the QuerySet"""
         return self.annotate(
@@ -19,6 +20,10 @@ class ClientQuerySet(models.QuerySet):
                 output_field=DecimalField(),
             )
         )
+
+
+class ClientManager(TenantManager.from_queryset(ClientQuerySet)):
+    pass
 
 
 class Client(TenantModel):
@@ -32,7 +37,7 @@ class Client(TenantModel):
     default_hourly_rate = models.DecimalField(
         max_digits=10, decimal_places=2, default=0.00, help_text="Standard rate used for new timesheet entries."
     )
-    objects = ClientQuerySet.as_manager()
+    objects = ClientManager()
     name = models.CharField(max_length=255)
     client_uuid = models.UUIDField(default=uuid.uuid4, editable=False, help_text="Unique identifier for syncing with Google Contacts")
     contact_name = models.CharField(max_length=255, blank=True, verbose_name="Contact Name")

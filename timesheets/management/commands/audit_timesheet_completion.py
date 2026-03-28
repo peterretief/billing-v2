@@ -43,12 +43,12 @@ class Command(BaseCommand):
         now = timezone.now()
         
         # Find all timesheets linked to events
-        all_linked = TimesheetEntry.objects.filter(todo__isnull=False).select_related('todo')
+        all_linked = TimesheetEntry.objects.filter(event__isnull=False).select_related('todo')
         
         # Find problematic ones (linked to future calendar events)
         problematic = []
         for entry in all_linked:
-            event = entry.todo
+            event = entry.event
             
             # Skip if no calendar event
             if not event.calendar_end_time:

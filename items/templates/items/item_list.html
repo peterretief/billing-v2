@@ -8,10 +8,17 @@
                     Optional one-off items. Select and collate into invoices manually, or delete if no longer needed.
                 </p>
             </div>
-            <a href="{% url 'items:item_create' %}"
-               class="btn btn-primary btn-lg fw-bold shadow-sm">
-                <i class="bi bi-plus-lg me-2"></i> Add New Item
-            </a>
+            <div>
+                {% if inventory_enabled %}
+                <button type="button" class="btn btn-outline-secondary btn-lg fw-bold shadow-sm me-2" data-bs-toggle="modal" data-bs-target="#inventoryModal">
+                    <i class="bi bi-box-seam me-1"></i> Add from Inventory
+                </button>
+                {% endif %}
+                <a href="{% url 'items:item_create' %}"
+                   class="btn btn-primary btn-lg fw-bold shadow-sm">
+                    <i class="bi bi-plus-lg me-2"></i> Add New Item
+                </a>
+            </div>
         </div>
         <form action="{% url 'items:generate_invoice_from_items' %}" method="post">
             {% csrf_token %}
@@ -161,6 +168,10 @@
                                            class="btn btn-outline-danger px-3">
                                             <i class="bi bi-trash"></i>
                                         </a>
+                                        <a href="{% url 'items:item_invoice_email_log' item.id %}"
+                                           class="btn btn-outline-info px-3">
+                                            <i class="bi bi-envelope-paper me-1"></i> Invoice Log
+                                        </a>
                                     </div>
                                 </td>
                             </tr>
@@ -216,4 +227,59 @@
             checkboxes.forEach(cb => cb.addEventListener('change', updateSelection));
         });
     </script>
+    </script>
+    
+    {% if inventory_enabled %}
+    <div class="modal fade" id="inventoryModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Create Unbilled Item from Inventory</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{% url 'items:create_from_inventory' %}">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        {% if inventory_items %}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Client</label>
+                            <select name="client_id" class="form-select" required>
+                                <option value="">-- Choose Client --</option>
+                                {% for client in active_clients %}
+                                <option value="{{ client.id }}">{{ client.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Select Inventory Stock</label>
+                            <select name="inventory_item_id" class="form-select" required>
+                                <option value="">-- Choose Item --</option>
+                                {% for item in inventory_items %}
+                                <option value="{{ item.id }}">{{ item.name }} ({{ item.sku }}) - {{ item.current_stock }} {{ item.unit_of_measure }} @ {{ GLOBAL_CURRENCY }}{{ item.default_price }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Quantity (Units)</label>
+                            <input type="number" name="quantity" class="form-control" value="1" step="0.01" min="0.01" required>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning border-0 shadow-sm">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>No currently available inventory.</strong> Please add some active stock levels before trying to invoice from inventory.
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        {% if inventory_items %}
+                        <button type="submit" class="btn btn-primary fw-bold">Add to Queue</button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 {% endblock %}

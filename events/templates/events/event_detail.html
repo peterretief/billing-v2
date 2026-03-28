@@ -311,7 +311,7 @@
                                     <span class="badge bg-warning">Not Invoiced</span> This timesheet has not been invoiced yet.
                                 </p>
                                 <p class="text-muted mb-0">
-                                    <i class="bi bi-info-circle me-1"></i> If you <strong>cancel</strong> this todo, the linked timesheet will be <strong>deleted</strong>.
+                                    <i class="bi bi-info-circle me-1"></i> If you <strong>cancel</strong> this event, the linked timesheet will be <strong>deleted</strong>.
                                 </p>
                             {% endif %}
                         </div>
@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded',function(){
       console.log('[LOG TIME] Modal opening...');
       var cf=document.getElementById('id_client');
       var catf=document.getElementById('id_category');
-      var tf=document.getElementById('id_todo');
+      var tf=document.getElementById('id_event');
       
       // Set event ID
       if(tf){tf.value='{{ event.pk }}';}

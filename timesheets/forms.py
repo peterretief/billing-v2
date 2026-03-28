@@ -1,5 +1,6 @@
 # timesheets/forms.py
 from django import forms
+from django.urls import reverse_lazy
 
 from .models import TimesheetEntry, WorkCategory
 
@@ -7,14 +8,20 @@ from .models import TimesheetEntry, WorkCategory
 class TimesheetEntryForm(forms.ModelForm):
     class Meta:
         model = TimesheetEntry
-        fields = ["client", "date", "hours", "hourly_rate", "category", "todo"]
+        fields = ["client", "date", "hours", "hourly_rate", "category"]
+                  #, #"event"]
         widgets = {
             "date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "hours": forms.NumberInput(attrs={"class": "form-control", "step": "0.25"}),
             "hourly_rate": forms.NumberInput(attrs={"class": "form-control"}),
             "client": forms.Select(attrs={"class": "form-select"}),
-            "category": forms.Select(attrs={"class": "form-select"}),
-            "todo": forms.HiddenInput(),
+            "category": forms.Select(attrs={
+                "class": "form-select",
+                "hx-get": reverse_lazy("timesheets:get_category_fields"),
+                "hx-target": "#dynamicFields",
+                "hx-trigger": "change"
+            }),
+#            "event": forms.HiddenInput(),
         }
         help_texts = {
             'category': '',  # Remove default help text
@@ -44,26 +51,26 @@ class TimesheetEntryForm(forms.ModelForm):
         
         # Validate calendar completion gate if event is linked
         # Rule: Event can only be linked to timesheet if it has completed on the calendar
-        event = cleaned_data.get('todo')
-        import sys
-        print(f"[FORM VALIDATION] Event in form: {event}", file=sys.stderr)
-        print(f"[FORM VALIDATION] Cleaned data keys: {cleaned_data.keys()}", file=sys.stderr)
+       # event = cleaned_data.get('event')
+       # import sys
+       # print(f"[FORM VALIDATION] Event in form: {event}", file=sys.stderr)
+       # print(f"[FORM VALIDATION] Cleaned data keys: {cleaned_data.keys()}", file=sys.stderr)
         
-        if event:
-            print(f"[FORM VALIDATION] Validating event: {event.id} - {event.description}", file=sys.stderr)
-            result = event.validate_timesheet_readiness()
-            print(f"[FORM VALIDATION] Result: {result}", file=sys.stderr)
+       # if event:
+       #     print(f"[FORM VALIDATION] Validating event: {event.id} - {event.description}", file=sys.stderr)
+       #     result = event.validate_timesheet_readiness()
+       #     print(f"[FORM VALIDATION] Result: {result}", file=sys.stderr)
             
-            if not result['is_ready']:
-                error_msg = "Cannot create timesheet"
-                if result['issues']:
-                    error_msg += ":\n• " + "\n• ".join(result['issues'])
-                if result['recommendations']:
-                    error_msg += "\n\nHow to fix:\n• " + "\n• ".join(result['recommendations'])
-                print(f"[FORM VALIDATION] BLOCKING: {error_msg}", file=sys.stderr)
-                raise forms.ValidationError(error_msg)
-        else:
-            print("[FORM VALIDATION] No event linked (todo is None)", file=sys.stderr)
+       #     if not result['is_ready']:
+       #        error_msg = "Cannot create timesheet"
+       #         if result['issues']:
+       #             error_msg += ":\n• " + "\n• ".join(result['issues'])
+       #         if result['recommendations']:
+       #             error_msg += "\n\nHow to fix:\n• " + "\n• ".join(result['recommendations'])
+       #         print(f"[FORM VALIDATION] BLOCKING: {error_msg}", file=sys.stderr)
+       #         raise forms.ValidationError(error_msg)
+       # else:
+       #     print("[FORM VALIDATION] No event linked (event is None)", file=sys.stderr)
         
         # Prevent changing client if timesheet is already in an invoice (business rule from TimesheetManager)
         if self.instance and self.instance.pk and self.instance.invoice_id:

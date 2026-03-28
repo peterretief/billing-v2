@@ -7,11 +7,16 @@ from .models import GroupMember, User, UserGroup, UserProfile
 
 
 # --- 1. User Profile Inline ---
+
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
-    can_delete = False
     verbose_name_plural = "Profile Settings"
     fk_name = "user"
+
+    def has_delete_permission(self, request, obj=None):
+        # Allow deletion only if it's a superuser 
+        # or if we are deleting the whole User object
+        return request.user.is_superuser
 
 
 # --- 2. Custom User Admin ---

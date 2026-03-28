@@ -80,6 +80,43 @@ class WorkingHoursForm(forms.ModelForm):
         return instance
 
 
+class PluginSettingsForm(forms.ModelForm):
+    """Form for managing enabled plugins/apps."""
+    
+    enabled_plugins = forms.MultipleChoiceField(
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        required=False,
+        label="Enabled Plugins",
+        help_text="Select the plugins you want to use in your workspace."
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = ["enabled_plugins"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .plugins import PluginManager
+        
+        # Get all available plugins from AppConfigs
+        available = PluginManager.get_available_plugins()
+        choices = [(p['app_label'], f"{p['display_name']} - {p['description']}") for p in available]
+        
+        self.fields["enabled_plugins"].choices = choices
+        
+        # Set initial values from the instance's JSON field
+        if self.instance and self.instance.enabled_plugins:
+            self.fields["enabled_plugins"].initial = self.instance.enabled_plugins
+
+    def save(self, commit=True):
+        # MultipleChoiceField returns a list, which is exactly what we want for our JSONField
+        instance = super().save(commit=False)
+        instance.enabled_plugins = self.cleaned_data.get("enabled_plugins", [])
+        if commit:
+            instance.save()
+        return instance
+
+
 
 class AppInterestForm(forms.Form):
     name = forms.CharField(

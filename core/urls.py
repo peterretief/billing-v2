@@ -39,4 +39,6 @@ urlpatterns = [
     path("audit-history/", views.audit_history, name="audit_history"),
     # Working Hours Settings
     path("working-hours/", views.working_hours_settings, name="working_hours_settings"),
+    # Plugin Management
+    path("plugin-settings/", views.plugin_settings, name="plugin_settings"),
 ]

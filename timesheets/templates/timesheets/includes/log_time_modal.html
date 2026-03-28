@@ -9,35 +9,34 @@
                         class="btn-close btn-close-white"
                         data-bs-dismiss="modal"></button>
             </div>
-            <!-- Todo Context Display -->
-            {% if todo %}
+
+        {% if event %}
             <div class="bg-light border-bottom p-3">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="flex-grow-1">
                         <h6 class="mb-2 text-dark fw-bold">
-                            <i class="bi bi-list-check me-2"></i>{{ todo.category.name }}
+                            <i class="bi bi-list-check me-2"></i>{{ event.description|default:"Work Event" }}
                         </h6>
-                        {% if todo.description %}
-                            <small class="text-muted d-block mb-2">{{ todo.description }}</small>
-                        {% endif %}
                         <div>
-                            {% if todo.category %}
-                                <span class="badge bg-info me-2">{{ todo.category.name }}</span>
+                            {% if event.category %}
+                                <span class="badge bg-info me-2">{{ event.category.name }}</span>
                             {% endif %}
-                            {% if todo.estimated_hours %}
-                                <span class="badge bg-secondary">{{ todo.estimated_hours }}h estimated</span>
+                            {% if event.estimated_hours %}
+                                <span class="badge bg-secondary">{{ event.estimated_hours }}h estimated</span>
                             {% endif %}
                         </div>
                     </div>
-                    {% if todo.get_linked_hours %}
+                    {% if event.get_linked_hours %}
                     <div class="text-end ps-3">
                         <small class="text-muted d-block">Logged</small>
-                        <strong class="text-success">{{ todo.get_linked_hours }}h</strong>
+                        <strong class="text-success">{{ event.get_linked_hours }}h</strong>
                     </div>
                     {% endif %}
                 </div>
             </div>
             {% endif %}
+
+            
             <form action="{% url 'timesheets:log_time' %}"
                   method="post"
                   id="logTimeForm">
@@ -80,7 +79,7 @@
                     <!-- DEBUG RAW FIELD: {{ timesheet_form.category }} -->
                     <input type="hidden" name="category_hidden" id="category_hidden" value=""
                            data-debug-field="{{ timesheet_form.category.value|default:'NONE' }}">
-                    <input type="hidden" name="todo" id="id_todo" value="">
+                    <input type="hidden" name="event" id="id_todo" value="">
                     <div id="dynamicFieldsContainer"
                          class="p-4 mb-3 border-start border-4 border-primary bg-light rounded shadow-sm"
                          style="display: none">

@@ -30,10 +30,10 @@ from .forms import TimesheetEntryForm, WorkCategoryForm
 from .models import TimesheetEntry, WorkCategory
 
 # Try importing Event from events app (optional, for event-based category creation)
-try:
-    from events.models import Event
-except ImportError:
-    Todo = None
+#try:
+#    from events.models import Event
+#except ImportError:
+#    Todo = None
 
 
 @login_required
@@ -310,19 +310,31 @@ def log_time(request):
             entry = form.save(commit=False)
             entry.user = request.user
             
+            # Manually handle category from POST (try regular field first, then backup)
+            category_id = request.POST.get("category") or request.POST.get("category_hidden")
+            if category_id:
+                entry.category_id = category_id
+            
             # Check calendar completion gate one more time before saving
-            if entry.todo:
-                result = entry.todo.validate_timesheet_readiness()
-                if not result['is_ready']:
-                    # Validation failed - show errors and re-render form
-                    error_msg = "❌ Cannot create timesheet"
-                    if result['issues']:
-                        error_msg += ":\n• " + "\n• ".join(result['issues'])
-                    if result['recommendations']:
-                        error_msg += "\n\nHow to fix:\n• " + "\n• ".join(result['recommendations'])
-                    messages.error(request, error_msg)
-                    # Return back to timesheet list which will show the error
-                    return redirect("timesheets:timesheet_list")
+#            if entry.event:
+#                result = entry.event.validate_timesheet_readiness()
+#                if not result['is_ready']:
+#                    # Validation failed - show errors and re-render form
+#                    error_msg = "❌ Cannot create timesheet"
+#                    if result['issues']:
+#                        error_msg += ":\n• " + "\n• ".join(result['issues'])
+#                    if result['recommendations']:
+#                        error_msg += "\n\nHow to fix:\n• " + "\n• ".join(result['recommendations'])
+#                    messages.error(request, error_msg)
+#                    # Return back to timesheet list which will show the error
+#                    return redirect("timesheets:timesheet_list")
+            
+            # Capture dynamic metadata fields
+            meta_data = {}
+            for key, value in request.POST.items():
+                if key.startswith("meta_"):
+                    meta_data[key.replace("meta_", "")] = value
+            entry.metadata = meta_data
             
             entry.save()
             messages.success(request, f"✓ Logged {entry.hours} hours on {entry.date}")

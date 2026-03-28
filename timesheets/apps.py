@@ -1,10 +1,11 @@
 from django.apps import AppConfig
 
-
 class TimesheetsConfig(AppConfig):
-    default_auto_field = "django.db.models.BigAutoField"
-    name = "timesheets"
-
-    def ready(self):
-        # The # noqa: F401 stops Ruff from deleting this "unused" import
-        import timesheets.signals  # noqa: F401
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'timesheets'
+    verbose_name = "Timesheets"
+    
+    # Plugin metadata
+    is_plugin = True
+    plugin_display_name = "Timesheets"
+    plugin_description = "Track billable hours and generate invoices."

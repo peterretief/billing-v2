@@ -22,6 +22,7 @@ from .forms import (
     AdminUserCreationForm,
     AppInterestForm,
     AuditSettingsForm,
+    PluginSettingsForm,
     StaffCreateAndAddUserForm,
     UserGroupForm,
     UserProfileForm,
@@ -717,3 +718,22 @@ def working_hours_settings(request):
     }
     
     return render(request, "core/settings/working_hours.html", context)
+@login_required
+def plugin_settings(request):
+    """View for users to enable/disable app-based plugins."""
+    profile = request.user.profile
+    if request.method == "POST":
+        form = PluginSettingsForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Plugin settings updated successfully.")
+            return redirect("core:plugin_settings")
+    else:
+        form = PluginSettingsForm(instance=profile)
+    
+    return render(request, "core/plugin_settings.html", {
+        "form": form,
+        "page_title": "Plugin Management",
+        "profile": profile,
+    })
+

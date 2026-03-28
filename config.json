@@ -1,0 +1,41 @@
+{
+  "api_key": "AIzaSyAQJsHQhZ7dAV7qyub82HaRcIpBlg4GeJI",
+  "user_preferences": {
+    "theme": "dark",
+    "language": "fr"
+  },
+  "version": "1.0.0",
+  "ide": {
+    "hasSeenNudge": true,
+    "enabled": true
+  },
+  "security": {
+    "auth": {
+      "selectedType": "oauth-personal"
+    }
+  },
+  "general": {
+    "vimMode": true
+  },
+"mcpServers": {
+  "archon": {
+    "httpUrl": "http://192.168.0.102:8051/mcp"
+  }
+},
+"ui": {
+    "footer": {
+      "items": [
+        "workspace",
+        "git-branch",
+        "sandbox",
+        "model-name",
+        "quota",
+        "context-used",
+        "memory-usage",
+        "session-id",
+        "code-changes",
+        "token-count"
+      ]
+    }
+  }
+}

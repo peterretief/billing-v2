@@ -35,7 +35,7 @@ class DeletedInvoiceReportTest(TestCase):
             user=self.user,
             client=self.client_obj,
             number=self.invoice_number,
-            status="POSTED",
+            status="PENDING",
             date_issued=today,
             due_date=today + timedelta(days=14),  # <--- FIXED: Added due_date
             total_amount=Decimal("1000.00"),
@@ -65,7 +65,7 @@ class DeletedInvoiceReportTest(TestCase):
             user=other_user,
             client=Client.objects.create(user=other_user, name="Other"),
             number=f"INV-OTHER-{other_id}",
-            status="POSTED",
+            status="PENDING",
             date_issued=today,
             due_date=today + timedelta(days=14),  # <--- FIXED: Added due_date
         )

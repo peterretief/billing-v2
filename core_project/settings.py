@@ -13,19 +13,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "billing_schedule.tasks.process_daily_billing_queue",
         "schedule": crontab(minute=1, hour=0),  # Run at 00:01 daily
     },
-
-    "sync-all-users-events-with-calendar": {
-        "task": "events.tasks.sync_all_users_events_with_calendar",
-        "schedule": crontab(minute="*/5"),  # Run every 5 minutes
-    },
-    "cleanup-old-sync-logs": {
-        "task": "events.tasks.cleanup_old_sync_logs",
-        "schedule": crontab(minute=0, hour=2),  # Run at 02:00 daily
-    },
-    "check-completed-calendar-events": {
-        "task": "events.tasks.check_completed_calendar_events",
-        "schedule": crontab(minute="*/15"),  # Run every 15 minutes
-    },
 }
 
 
@@ -84,10 +71,12 @@ INSTALLED_APPS = [
     "clients",
     "invoices",
     "timesheets",
-    "events",
+    #"events",
     # "todos",  # Deprecated - renamed to events app
     "items",
     "notifications",
+    "integrations",
+    "inventory",
     "widget_tweaks",
     "crispy_forms",
     "crispy_bootstrap5",
@@ -108,6 +97,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",  # 2. Check CSRF after session is loaded
     "django.contrib.auth.middleware.AuthenticationMiddleware",  # 3. Then authenticate the user
+    "core.middleware.TenantMiddleware",  # Set current user for TenantManager
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
@@ -135,6 +125,7 @@ TEMPLATES = [
                 "notifications.context_processors.onboarding",
                 "core.context_processors.vat_settings",
                 "core.context_processors.currency_settings",
+                "core.context_processors.enabled_plugins",
             ],
         },
     },

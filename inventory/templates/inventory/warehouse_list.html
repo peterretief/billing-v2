@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0"><i class="bi bi-building me-2 text-primary"></i>Warehouses</h2>
+        <a href="{% url 'inventory:warehouse_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Warehouse
+        </a>
+    </div>
+
+    <div class="row g-4">
+        {% for warehouse in warehouses %}
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title fw-bold mb-0">{{ warehouse.name }}</h5>
+                            {% if warehouse.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                        <p class="card-text text-muted small">{{ warehouse.location|linebreaksbr }}</p>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12 text-center py-5">
+                <p class="text-muted">No warehouses configured.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

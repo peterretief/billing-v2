@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>Inventory Items</h2>
+        <div>
+            <a href="{% url 'inventory:item_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Add Item
+            </a>
+            <a href="{% url 'inventory:transaction_create' %}" class="btn btn-outline-success ms-2">
+                <i class="bi bi-arrow-left-right"></i> Record Movement
+            </a>
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <a href="{% url 'inventory:warehouse_list' %}" class="btn btn-sm btn-outline-dark">
+            <i class="bi bi-building me-1"></i> Manage Warehouses
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table align-middle table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">SKU</th>
+                        <th>Name</th>
+                        <th>Current Stock</th>
+                        <th>Reorder Level</th>
+                        <th class="text-end pe-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr class="{% if item.current_stock <= item.reorder_level %}table-danger{% endif %}">
+                            <td class="ps-3 fw-bold">{{ item.sku }}</td>
+                            <td>
+                                {{ item.name }}
+                                <div class="small text-muted">{{ item.unit_of_measure }}</div>
+                            </td>
+                            <td>
+                                <span class="badge {% if item.current_stock <= item.reorder_level %}bg-danger{% else %}bg-success{% endif %} fs-6">
+                                    {{ item.current_stock }}
+                                </span>
+                            </td>
+                            <td class="text-muted">{{ item.reorder_level }}</td>
+                            <td class="text-end pe-3">
+                                <a href="{% url 'inventory:item_update' item.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">No inventory items found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

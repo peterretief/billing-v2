@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-success text-white py-3">
+                    <h4 class="mb-0"><i class="bi bi-arrow-left-right me-2"></i>Record Stock Movement</h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-info small mb-4">
+                        <i class="bi bi-info-circle me-2"></i> Use <strong>Stock In</strong> to add stock, <strong>Stock Out</strong> to remove stock, and <strong>Adjustment</strong> for count corrections (quantity is added to current stock).
+                    </div>
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form|crispy }}
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success">Record Movement</button>
+                            <a href="{% url 'inventory:item_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

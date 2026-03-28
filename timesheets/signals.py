@@ -12,7 +12,15 @@ User = get_user_model()
 @receiver(post_save, sender=User)
 def create_default_work_categories(sender, instance, created, **kwargs):
     if created:
-        for default in DefaultWorkCategory.objects.all():
-            WorkCategory.objects.get_or_create(
-                user=instance, name=default.name, defaults={"metadata_schema": default.metadata_schema}
-            )
+        # 1. Create the actual category for this specific user
+        category, _ = WorkCategory.objects.get_or_create(
+            user=instance, 
+            name="General Work",
+            defaults={"description": "System default category"}
+        )
+        
+        # 2. Designate it as the 'Default' link for this user
+        DefaultWorkCategory.objects.get_or_create(
+            user=instance,
+            defaults={"work_category": category}
+        )

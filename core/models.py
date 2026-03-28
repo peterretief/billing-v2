@@ -224,6 +224,20 @@ class UserProfile(models.Model):
         """Get work end time as string HH:MM."""
         return self.work_end_time.strftime("%H:%M")
 
+    # Dynamic Plugin Management
+    enabled_plugins = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of app labels for enabled plugins (e.g., ['items', 'timesheets'])"
+    )
+
+    def is_plugin_enabled(self, app_label):
+        """Check if an app-based plugin is enabled for the user."""
+        # If the list is empty, we might want to default to 'everything' for legacy 
+        # or have a set of core plugins. For now, let's assume if the field exists, 
+        # it's the source of truth.
+        return app_label in self.enabled_plugins
+
     def __str__(self):
         return f"Profile: {self.user.username}"
 

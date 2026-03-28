@@ -16,10 +16,11 @@ urlpatterns = [
     path("clients/", include("clients.urls")),
     # path('core/', include('core.urls')), # This is now the root
     path("timesheets/", include("timesheets.urls")),
-    path("calendar/", include("events.urls")),
+#    path("calendar/", include("events.urls")),
     path("items/", include("items.urls")),
     path("notifications/", include("notifications.urls")),
     path("__debug__/", include("debug_toolbar.urls")),
     path("scheduler/", include("billing_schedule.urls")),
+    path("inventory/", include("inventory.urls")),
     # path("ops/", include("ops.urls")),  # Disabled for now, can be re-enabled later if needed
 ]

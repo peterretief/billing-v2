@@ -2,8 +2,7 @@ import json
 import logging
 
 from django.conf import settings
-from google import genai
-from google.genai import types
+from integrations.services import IntegrationService
 
 from invoices.models import Invoice
 
@@ -81,49 +80,37 @@ def check_onboarding_status(user):
 
 def get_gemini_suggestions(user):
     """
-    Gets personalized suggestions using the new Unified Google GenAI SDK.
+    Gets personalized suggestions using the unified IntegrationService bridge.
     """
-    if not settings.GEMINI_API_KEY:
+    ai_service = IntegrationService.get_ai(user)
+    if not ai_service.is_configured():
         return []
 
-    # 1. Initialize the new Client
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
-    # 2. Build context-aware prompt
+    # 1. Build context-aware prompt
     profile_info = "Profile not created"
     try:
-        if hasattr(user, "profile"):
-            p = user.profile
-            profile_info = f"Company: {p.company_name}, VAT: {p.is_vat_registered}"
+        # Assuming UserProfile is available via user.userprofile or user.profile
+        # We'll use a generic approach based on existing code
+        p = getattr(user, 'userprofile', getattr(user, 'profile', None))
+        if p:
+            profile_info = f"Company: {getattr(p, 'business_name', 'Unknown')}, VAT: {getattr(p, 'is_vat_registered', False)}"
     except Exception:
         pass
 
     unpaid_count = Invoice.objects.filter(client__user=user, status="unpaid").count()
 
-    prompt = f"""
-    User: {user.username}
-    Context: {profile_info}
-    Unpaid Invoices: {unpaid_count}
+    context_str = f"User: {user.username}, Context: {profile_info}, Unpaid Invoices: {unpaid_count}"
     
-    Suggest 3 short, actionable notifications for this user.
+    prompt = f"""
+    Context: {context_str}
+    
+    Suggest 3 short, actionable notifications for this user based on their status.
     Return the response as a simple JSON list of strings.
     Example: ["Update your VAT number", "Follow up on 5 invoices", "Complete your profile"]
     """
 
-    try:
-        # 3. Use GenerateContentConfig to enforce JSON response
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.5),
-        )
-
-        # 4. Safe JSON parsing
-        return json.loads(response.text)
-
-    except Exception as e:
-        logger.error(f"Gemini API error for user {user.username}: {e}")
-        return []
+    # 2. Use the bridge
+    return ai_service.get_suggestions(context_str, prompt_template=prompt)
 
 
 def generate_notifications(user):

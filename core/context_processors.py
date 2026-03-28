@@ -1,40 +1,41 @@
-# core/context_processors.py
-
-from decimal import Decimal
-
+from .plugins import PluginManager
 
 def vat_settings(request):
-    """
-    Makes the user's VAT registration status and rate
-    globally available in templates.
-    """
-    if request.user.is_authenticated:
-        profile = getattr(request.user, "profile", None)
-        if profile:
-            return {
-                "GLOBAL_VAT_RATE": profile.vat_rate,
-                "IS_VAT_REGISTERED": profile.is_vat_registered,
-            }
-
-    # Fallback for anonymous users or missing profiles
-    return {
-        "GLOBAL_VAT_RATE": Decimal("15.00"),
-        "IS_VAT_REGISTERED": False,
-    }
-
+    """Provides VAT-related settings to templates."""
+    if not request.user.is_authenticated:
+        return {
+            'IS_VAT_REGISTERED': False,
+            'VAT_RATE': 15.00,
+        }
+    try:
+        profile = request.user.profile
+        return {
+            'IS_VAT_REGISTERED': profile.is_vat_registered,
+            'VAT_RATE': profile.vat_rate,
+        }
+    except Exception:
+        return {
+            'IS_VAT_REGISTERED': False,
+            'VAT_RATE': 15.00,
+        }
 
 def currency_settings(request):
-    """
-    Makes the user's preferred currency symbol available in all templates.
-    """
-    if request.user.is_authenticated:
-        # Accessing the currency from the user's profile
-        # Adjust 'profile' if your related_name is different
-        try:
-            user_currency = request.user.profile.currency
-        except AttributeError:
-            user_currency = "R"  # Fallback
-    else:
-        user_currency = "R"  # Fallback for anonymous users
+    """Provides currency settings to templates."""
+    if not request.user.is_authenticated:
+        return {'GLOBAL_CURRENCY': 'R'}
+    try:
+        return {'GLOBAL_CURRENCY': request.user.profile.currency}
+    except Exception:
+        return {'GLOBAL_CURRENCY': 'R'}
 
-    return {"GLOBAL_CURRENCY": user_currency}
+def enabled_plugins(request):
+    """
+    Makes the list of enabled plugins available globally in templates.
+    Used for dynamic sidebar/menu rendering.
+    """
+    if not request.user.is_authenticated:
+        return {'ENABLED_PLUGINS': []}
+        
+    return {
+        'ENABLED_PLUGINS': PluginManager.get_enabled_plugins(request.user)
+    }

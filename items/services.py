@@ -45,6 +45,17 @@ def import_recurring_to_invoices(user):
         is_recurring=True, 
         billing_policy__in=due_policies
     ).exclude(last_billed_date__range=[current_month_start, current_month_end])
+
+    # --- PATCH: Exclude items added after their policy's run_day ---
+    # For each exact date policy, exclude items added after the run_day in the current month
+    from django.db.models import Q
+    cutoff_filters = Q()
+    for policy in due_policies:
+        if policy.run_day:
+            cutoff_date = today.date().replace(day=policy.run_day)
+            cutoff_filters |= Q(billing_policy=policy, date__gt=cutoff_date)
+    if cutoff_filters:
+        policy_items = policy_items.exclude(cutoff_filters)
     
     # Items in the Master Recurring Queue (queued for invoicing, not yet billed)
     queued_items = Item.objects.filter(
@@ -86,17 +97,12 @@ def import_recurring_to_invoices(user):
                 user=user, client=client_obj, date_issued=today.date(), due_date=calculated_due_date, status="DRAFT"
             )
 
-            # Create specific line items for this specific invoice
+
+            # Link the existing recurring items to the invoice and set is_billed, but DO NOT update last_billed_date yet
             for t in client_templates:
-                Item.objects.create(
-                    user=user,
-                    client=client_obj,
-                    invoice=invoice,
-                    description=t.description,
-                    quantity=t.quantity,
-                    unit_price=t.unit_price,
-                    is_recurring=False,
-                )
+                t.invoice = invoice
+                t.is_billed = True
+                t.save(update_fields=["invoice", "is_billed"])
 
             Invoice.objects.update_totals(invoice)
             invoice.refresh_from_db()
@@ -141,12 +147,9 @@ def import_recurring_to_invoices(user):
 
     for inv in new_invoices:
         try:
-            # FIX: Update last_billed_date BEFORE sending email to prevent nightly re-sends
-            # This ensures even if email fails, we don't retry sending the same invoice today
-            templates.filter(client=inv.client).update(last_billed_date=today.date())
-            
-            # Send invoice - email_item_invoice_to_client handles all status updates on success
+            # Send invoice - only update last_billed_date if email is sent successfully
             if email_item_invoice_to_client(inv):
+                templates.filter(client=inv.client).update(last_billed_date=today.date())
                 logger.info(f"Successfully sent invoice {inv.id} to {inv.client.name}")
                 processed_invoices.append(inv)
             else:

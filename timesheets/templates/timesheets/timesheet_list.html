@@ -126,6 +126,7 @@
                                                         data-hours="{{ entry.hours }}"
                                                         data-rate="{{ entry.hourly_rate }}"
                                                         data-category="{{ entry.category_id|default:'' }}"
+                                                        data-todo="{{ entry.event_id|default:'' }}"
                                                         data-metadata='{{ entry.metadata_json|safe }}'>
                                                     <i class="bi bi-pencil me-1"></i> Edit
                                                 </button>
@@ -175,6 +176,7 @@
 
                 const entryId = button.getAttribute('data-id');
                 const catId = button.getAttribute('data-category');
+                const todoId = button.getAttribute('data-todo');
                 const metadataString = button.getAttribute('data-metadata');
 
                 form.action = `/timesheets/${entryId}/edit/`;
@@ -182,6 +184,10 @@
                 form.querySelector('[name="date"]').value = button.getAttribute('data-date');
                 form.querySelector('[name="hours"]').value = button.getAttribute('data-hours');
                 form.querySelector('[name="hourly_rate"]').value = button.getAttribute('data-rate');
+                
+                // Set todo ID
+                const todoField = form.querySelector('[name="todo"]');
+                if (todoField) todoField.value = todoId || '';
 
                 // Always set category value when editing
                 const catSelect = form.querySelector('[name="category"]');
@@ -194,11 +200,10 @@
                 }
 
                 // Load dynamic fields if category has metadata schema or if there's saved metadata
-                if (catId || (metadataString && metadataString !== '{}')) {
+                if (catId && catId !== "") {
                     if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'block';
-                    const activeCatId = (catId && catId !== "") ? catId : "1";
-
-                    htmx.ajax('GET', `{% url "timesheets:get_category_fields" %}?category=${activeCatId}`, {
+                    
+                    htmx.ajax('GET', `{% url "timesheets:get_category_fields" %}?category=${catId}`, {
                         target: '#dynamicFields',
                         swap: 'innerHTML'
                     }).then(() => {
@@ -207,17 +212,19 @@
                             setTimeout(() => {
                                 Object.keys(metadata).forEach(key => {
                                     const val = metadata[key];
+                                    // Try different naming conventions for meta fields
                                     const input = form.querySelector(`[name="meta_${key}"]`) ||
+                                        form.querySelector(`[name="meta_${key.replace(/ /g, '_')}"]`) ||
                                         form.querySelector(`[name="meta_${key.replace(/_/g, ' ')}"]`);
                                     if (input) input.value = val;
                                 });
-                            }, 250);
+                            }, 100);
                         } catch (e) {
                             console.error("Metadata Parse Error", e);
                         }
                     });
                 } else {
-                    // If no category or metadata, clear the dynamic fields
+                    // If no category, clear the dynamic fields
                     if (dynamicFieldsTarget) dynamicFieldsTarget.innerHTML = '';
                     if (dynamicFieldsContainer) dynamicFieldsContainer.style.display = 'none';
                 }

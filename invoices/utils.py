@@ -58,9 +58,6 @@ def build_invoice_items_list(invoice, is_service=False):
     
     items_list = []
     
-    # Check if invoice has timesheets
-    has_timesheets = invoice.billed_timesheets.exists()
-    
     if hasattr(invoice, "custominvoice"):
         logger.debug(f"Invoice {invoice.id} has CustomInvoice - using custom lines only")
         for line in invoice.custominvoice.custom_lines.all():
@@ -73,52 +70,46 @@ def build_invoice_items_list(invoice, is_service=False):
                 }
             )
     else:
-        # If invoice has timesheets, skip billed_items and only show grouped timesheets
-        # This ensures timesheets are always grouped by category
-        if not has_timesheets:
-            logger.debug(f"Invoice {invoice.id} - adding billed_items (no timesheets)")
-            # Add regular items only if NO timesheets exist
+        # Add regular items if they exist
+        if hasattr(invoice, "billed_items") and invoice.billed_items.exists():
+            logger.debug(f"Invoice {invoice.id} - adding billed_items")
             for item in invoice.billed_items.all():
                 items_list.append(
                     {
                         "description": tex_safe(item.description),
-                        "quantity": f"{item.quantity:.2f}" if is_service else f"{item.quantity:.0f}",
+                        "quantity": f"{item.quantity:.0f}",
                         "unit_price": f"{item.unit_price:,.2f}",
                         "row_subtotal": f"{(item.quantity * item.unit_price):,.2f}",
                     }
                 )
-        else:
-            logger.debug(f"Invoice {invoice.id} - SKIPPING billed_items (has timesheets)")
         
-        # Group timesheets by category for aggregated display
-        grouped_timesheets = defaultdict(lambda: {"hours": Decimal("0.00"), "hourly_rate": Decimal("0.00")})
-        
-        ts_list = list(invoice.billed_timesheets.all().select_related("category"))
-        logger.debug(f"Invoice {invoice.id} has {len(ts_list)} billed timesheets")
-        
-        for timesheet in ts_list:
-            category_name = timesheet.category.name if timesheet.category else "Timesheet Entry"
-            # Normalize hourly_rate to ensure consistent grouping keys
-            # Convert to string first, then to Decimal with 2 decimal places
-            normalized_rate = Decimal(str(timesheet.hourly_rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            key = (category_name, normalized_rate)
-            logger.debug(f"  TS: {category_name} | {timesheet.hours}h @ {timesheet.hourly_rate} (normalized: {normalized_rate}) | key={key}")
-            grouped_timesheets[key]["hours"] += timesheet.hours
-            grouped_timesheets[key]["hourly_rate"] = normalized_rate
-        
-        logger.debug(f"After grouping: {len(grouped_timesheets)} groups: {list(grouped_timesheets.keys())}")
-        
-        # Add grouped timesheets to items list
-        for (category_name, hourly_rate), data in sorted(grouped_timesheets.items()):
-            logger.debug(f"  GROUP OUTPUT: {category_name} | {data['hours']}h @ {hourly_rate}")
-            items_list.append(
-                {
-                    "description": tex_safe(category_name),
-                    "quantity": f"{data['hours']:.2f}",
-                    "unit_price": f"{hourly_rate:,.2f}",
-                    "row_subtotal": f"{(data['hours'] * hourly_rate):,.2f}",
-                }
-            )
+        # Add grouped timesheets if they exist
+        if hasattr(invoice, "billed_timesheets") and invoice.billed_timesheets.exists():
+            logger.debug(f"Invoice {invoice.id} - adding billed_timesheets")
+            
+            # Group timesheets by category for aggregated display
+            grouped_timesheets = defaultdict(lambda: {"hours": Decimal("0.00"), "hourly_rate": Decimal("0.00")})
+            
+            ts_list = list(invoice.billed_timesheets.all().select_related("category"))
+            
+            for timesheet in ts_list:
+                category_name = timesheet.category.name if timesheet.category else "Timesheet Entry"
+                # Normalize hourly_rate to ensure consistent grouping keys
+                normalized_rate = Decimal(str(timesheet.hourly_rate)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                key = (category_name, normalized_rate)
+                grouped_timesheets[key]["hours"] += timesheet.hours
+                grouped_timesheets[key]["hourly_rate"] = normalized_rate
+            
+            # Add grouped timesheets to items list
+            for (category_name, hourly_rate), data in sorted(grouped_timesheets.items()):
+                items_list.append(
+                    {
+                        "description": tex_safe(category_name),
+                        "quantity": f"{data['hours']:.2f}",
+                        "unit_price": f"{hourly_rate:,.2f}",
+                        "row_subtotal": f"{(data['hours'] * hourly_rate):,.2f}",
+                    }
+                )
     
     logger.debug(f"build_invoice_items_list returning {len(items_list)} items")
     return items_list
