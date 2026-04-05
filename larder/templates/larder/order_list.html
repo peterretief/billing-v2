@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Orders - Meal Planning{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-cart-check me-2 text-primary"></i>Orders</h2>
+        <a href="{% url 'larder:order-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Create Order
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Filters by Status -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="all-tab" data-bs-toggle="tab" href="#all" role="tab">
+                All <span class="badge bg-secondary">{{ object_list.count }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="draft-tab" data-bs-toggle="tab" href="#draft" role="tab">
+                Draft <span class="badge bg-warning">{{ object_list|dictsort:'status'|length }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="pending-tab" data-bs-toggle="tab" href="#pending" role="tab">
+                Pending <span class="badge bg-info">0</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="delivered-tab" data-bs-toggle="tab" href="#delivered" role="tab">
+                Delivered <span class="badge bg-success">0</span>
+            </a>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div id="all" class="tab-pane fade show active">
+            <div class="row">
+                {% for order in object_list %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card shadow-sm h-100 hover-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="card-title">Order #{{ order.pk }}</h5>
+                                    {% if order.status == 'draft' %}
+                                        <span class="badge bg-warning">Draft</span>
+                                    {% elif order.status == 'pending' %}
+                                        <span class="badge bg-info">Pending</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Delivered</span>
+                                    {% endif %}
+                                </div>
+
+                                <div class="mb-3">
+                                    <small class="text-muted d-block mb-1">
+                                        <i class="bi bi-bag me-1"></i>Store
+                                    </small>
+                                    <strong>{{ order.store.name }}</strong>
+                                </div>
+
+                                {% if order.shopping_list %}
+                                    <div class="mb-3">
+                                        <small class="text-muted d-block mb-1">
+                                            <i class="bi bi-list-check me-1"></i>Shopping List
+                                        </small>
+                                        <strong>{{ order.shopping_list.name }}</strong>
+                                    </div>
+                                {% endif %}
+
+                                <div class="alert alert-light py-2 mb-3">
+                                    <small class="text-muted d-block">Total Amount</small>
+                                    <strong class="text-primary">
+                                        {% if order.total_amount %}R{{ order.total_amount }}{% else %}TBD{% endif %}
+                                    </strong>
+                                </div>
+
+                                <small class="text-muted d-block mb-3">
+                                    Ordered {{ order.ordered_at|date:"M d, Y" if order.ordered_at else "Not yet" }}
+                                </small>
+
+                                <div class="d-flex gap-2">
+                                    <a href="{% url 'larder:order-detail' order.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                        <i class="bi bi-eye me-1"></i>View
+                                    </a>
+                                    <a href="{% url 'larder:order-update' order.pk %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>No orders yet. 
+                            <a href="{% url 'larder:order-create' %}">Create your first order</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .hover-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}

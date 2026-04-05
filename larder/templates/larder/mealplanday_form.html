@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Day - {{ meal_plan_day.day_date|date:"M d, Y" }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-calendar-event me-2"></i>
+                        Edit Meals for {{ meal_plan_day.day_date|date:"l, M d, Y" }}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                {{ error }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <div class="alert alert-light mb-4">
+                        <p class="mb-0">
+                            <strong>Meal Plan:</strong> {{ meal_plan_day.meal_plan.name }}<br>
+                            <small class="text-muted">{{ meal_plan_day.meal_plan.start_date|date:"M d" }} - {{ meal_plan_day.meal_plan.end_date|date:"M d, Y" }}</small>
+                        </p>
+                    </div>
+
+                    <form method="post" class="needs-validation">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="bi bi-list-task me-2"></i>{{ form.menus.label }}
+                            </label>
+                            {{ form.menus }}
+                            <small class="text-muted d-block mt-2">
+                                Select menus to assign to this day. You can select multiple menus for different meal periods.
+                            </small>
+                            {% if form.menus.errors %}
+                                <div class="invalid-feedback d-block">{{ form.menus.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Available Menus by Period -->
+                        <div class="mb-4">
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading"><i class="bi bi-info-circle me-1"></i>Available Menus</h6>
+                                <p class="mb-2">Here are the available menus grouped by meal period:</p>
+                                
+                                {% regroup all_menus by get_meal_period_display as menus_by_period %}
+                                {% for period in menus_by_period %}
+                                    <div class="mb-2">
+                                        <strong class="d-block text-muted">{{ period.grouper }}</strong>
+                                        <div class="ps-3">
+                                            {% for menu in period.list %}
+                                                <small class="d-block">
+                                                    • {{ menu.name }}
+                                                    <span class="text-muted">({{ menu.recipes.count }} recipes)</span>
+                                                </small>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>Save Menus
+                            </button>
+                            <a href="{% url 'larder:mealplan-detail' meal_plan_day.meal_plan.pk %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Back to Plan
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Get reference to the select element
+    const menusSelect = document.querySelector('[name="menus"]');
+    
+    // Display current selections
+    function updateSelectedCount() {
+        const count = Array.from(menusSelect.selectedOptions).length;
+        const label = document.querySelector('label[for="' + menusSelect.id + '"]');
+        if (count > 0) {
+            label.innerHTML = '<i class="bi bi-list-task me-2"></i>' + 
+                              label.textContent.trim().split('(')[0].trim() + 
+                              ' <span class="badge bg-primary">' + count + ' selected</span>';
+        }
+    }
+    
+    menusSelect.addEventListener('change', updateSelectedCount);
+    updateSelectedCount();
+</script>
+
+<style>
+    select[multiple] {
+        height: 250px;
+        background: white;
+    }
+    select[multiple] option:checked {
+        background: linear-gradient(#0d6efd, #0d6efd);
+        background-color: #0d6efd;
+        color: white;
+    }
+</style>
+{% endblock %}

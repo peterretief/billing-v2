@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load django_tables2 %}
+
+{% block title %}{{ meal_plan.name }} - Meal Plan{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <!-- Header -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h1 class="card-title mb-1">{{ meal_plan.name }}</h1>
+                    <p class="text-muted mb-0">{{ meal_plan.get_time_period_display }} Plan</p>
+                </div>
+                <div>
+                    <a href="{% url 'larder:mealplan-update' meal_plan.pk %}" class="btn btn-primary">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                    <a href="{% url 'larder:mealplan-list' %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Back
+                    </a>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <i class="bi bi-calendar-event text-primary me-2"></i>
+                        <small class="text-muted d-block">Start Date</small>
+                        <strong>{{ meal_plan.start_date|date:"M d, Y" }}</strong>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <i class="bi bi-calendar-event text-primary me-2"></i>
+                        <small class="text-muted d-block">End Date</small>
+                        <strong>{{ meal_plan.end_date|date:"M d, Y" }}</strong>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <i class="bi bi-hourglass-split text-info me-2"></i>
+                        <small class="text-muted d-block">Duration</small>
+                        <strong>{{ days_count }} days</strong>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <i class="bi bi-list-check text-success me-2"></i>
+                        <small class="text-muted d-block">Days Planned</small>
+                        <strong>{{ meal_plan.meal_plan_days.count }} configured</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meal Plan Calendar -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-calendar3 me-2"></i>Meal Schedule</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="col-2">Date</th>
+                            <th class="col-2">Day</th>
+                            <th class="col-6">Menus Assigned</th>
+                            <th class="col-2">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day in meal_plan.meal_plan_days.all %}
+                            <tr>
+                                <td>
+                                    <strong>{{ day.day_date|date:"M d" }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ day.day_date|date:"l" }}</span>
+                                </td>
+                                <td>
+                                    {% if day.menus.all %}
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% for menu in day.menus.all %}
+                                                <span class="badge bg-info">
+                                                    <i class="bi bi-cup-straw me-1"></i>{{ menu.get_meal_period_display }}
+                                                </span>
+                                            {% endfor %}
+                                        </div>
+                                        <small class="text-muted d-block mt-2">
+                                            {% for menu in day.menus.all %}
+                                                <div><strong>{{ menu.name }}</strong>: 
+                                                    {% for recipe in menu.recipes.all|slice:":2" %}
+                                                        {{ recipe.name }}{% if not forloop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                    {% if menu.recipes.count > 2 %}
+                                                        +{{ menu.recipes.count|add:"-2" }}
+                                                    {% endif %}
+                                                </div>
+                                            {% endfor %}
+                                        </small>
+                                    {% else %}
+                                        <span class="text-muted">No menus assigned</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'larder:mealplanday-update' day.pk %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-4">
+                                    No days configured yet
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ingredients Summary -->
+    {% if ingredients %}
+        <div class="card shadow mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-basket2 me-2 text-success"></i>Ingredients Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for ingredient in ingredients %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="p-3 bg-light rounded">
+                                <strong>{{ ingredient.product.name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ ingredient.product.brand }}</small>
+                                <div class="mt-2">
+                                    <span class="badge bg-primary">{{ ingredient.total_quantity }} {{ ingredient.unit }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Shopping List -->
+    <div class="card shadow">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-bag-check me-2 text-warning"></i>Shopping Lists</h5>
+                <a href="{% url 'larder:shoppinglist-list' %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-plus-lg me-1"></i>Create Shopping List
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if meal_plan.shopping_lists.all %}
+                <ul class="list-group">
+                    {% for list in meal_plan.shopping_lists.all %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ list.name }}</strong>
+                                <br>
+                                <small class="text-muted">Created {{ list.created_at|date:"M d, Y" }}</small>
+                            </div>
+                            <div>
+                                {% if list.is_purchased %}
+                                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Purchased</span>
+                                {% else %}
+                                    <span class="badge bg-warning"><i class="bi bi-clock me-1"></i>Pending</span>
+                                {% endif %}
+                                <a href="{% url 'larder:shoppinglist-detail' list.pk %}" class="btn btn-sm btn-outline-primary ms-2">
+                                    View
+                                </a>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-muted mb-0">
+                    <i class="bi bi-info-circle me-2"></i>No shopping lists created yet
+                </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{% if meal_plan %}Edit Meal Plan{% else %}Create Meal Plan{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-calendar-event me-2"></i>
+                        {% if meal_plan %}Edit Plan: {{ meal_plan.name }}{% else %}Create New Meal Plan{% endif %}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                {{ error }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="needs-validation">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.name.label }}</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ form.start_date.label }}</label>
+                                    {{ form.start_date }}
+                                    {% if form.start_date.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.start_date.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ form.end_date.label }}</label>
+                                    {{ form.end_date }}
+                                    {% if form.end_date.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.end_date.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.time_period.label }}</label>
+                            {{ form.time_period }}
+                            {% if form.time_period.errors %}
+                                <div class="invalid-feedback d-block">{{ form.time_period.errors.0 }}</div>
+                            {% endif %}
+                            <small class="text-muted d-block mt-1">Select the type of meal plan</small>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> After creating this meal plan, you'll be able to assign menus to individual days.
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                {% if meal_plan %}Update Plan{% else %}Create Plan{% endif %}
+                            </button>
+                            <a href="{% url 'larder:mealplan-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control, .form-select, textarea {
+        border: 1px solid #dee2e6;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}

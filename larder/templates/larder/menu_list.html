@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Menus - Meal Planning{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-list-task me-2 text-primary"></i>Menus</h2>
+        <a href="{% url 'larder:menu-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Create Menu
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% regroup object_list by get_meal_period_display as menus_by_period %}
+
+    {% for period in menus_by_period %}
+        <div class="mb-5">
+            <h4 class="mb-3 pb-2 border-bottom">
+                <i class="bi bi-cup-straw me-2 text-info"></i>{{ period.grouper }}
+            </h4>
+            
+            <div class="row">
+                {% for menu in period.list %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card shadow-sm h-100 hover-card">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ menu.name }}</h5>
+                                
+                                {% if menu.criteria %}
+                                    <p class="text-muted small mb-2">
+                                        <i class="bi bi-check-circle me-1 text-success"></i>
+                                        Criteria: <strong>{{ menu.criteria.name }}</strong>
+                                    </p>
+                                {% endif %}
+
+                                <div class="mb-3">
+                                    <small class="text-muted d-block mb-2">
+                                        <i class="bi bi-book me-1"></i>Recipes ({{ menu.recipes.count }})
+                                    </small>
+                                    {% if menu.recipes.all %}
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% for recipe in menu.recipes.all|slice:":3" %}
+                                                <span class="badge bg-light text-dark" title="{{ recipe.name }}">
+                                                    {{ recipe.name|truncatewords:2 }}
+                                                </span>
+                                            {% endfor %}
+                                            {% if menu.recipes.count > 3 %}
+                                                <span class="badge bg-secondary">+{{ menu.recipes.count|add:"-3" }} more</span>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted small">No recipes assigned</span>
+                                    {% endif %}
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <a href="{% url 'larder:menu-detail' menu.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                        <i class="bi bi-eye me-1"></i>View
+                                    </a>
+                                    <a href="{% url 'larder:menu-update' menu.pk %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% empty %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>No menus yet. 
+            <a href="{% url 'larder:menu-create' %}">Create your first menu</a>
+        </div>
+    {% endfor %}
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .hover-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}

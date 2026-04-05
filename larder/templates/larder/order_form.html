@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}{% if order %}Edit Order #{{ order.pk }}{% else %}Create Order{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-cart-check me-2"></i>
+                        {% if order %}Edit Order #{{ order.pk }}{% else %}Create New Order{% endif %}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                {{ error }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="needs-validation">
+                        {% csrf_token %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ form.shopping_list.label }}</label>
+                                    {{ form.shopping_list }}
+                                    {% if form.shopping_list.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.shopping_list.errors.0 }}</div>
+                                    {% endif %}
+                                    <small class="text-muted d-block mt-1">Select the shopping list for this order</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ form.store.label }}</label>
+                                    {{ form.store }}
+                                    {% if form.store.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.store.errors.0 }}</div>
+                                    {% endif %}
+                                    <small class="text-muted d-block mt-1">Where to purchase items</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.status.label }}</label>
+                            {{ form.status }}
+                            {% if form.status.errors %}
+                                <div class="invalid-feedback d-block">{{ form.status.errors.0 }}</div>
+                            {% endif %}
+                            <small class="text-muted d-block mt-1">Current order status</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.total_amount.label }}</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R</span>
+                                {{ form.total_amount }}
+                            </div>
+                            {% if form.total_amount.errors %}
+                                <div class="invalid-feedback d-block">{{ form.total_amount.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.notes.label }}</label>
+                            {{ form.notes }}
+                            <small class="text-muted d-block mt-1">Any additional notes for this order</small>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                {% if order %}Update Order{% else %}Create Order{% endif %}
+                            </button>
+                            <a href="{% url 'larder:order-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control, .form-select, textarea {
+        border: 1px solid #dee2e6;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}

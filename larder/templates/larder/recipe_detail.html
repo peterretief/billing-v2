@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}{{ recipe.name }} - Recipe{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row">
+        <div class="col-lg-10">
+            <!-- Header -->
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h1 class="card-title mb-1">{{ recipe.name }}</h1>
+                            <p class="text-muted mb-0">{{ recipe.description }}</p>
+                        </div>
+                        <div>
+                            {% if recipe.is_vegetarian %}
+                                <span class="badge bg-success"><i class="bi bi-leaf me-1"></i>Vegetarian</span>
+                            {% endif %}
+                            {% if recipe.is_vegan %}
+                                <span class="badge bg-success"><i class="bi bi-stars me-1"></i>Vegan</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- Cooking Times -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded">
+                                <i class="bi bi-clock-history text-primary me-2"></i>
+                                <small class="text-muted d-block">Prep Time</small>
+                                <strong>{{ recipe.prep_time }} min</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded">
+                                <i class="bi bi-fire text-warning me-2"></i>
+                                <small class="text-muted d-block">Cook Time</small>
+                                <strong>{{ recipe.cook_time }} min</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-light rounded">
+                                <i class="bi bi-hourglass-split text-danger me-2"></i>
+                                <small class="text-muted d-block">Total Time</small>
+                                <strong>{{ recipe.prep_time|add:recipe.cook_time }} min</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'larder:recipe-update' recipe.pk %}" class="btn btn-primary">
+                            <i class="bi bi-pencil me-1"></i>Edit
+                        </a>
+                        <a href="{% url 'larder:recipe-delete' recipe.pk %}" class="btn btn-danger" 
+                           onclick="return confirm('Are you sure?')">
+                            <i class="bi bi-trash me-1"></i>Delete
+                        </a>
+                        <a href="{% url 'larder:recipe-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left me-1"></i>Back
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nutritional Information -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card shadow">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="bi bi-heart me-2 text-danger"></i>Nutrition (per serving)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center mb-3">
+                                <div class="col-6">
+                                    <div class="p-2 bg-light rounded">
+                                        <small class="text-muted d-block">Calories</small>
+                                        <strong class="fs-5">{{ recipe.calories }}</strong>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 bg-light rounded">
+                                        <small class="text-muted d-block">Protein</small>
+                                        <strong class="fs-5">{{ recipe.protein }}g</strong>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="p-2 bg-light rounded">
+                                        <small class="text-muted d-block">Carbs</small>
+                                        <strong class="fs-5">{{ recipe.carbs }}g</strong>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-2 bg-light rounded">
+                                        <small class="text-muted d-block">Fat</small>
+                                        <strong class="fs-5">{{ recipe.fat }}g</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Allergens -->
+                <div class="col-md-6">
+                    <div class="card shadow">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Allergens</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if recipe.allergens %}
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for allergen in recipe.allergens %}
+                                        <span class="badge bg-warning">{{ allergen }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted mb-0">No allergens listed</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ingredients -->
+            <div class="card shadow">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-basket2 me-2 text-success"></i>Ingredients</h5>
+                </div>
+                <div class="card-body">
+                    {% if recipe.ingredients.all %}
+                        <ul class="list-group list-group-flush">
+                            {% for ingredient in recipe.ingredients.all %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ ingredient.product.name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ ingredient.product.brand }}</small>
+                                    </div>
+                                    <span class="badge bg-primary rounded-pill">{{ ingredient.quantity }} {{ ingredient.unit }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted mb-0">No ingredients added yet</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

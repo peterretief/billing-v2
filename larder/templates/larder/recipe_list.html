@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Recipes - Meal Planning{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-book me-2 text-primary"></i>Recipes</h2>
+        <a href="{% url 'larder:recipe-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Add Recipe
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        {% for recipe in object_list %}
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100 shadow-sm hover-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title">{{ recipe.name }}</h5>
+                            <div>
+                                {% if recipe.is_vegetarian %}
+                                    <span class="badge bg-success"><i class="bi bi-leaf me-1"></i>Vegetarian</span>
+                                {% endif %}
+                                {% if recipe.is_vegan %}
+                                    <span class="badge bg-success"><i class="bi bi-stars me-1"></i>Vegan</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <p class="text-muted small mb-3">{{ recipe.description|truncatewords:20 }}</p>
+                        
+                        <div class="row text-center mb-3">
+                            <div class="col-6">
+                                <small class="text-muted d-block">Calories</small>
+                                <strong>{{ recipe.calories }}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Time</small>
+                                <strong>{{ recipe.prep_time|add:recipe.cook_time }} min</strong>
+                            </div>
+                        </div>
+
+                        <div class="row text-center mb-3 text-xs">
+                            <div class="col-4">
+                                <small class="text-muted">Protein</small>
+                                <div>{{ recipe.protein }}g</div>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">Carbs</small>
+                                <div>{{ recipe.carbs }}g</div>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">Fat</small>
+                                <div>{{ recipe.fat }}g</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'larder:recipe-detail' recipe.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                <i class="bi bi-eye me-1"></i>View
+                            </a>
+                            <a href="{% url 'larder:recipe-update' recipe.pk %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'larder:recipe-delete' recipe.pk %}" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>No recipes yet. 
+                    <a href="{% url 'larder:recipe-create' %}">Create your first recipe</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .hover-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}

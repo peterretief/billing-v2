@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Shopping Lists - Meal Planning{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-bag-check me-2 text-primary"></i>Shopping Lists</h2>
+        <a href="{% url 'larder:shoppinglist-list' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>New List
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        {% for shopping_list in object_list %}
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title">{{ shopping_list.name }}</h5>
+                            {% if shopping_list.is_purchased %}
+                                <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Purchased</span>
+                            {% else %}
+                                <span class="badge bg-warning"><i class="bi bi-hourglass me-1"></i>Pending</span>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {% if shopping_list.meal_plan %}
+                                <small class="text-muted d-block mb-2">
+                                    <i class="bi bi-calendar me-1"></i>From: {{ shopping_list.meal_plan.name }}
+                                </small>
+                            {% endif %}
+                            <small class="text-muted d-block mb-2">
+                                <i class="bi bi-calendar3 me-1"></i>Created {{ shopping_list.created_at|date:"M d, Y" }}
+                            </small>
+                        </div>
+
+                        <div class="alert alert-light py-2 mb-3">
+                            <small class="text-muted d-block">Items</small>
+                            <strong>{{ shopping_list.shoppinglistitem_set.count }} items</strong>
+                        </div>
+
+                        {% if shopping_list.total_cost %}
+                            <div class="alert alert-light py-2 mb-3">
+                                <small class="text-muted d-block">Estimated Cost</small>
+                                <strong>R{{ shopping_list.total_cost }}</strong>
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'larder:shoppinglist-detail' shopping_list.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                <i class="bi bi-eye me-1"></i>View
+                            </a>
+                            <a href="{% url 'larder:shoppinglist-list' %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>No shopping lists yet. 
+                    <a href="{% url 'larder:shoppinglist-list' %}">Create your first shopping list</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .hover-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}

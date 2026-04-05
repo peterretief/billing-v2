@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}{% if menu %}Edit Menu{% else %}Create Menu{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-list-task me-2"></i>
+                        {% if menu %}Edit Menu: {{ menu.name }}{% else %}Create New Menu{% endif %}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                {{ error }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="needs-validation">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.name.label }}</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.meal_period.label }}</label>
+                            {{ form.meal_period }}
+                            {% if form.meal_period.errors %}
+                                <div class="invalid-feedback d-block">{{ form.meal_period.errors.0 }}</div>
+                            {% endif %}
+                            <small class="text-muted d-block mt-1">Select which meal time this menu is for</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.criteria.label }}</label>
+                            {{ form.criteria }}
+                            <small class="text-muted d-block mt-1">Optional: Select dietary criteria to guide recipe selection</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.recipes.label }}</label>
+                            {{ form.recipes }}
+                            <small class="text-muted d-block mt-1">
+                                <i class="bi bi-info-circle me-1"></i>Select recipes to include in this menu
+                            </small>
+                            {% if form.recipes.errors %}
+                                <div class="invalid-feedback d-block">{{ form.recipes.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                {% if menu %}Update Menu{% else %}Create Menu{% endif %}
+                            </button>
+                            <a href="{% url 'larder:menu-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control, .form-select, textarea {
+        border: 1px solid #dee2e6;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    select[multiple] {
+        height: 200px;
+    }
+</style>
+{% endblock %}

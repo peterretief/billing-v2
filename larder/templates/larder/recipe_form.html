@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}{% if recipe %}Edit Recipe{% else %}Create Recipe{% endif %} - Meal Planning{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-book me-2"></i>
+                        {% if recipe %}Edit Recipe: {{ recipe.name }}{% else %}Create New Recipe{% endif %}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                {{ error }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="needs-validation">
+                        {% csrf_token %}
+
+                        <!-- Basic Info -->
+                        <fieldset class="mb-4">
+                            <legend class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-info-circle me-2"></i>Basic Information
+                            </legend>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.name.label }}</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.description.label }}</label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.prep_time.label }}</label>
+                                        {{ form.prep_time }}
+                                        <small class="text-muted">minutes</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.cook_time.label }}</label>
+                                        {{ form.cook_time }}
+                                        <small class="text-muted">minutes</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- Nutrition -->
+                        <fieldset class="mb-4">
+                            <legend class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-heart me-2"></i>Nutritional Information
+                            </legend>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.calories.label }}</label>
+                                        {{ form.calories }}
+                                        <small class="text-muted">per serving</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.protein.label }}</label>
+                                        {{ form.protein }}
+                                        <small class="text-muted">grams</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.carbs.label }}</label>
+                                        {{ form.carbs }}
+                                        <small class="text-muted">grams</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.fat.label }}</label>
+                                        {{ form.fat }}
+                                        <small class="text-muted">grams</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <!-- Dietary Preferences -->
+                        <fieldset class="mb-4">
+                            <legend class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-leaf me-2"></i>Dietary
+                            </legend>
+                            
+                            <div class="form-check mb-2">
+                                {{ form.is_vegetarian }}
+                                <label class="form-check-label" for="{{ form.is_vegetarian.id_for_label }}">
+                                    {{ form.is_vegetarian.label }}
+                                </label>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                {{ form.is_vegan }}
+                                <label class="form-check-label" for="{{ form.is_vegan.id_for_label }}">
+                                    {{ form.is_vegan.label }}
+                                </label>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.allergens.label }}</label>
+                                {{ form.allergens }}
+                                <small class="text-muted d-block mt-1">Comma-separated list (e.g., peanuts, shellfish)</small>
+                            </div>
+                        </fieldset>
+
+                        <!-- Ingredients -->
+                        <fieldset class="mb-4">
+                            <legend class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-basket me-2"></i>Ingredients
+                            </legend>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.ingredients.label }}</label>
+                                {{ form.ingredients }}
+                                <small class="text-muted d-block mt-1">Select ingredients used in this recipe</small>
+                            </div>
+                        </fieldset>
+
+                        <!-- Form Actions -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                {% if recipe %}Update Recipe{% else %}Create Recipe{% endif %}
+                            </button>
+                            <a href="{% url 'larder:recipe-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control, .form-select, textarea {
+        border: 1px solid #dee2e6;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}
