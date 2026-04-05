@@ -12,4 +12,5 @@ app = Celery("core_project")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Discover tasks from all apps that have tasks
-app.autodiscover_tasks(["invoices", "billing_schedule", "items", "events", "notifications", "clients"])
+# Added 'larder' to this list to discover tasks in the larder app.
+app.autodiscover_tasks(["invoices", "billing_schedule", "items", "notifications", "clients"])

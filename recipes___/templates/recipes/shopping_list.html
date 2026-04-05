@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Shop for Ingredients{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-0"><i class="bi bi-cart4 me-2 text-success"></i>Procurement & Shopping</h2>
+        <p class="text-muted">Aggregate requirements and stock them into your physical inventory.</p>
+    </div>
+    <div class="col-md-4">
+        <form method="GET" class="card border-0 shadow-sm">
+            <div class="card-body py-2">
+                <label class="small fw-bold text-muted text-uppercase mb-1">Scale for Headcount</label>
+                <div class="input-group">
+                    <input type="number" name="headcount" value="{{ headcount }}" class="form-control" min="1">
+                    <button class="btn btn-primary" type="submit">Update</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form method="POST" action="{% url 'recipes:stock_purchased' %}">
+    {% csrf_token %}
+    <div class="card border-0 shadow-sm overflow-hidden mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4" style="width: 40px;">
+                            <input type="checkbox" class="form-check-input" id="selectAll">
+                        </th>
+                        <th>Ingredient</th>
+                        <th class="text-center">Required Qty</th>
+                        <th class="text-end">Est. Cost</th>
+                        <th class="text-center pe-4">Inventory Link</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for name, data in summary.items %}
+                    <tr class="{% if not data.is_linked %}table-light text-muted{% endif %}">
+                        <td class="ps-4">
+                            {% if data.is_linked %}
+                                <input type="checkbox" name="ingredient_ids" value="{{ data.ingredient_id }}" class="form-check-input row-check">
+                                <input type="hidden" name="qtys" value="{{ data.qty }}">
+                            {% else %}
+                                <i class="bi bi-lock-fill text-muted" title="Link to inventory to stock this item"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="fw-bold">{{ name }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-white text-dark border px-3 py-2">{{ data.qty|floatformat:2 }} {{ data.unit }}</span>
+                        </td>
+                        <td class="text-end fw-bold text-primary">
+                            R {{ data.cost|floatformat:2 }}
+                        </td>
+                        <td class="text-center pe-4">
+                            {% if data.is_linked %}
+                                <span class="badge bg-success-subtle text-success border-0 px-3">
+                                    <i class="bi bi-check-circle me-1"></i> LINKED
+                                </span>
+                            {% else %}
+                                <a href="{% url 'recipes:link_to_market' data.ingredient_id %}" class="btn btn-sm btn-outline-warning py-0" style="font-size: 0.7rem;">
+                                    LINK NOW
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted">No items found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center bg-white p-4 rounded shadow-sm border border-success-subtle">
+        <div>
+            <h5 class="fw-bold mb-0">Procurement Action</h5>
+            <p class="text-muted small mb-0">Items checked above will be recorded as "Stock In" transactions in your inventory.</p>
+        </div>
+        <button type="submit" class="btn btn-success btn-lg px-5 shadow">
+            <i class="bi bi-bag-check me-2"></i> Complete Shopping & Update Stock
+        </button>
+    </div>
+</form>
+
+<script>
+    document.getElementById('selectAll').addEventListener('change', function() {
+        const checks = document.querySelectorAll('.row-check');
+        checks.forEach(c => c.checked = this.checked);
+    });
+</script>
+{% endblock %}

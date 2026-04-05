@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="bi bi-box-seam me-2 text-primary"></i>Larder
+            </h2>
+            <p class="text-muted mb-0">Track what's in your pantry and eliminate food waste.</p>
+        </div>
+        <div class="d-flex gap-2">
+            {% if has_urgent %}
+            <a href="{% url 'recipes:larder_cook' %}" class="btn btn-danger">
+                <i class="bi bi-fire me-1"></i> Cook from Larder
+            </a>
+            {% else %}
+            <a href="{% url 'recipes:larder_cook' %}" class="btn btn-outline-success">
+                <i class="bi bi-magic me-1"></i> Cook from Larder
+            </a>
+            {% endif %}
+            <a href="{% url 'recipes:larder_add' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> Add Item
+            </a>
+        </div>
+    </div>
+
+    <!-- Summary bar -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center {% if critical %}border-danger{% endif %}">
+                <div class="card-body py-2">
+                    <div class="text-danger fw-bold fs-4">{{ critical|length }}</div>
+                    <small class="text-muted">Urgent</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center">
+                <div class="card-body py-2">
+                    <div class="text-warning fw-bold fs-4">{{ warning|length }}</div>
+                    <small class="text-muted">This week</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center">
+                <div class="card-body py-2">
+                    <div class="text-success fw-bold fs-4">{{ ok|length }}</div>
+                    <small class="text-muted">OK</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm text-center">
+                <div class="card-body py-2">
+                    <div class="fw-bold fs-4">R {{ total_value|floatformat:2 }}</div>
+                    <small class="text-muted">Est. larder value</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Critical / Expiring -->
+    {% if critical %}
+    <div class="card border-danger border-2 shadow-sm mb-4">
+        <div class="card-header bg-danger text-white fw-bold">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>Use These Now — Expiring Within 48 Hours
+        </div>
+        {% include "recipes/_larder_table.html" with items=critical show_urgency=True %}
+    </div>
+    {% endif %}
+
+    <!-- Warning -->
+    {% if warning %}
+    <div class="card border-warning border-2 shadow-sm mb-4">
+        <div class="card-header bg-warning text-dark fw-bold">
+            <i class="bi bi-clock-history me-2"></i>Use This Week
+        </div>
+        {% include "recipes/_larder_table.html" with items=warning show_urgency=True %}
+    </div>
+    {% endif %}
+
+    <!-- OK -->
+    {% if ok %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold border-bottom">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>In Stock
+        </div>
+        {% include "recipes/_larder_table.html" with items=ok show_urgency=False %}
+    </div>
+    {% endif %}
+
+    <!-- Staples -->
+    {% if staples %}
+    <div class="card border-0 shadow-sm mb-4 bg-light">
+        <div class="card-header bg-light fw-semibold border-bottom">
+            <i class="bi bi-star-fill text-secondary me-2"></i>Staples
+            <small class="text-muted fw-normal ms-2">Always assumed available — not included in expiry alerts</small>
+        </div>
+        {% include "recipes/_larder_table.html" with items=staples show_urgency=False %}
+    </div>
+    {% endif %}
+
+    {% if not critical and not warning and not ok and not staples %}
+    <div class="text-center py-5">
+        <i class="bi bi-box text-muted" style="font-size: 3rem;"></i>
+        <h5 class="mt-3 text-muted">Your larder is empty</h5>
+        <p class="text-muted">Start adding items to track expiry dates and reduce food waste.</p>
+        <a href="{% url 'recipes:larder_add' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Add Your First Item
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

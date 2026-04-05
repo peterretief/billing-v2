@@ -1,16 +1,68 @@
+import io
+import barcode
+from barcode.writer import ImageWriter
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.urls import reverse
+from django.http import HttpResponse
 from .models import Warehouse, InventoryItem, StockTransaction
 from .forms import WarehouseForm, InventoryItemForm, StockTransactionForm
+
+
+
+from integrations.models import IntegrationSettings # Make sure this is imported
 
 @login_required
 def inventory_item_list(request):
     items = InventoryItem.objects.filter(user=request.user)
-    return render(request, 'inventory/item_list.html', {'items': items})
+    # GET THE SETTINGS FOR THE LOGGED IN USER
+    settings, _ = IntegrationSettings.objects.get_or_create(user=request.user)
+    
+    return render(request, 'inventory/item_list.html', {
+        'items': items,
+        'barcodes_enabled': settings.barcodes_enabled # Pass the toggle here!
+    })
+
+@login_required
+def inventory_item_detail(request, pk):
+    item = get_object_or_404(InventoryItem, pk=pk, user=request.user)
+    settings, _ = IntegrationSettings.objects.get_or_create(user=request.user)
+    
+    return render(request, 'inventory/item_detail.html', {
+        'item': item,
+        'barcodes_enabled': settings.barcodes_enabled # And here!
+    })
+
+
+@login_required
+def print_barcode(request, pk):
+    item = get_object_or_404(InventoryItem, pk=pk, user=request.user)
+    
+    if not item.barcode:
+        messages.error(request, "This item does not have a barcode set.")
+        return redirect('inventory:item_detail', pk=item.pk)
+
+    try:
+        # Generate barcode using python-barcode
+        # We use 'code128' as a standard versatile barcode format
+        COD = barcode.get_barcode_class('code128')
+        bar = COD(item.barcode, writer=ImageWriter())
+        
+        # Save to a memory buffer
+        buffer = io.BytesIO()
+        bar.write(buffer)
+        
+        return HttpResponse(buffer.getvalue(), content_type="image/png")
+    except Exception as e:
+        messages.error(request, f"Error generating barcode: {str(e)}")
+        return redirect('inventory:item_detail', pk=item.pk)
 
 @login_required
 def inventory_item_create(request):
+    barcode_param = request.GET.get('barcode')
+    settings, _ = IntegrationSettings.objects.get_or_create(user=request.user)
+    
     if request.method == 'POST':
         form = InventoryItemForm(request.POST)
         if form.is_valid():
@@ -20,12 +72,19 @@ def inventory_item_create(request):
             messages.success(request, f"Item {item.name} created successfully.")
             return redirect('inventory:item_list')
     else:
-        form = InventoryItemForm()
-    return render(request, 'inventory/item_form.html', {'form': form, 'title': 'Create Inventory Item'})
+        form = InventoryItemForm(initial={'barcode': barcode_param})
+    
+    return render(request, 'inventory/item_form.html', {
+        'form': form, 
+        'title': 'Create Inventory Item',
+        'barcodes_enabled': settings.barcodes_enabled
+    })
 
 @login_required
 def inventory_item_update(request, pk):
     item = get_object_or_404(InventoryItem, pk=pk, user=request.user)
+    settings, _ = IntegrationSettings.objects.get_or_create(user=request.user)
+    
     if request.method == 'POST':
         form = InventoryItemForm(request.POST, instance=item)
         if form.is_valid():
@@ -34,7 +93,26 @@ def inventory_item_update(request, pk):
             return redirect('inventory:item_list')
     else:
         form = InventoryItemForm(instance=item)
-    return render(request, 'inventory/item_form.html', {'form': form, 'title': 'Update Inventory Item'})
+        
+    return render(request, 'inventory/item_form.html', {
+        'form': form, 
+        'title': 'Update Inventory Item',
+        'barcodes_enabled': settings.barcodes_enabled
+    })
+
+@login_required
+def item_by_barcode(request):
+    barcode_val = request.GET.get('barcode')
+    if not barcode_val:
+        messages.error(request, "No barcode provided.")
+        return redirect('inventory:item_list')
+    
+    item = InventoryItem.objects.filter(user=request.user, barcode=barcode_val).first()
+    if item:
+        return redirect('inventory:item_update', pk=item.pk)
+    else:
+        messages.info(request, f"No item found with barcode '{barcode_val}'. You can create one now.")
+        return redirect(f"{reverse('inventory:item_create')}?barcode={barcode_val}")
 
 @login_required
 def warehouse_list(request):

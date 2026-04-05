@@ -205,7 +205,7 @@ class ItemBilledFlagTest(TestCase):
         self.today = timezone.now().date()
 
     def test_items_marked_billed_after_invoicing(self):
-        """Test that items are marked as_billed=True after invoice creation."""
+        """Test that items are marked billed (linked to invoice) after invoice creation."""
         # Create item
         item = Item.objects.create(
             user=self.user,
@@ -213,7 +213,6 @@ class ItemBilledFlagTest(TestCase):
             description="Test Service",
             quantity=Decimal("1.00"),
             unit_price=Decimal("100.00"),
-            is_billed=False,
             is_recurring=False,
         )
 
@@ -228,19 +227,28 @@ class ItemBilledFlagTest(TestCase):
         )
 
         item.invoice = invoice
-        item.is_billed = True
         item.save()
 
-        # Verify item is billed
+        # Verify item is billed (has invoice)
         item.refresh_from_db()
-        self.assertTrue(item.is_billed)
+        self.assertIsNotNone(item.invoice)
 
         # Verify unbilled items list excludes it
-        unbilled = Item.objects.filter(user=self.user, is_billed=False, is_recurring=False)
+        unbilled = Item.objects.filter(user=self.user, invoice__isnull=True, is_recurring=False)
         self.assertEqual(unbilled.count(), 0)
 
     def test_unbilled_items_filter(self):
         """Test that only unbilled items show in the list."""
+        # Create invoice for billing one item
+        invoice = Invoice.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            number="INV-001",
+            status="DRAFT",
+            date_issued=self.today,
+            due_date=self.today + timedelta(days=14),
+        )
+
         # Create 2 items
         item1 = Item.objects.create(
             user=self.user,
@@ -248,7 +256,7 @@ class ItemBilledFlagTest(TestCase):
             description="Billed Item",
             quantity=Decimal("1.00"),
             unit_price=Decimal("100.00"),
-            is_billed=True,
+            invoice=invoice,
             is_recurring=False,
         )
 
@@ -258,12 +266,11 @@ class ItemBilledFlagTest(TestCase):
             description="Unbilled Item",
             quantity=Decimal("1.00"),
             unit_price=Decimal("200.00"),
-            is_billed=False,
             is_recurring=False,
         )
 
         # Filter as ItemListView does
-        unbilled = Item.objects.filter(user=self.user, is_billed=False, is_recurring=False)
+        unbilled = Item.objects.filter(user=self.user, invoice__isnull=True, is_recurring=False)
 
         self.assertEqual(unbilled.count(), 1)
         self.assertEqual(unbilled.first().description, "Unbilled Item")

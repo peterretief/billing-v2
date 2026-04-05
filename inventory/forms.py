@@ -14,9 +14,10 @@ class WarehouseForm(forms.ModelForm):
 class InventoryItemForm(forms.ModelForm):
     class Meta:
         model = InventoryItem
-        fields = ['sku', 'name', 'description', 'unit_of_measure', 'reorder_level', 'current_stock', 'buy_price', 'sell_price']
+        fields = ['sku', 'barcode', 'name', 'description', 'unit_of_measure', 'reorder_level', 'current_stock', 'buy_price', 'sell_price']
         widgets = {
             'sku': forms.TextInput(attrs={'class': 'form-control'}),
+            'barcode': forms.TextInput(attrs={'class': 'form-control'}),
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'unit_of_measure': forms.TextInput(attrs={'class': 'form-control'}),

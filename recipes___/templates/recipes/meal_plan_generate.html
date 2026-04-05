@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="mb-4">
+                <h2 class="fw-bold mb-0">
+                    <i class="bi bi-calendar-plus me-2 text-primary"></i>Generate Meal Plan
+                </h2>
+                <p class="text-muted mb-0">Auto-fill a week or month of meals based on your dietary preferences.</p>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.title.id_for_label }}" class="form-label fw-medium">Plan Title</label>
+                            {{ form.title }}
+                            {% if form.title.errors %}<div class="text-danger small mt-1">{{ form.title.errors }}</div>{% endif %}
+                            <div class="form-text">{{ form.title.help_text }}</div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-6">
+                                <label for="{{ form.start_date.id_for_label }}" class="form-label fw-medium">Start Date</label>
+                                {{ form.start_date }}
+                                {% if form.start_date.errors %}<div class="text-danger small mt-1">{{ form.start_date.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-6">
+                                <label for="{{ form.end_date.id_for_label }}" class="form-label fw-medium">End Date</label>
+                                {{ form.end_date }}
+                                {% if form.end_date.errors %}<div class="text-danger small mt-1">{{ form.end_date.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-magic me-1"></i> Generate Plan
+                            </button>
+                            <a href="{% url 'recipes:preferences' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-sliders me-1"></i> Edit Preferences
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mt-3 bg-light">
+                <div class="card-body p-3">
+                    <small class="text-muted">
+                        <i class="bi bi-lightbulb me-1 text-warning"></i>
+                        Recipes are assigned based on your <a href="{% url 'recipes:preferences' %}">dietary preferences</a>.
+                        Recipes must have a matching <strong>meal type</strong> (breakfast/lunch/dinner) to appear in the right slot.
+                        No repeats within the same week.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Default start_date to today if empty
+    document.addEventListener('DOMContentLoaded', function() {
+        const startInput = document.getElementById('{{ form.start_date.id_for_label }}');
+        const endInput = document.getElementById('{{ form.end_date.id_for_label }}');
+        if (startInput && !startInput.value) {
+            const today = new Date().toISOString().split('T')[0];
+            startInput.value = today;
+            if (endInput && !endInput.value) {
+                const nextWeek = new Date(Date.now() + 6 * 86400000).toISOString().split('T')[0];
+                endInput.value = nextWeek;
+            }
+        }
+    });
+</script>
+{% endblock %}

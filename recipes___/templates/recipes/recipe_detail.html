@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}{{ recipe.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{% url 'recipes:recipe_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'recipes:recipe_list' %}" class="text-decoration-none">Recipe Book</a></li>
+                    <li class="breadcrumb-item active">{{ recipe.name }}</li>
+                </ol>
+            </nav>
+            <h1 class="fw-bold mb-0 text-primary">{{ recipe.name }}</h1>
+        </div>
+        <div class="btn-group shadow-sm">
+            <a href="{% url 'recipes:recipe_update' recipe.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil me-1"></i> Edit
+            </a>
+            <a href="{% url 'recipes:shopping_list' %}" class="btn btn-success">
+                <i class="bi bi-cart-check me-1"></i> Shop
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-5">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm text-center py-3">
+                <div class="card-body">
+                    <span class="text-muted d-block small text-uppercase fw-bold mb-1">Servings Yield</span>
+                    <span class="fs-3 fw-bold">{{ recipe.servings_yield }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm text-center py-3">
+                <div class="card-body">
+                    <span class="text-muted d-block small text-uppercase fw-bold mb-1">Cost Per Person</span>
+                    <span class="fs-3 fw-bold text-success">R {{ recipe.cost_per_serving|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm text-center py-3">
+                <div class="card-body">
+                    <span class="text-muted d-block small text-uppercase fw-bold mb-1">Calories Per Person</span>
+                    <span class="fs-3 fw-bold text-fire">{{ recipe.calories_per_serving|floatformat:0 }} <small class="text-muted fs-6">kcal</small></span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm text-center py-3 bg-light">
+                <div class="card-body">
+                    <span class="text-muted d-block small text-uppercase fw-bold mb-1">Total Batch Cost</span>
+                    <span class="fs-3 fw-bold">R {{ recipe.total_cost|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Ingredients -->
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 border-0">
+                    <h4 class="fw-bold mb-0"><i class="bi bi-list-check me-2 text-primary"></i>Ingredients</h4>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Item</th>
+                                    <th class="text-center">Qty</th>
+                                    <th class="text-end">Calories</th>
+                                    <th class="text-end pe-3">Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for comp in recipe.components.all %}
+                                <tr>
+                                    <td class="ps-3">
+                                        <div class="fw-bold">{{ comp.ingredient.name }}</div>
+                                        {% if comp.ingredient.market_ref %}
+                                            <span class="badge bg-success-subtle text-success small border-0" style="font-size: 0.6rem;">MARKET SYNCED</span>
+                                        {% else %}
+                                            <a href="{% url 'recipes:link_to_market' comp.ingredient.id %}" class="badge bg-light text-muted text-decoration-none small border" style="font-size: 0.6rem;">LINK TO MARKET</a>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {{ comp.quantity_used|floatformat:2 }} <span class="text-muted small">{{ comp.ingredient.unit }}</span>
+                                    </td>
+                                    <td class="text-end text-muted small">{{ comp.calories|floatformat:0 }} kcal</td>
+                                    <td class="text-end pe-3">R {{ comp.component_cost|floatformat:2 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted small">No ingredients added yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Method -->
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 border-0">
+                    <h4 class="fw-bold mb-0"><i class="bi bi-book me-2 text-primary"></i>Method</h4>
+                </div>
+                <div class="card-body">
+                    <div class="instructions-text" style="white-space: pre-wrap; line-height: 1.8; color: #444;">
+                        {% if recipe.instructions %}
+                            {{ recipe.instructions }}
+                        {% else %}
+                            <p class="text-muted italic">No instructions provided for this recipe.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

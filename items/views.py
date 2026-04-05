@@ -22,6 +22,17 @@ from .forms import ItemForm
 from .models import Item
 from .services import import_recurring_to_invoices
 
+from django.shortcuts import get_object_or_404
+from decimal import Decimal, InvalidOperation
+from clients.models import Client
+from inventory.models import InventoryItem
+from inventory.models import StockTransaction
+from integrations.models import ItemInventoryLink
+
+from inventory.models import InventoryItem
+from clients.models import Client
+        
+
 
 class ItemListView(LoginRequiredMixin, ListView):
     model = Item
@@ -33,8 +44,8 @@ class ItemListView(LoginRequiredMixin, ListView):
         # Items with is_billed=False OR invoice=NULL will show
         return Item.objects.filter(
             user=self.request.user,
-            is_billed=False,  # Check is_billed status
             is_recurring=False,  # Only one-offs, not recurring templates
+            invoice__isnull=True
         ).order_by("-date")
 
     def get_context_data(self, **kwargs):
@@ -56,14 +67,11 @@ class ItemListView(LoginRequiredMixin, ListView):
         ctx["inventory_enabled"] = False 
 
         if settings and settings.inventory_enabled:
-            from inventory.models import InventoryItem
-            from clients.models import Client
             
             # Fetch the inventory-specific data
             ctx["inventory_items"] = InventoryItem.objects.filter(
-                user=self.request.user, 
-                current_stock__gt=0
-            )
+                user=self.request.user
+            ).order_by('name')
             ctx["active_clients"] = Client.objects.filter(
                 user=self.request.user
             ).order_by('name')
@@ -162,7 +170,7 @@ def generate_invoice_from_items(request):
         
         items = (
             Item.objects.select_for_update()
-            .filter(id__in=selected_ids, user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True)
+            .filter(id__in=selected_ids, user=request.user, is_recurring=False, invoice__isnull=True)
             .select_related("client")
         )
 
@@ -185,7 +193,6 @@ def generate_invoice_from_items(request):
             )
 
             for item in client_items:
-                item.is_billed = True
                 item.invoice = invoice
                 item.save()
 
@@ -286,11 +293,6 @@ def trigger_billing(request):
 
 @login_required
 def create_item_from_inventory(request):
-    from django.shortcuts import get_object_or_404
-    from decimal import Decimal, InvalidOperation
-    from clients.models import Client
-    from inventory.models import InventoryItem
-    from integrations.models import ItemInventoryLink
     
     if request.method != "POST":
         return redirect("items:item_list")
@@ -310,27 +312,49 @@ def create_item_from_inventory(request):
     client = get_object_or_404(Client, pk=client_id, user=request.user)
     inv_item = get_object_or_404(InventoryItem, pk=inventory_item_id, user=request.user)
     
-# Check if sell_price is actually set
+    # Check if sell_price is actually set
     if inv_item.sell_price is None:
         messages.error(request, f"Cannot add '{inv_item.name}': It has no Sell Price defined in Inventory.")
         return redirect('items:item_list')
 
-    billing_item = Item.objects.create(
-        user=request.user,
-        client=client,
-        description=f"{inv_item.name} ({inv_item.sku})",
-        quantity=quantity,
-        unit_price=inv_item.sell_price,
-        is_billed=False
-    )
+    # Stock Level Guardrail
+    if inv_item.current_stock < quantity:
+        messages.error(
+            request, 
+            f"Insufficient stock for '{inv_item.name}'. Available: {inv_item.current_stock}, Requested: {quantity}"
+        )
+        return redirect('items:item_list')
+
+    with transaction.atomic():
+        # Real-time Stock Decrement
+        inv_item.current_stock -= quantity
+        inv_item.save(update_fields=['current_stock'])
+
+        # Create Stock Transaction for Audit Trail
+        StockTransaction.objects.create(
+            user=request.user,
+            inventory_item=inv_item,
+            transaction_type='OUT',
+            quantity=quantity,
+            reference=f"Allocated to billing: {client.name}",
+            notes=f"Created unbilled item for {inv_item.name}"
+        )
+
+        billing_item = Item.objects.create(
+            user=request.user,
+            client=client,
+            description=f"{inv_item.name} ({inv_item.sku})",
+            quantity=quantity,
+            unit_price=inv_item.sell_price
+        )
+        
+        ItemInventoryLink.objects.create(
+            user=request.user,
+            item=billing_item,
+            inventory_item=inv_item,
+            quantity_multiplier=1.0,
+            auto_decrement=True
+        )
     
-    ItemInventoryLink.objects.create(
-        user=request.user,
-        item=billing_item,
-        inventory_item=inv_item,
-        quantity_multiplier=1.0,
-        auto_decrement=True
-    )
-    
-    messages.success(request, f"Created unbilled item {quantity} x {inv_item.name} for {client.name}.")
+    messages.success(request, f"Created unbilled item {quantity} x {inv_item.name} for {client.name}. Stock decremented.")
     return redirect('items:item_list')

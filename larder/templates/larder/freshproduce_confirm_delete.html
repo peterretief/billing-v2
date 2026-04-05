@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Delete Produce - Billing v2{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-trash me-2"></i>Confirm Deletion</h5>
+                </div>
+                <div class="card-body">
+                    <p>Are you sure you want to delete <strong>{{ object.name }}</strong>?</p>
+                    <p class="text-muted">This action cannot be undone.</p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'larder:freshproduce-list' %}">
+                        <button type="submit" class="btn btn-danger"><i class="bi bi-trash me-1"></i>Delete</button>
+                        <a href="{% url 'larder:freshproduce-list' %}" class="btn btn-link"><i class="bi bi-arrow-left me-1"></i>Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -78,7 +78,7 @@ def send_invoice_async(invoice_id):
         with transaction.atomic():
             # FIX: Only mark items as billed, don't touch invoice status yet
             # Status will be set by email_invoice_to_client only after successful send
-            invoice.billed_items.all().update(is_billed=True)
+            #invoice.billed_items.all().update(is_billed=True)
             
             # Update last_billed_date for recurring items
             item_desc = invoice.billed_items.values_list("description", flat=True)

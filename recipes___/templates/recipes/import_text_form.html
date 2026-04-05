@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Ingredient Import{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold"><i class="bi bi-file-earmark-text me-2 text-success"></i>Bulk Ingredient Import</h2>
+            <p class="text-muted">Paste a list of ingredients (even with quantities and instructions) and we'll parse them into your system.</p>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="recipe_name" class="form-label fw-bold small text-muted text-uppercase">Collection/Recipe Name</label>
+                        <input type="text" name="recipe_name" id="recipe_name" class="form-control" placeholder="e.g. My Shopping List, Sunday Roast..." required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="text" class="form-label fw-bold small text-muted text-uppercase">Ingredient List</label>
+                        <textarea name="text" id="text" rows="12" class="form-control font-monospace" 
+                                  placeholder="4 chicken breasts&#10;2 tbsp olive oil&#10;1 onion, chopped..." required></textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg shadow-sm">
+                            <i class="bi bi-cpu me-2"></i> Parse & Add Ingredients
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-light border-0 py-3 small text-muted">
+                <i class="bi bi-lightbulb me-2"></i>
+                <strong>Pro Tip:</strong> You can paste messy text! Our AI is trained to find names, units, and quantities even in descriptive sentences.
+            </div>
+        </div>
+
+        <div class="mt-4 text-center">
+            <a href="{% url 'recipes:recipe_dashboard' %}" class="btn btn-link text-decoration-none">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

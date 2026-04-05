@@ -91,7 +91,28 @@
                                 </li>
                             {% endfor %}
 
-                            {# Updated: Changed is_ops to is_staff/superuser for visibility #}
+                            {# Commented out Recipes app references #}
+                            {% comment %}
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle {% if 'recipes' in request.path %}active fw-bold{% endif %}"
+                                   href="#" data-bs-toggle="dropdown">
+                                    <i class="bi bi-journal-richtext me-1"></i>Recipes
+                                </a>
+                                <ul class="dropdown-menu shadow">
+                                    <li><a class="dropdown-item" href="{% url 'recipes:recipe_dashboard' %}"><i class="bi bi-speedometer2 me-2 text-primary"></i>Dashboard</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'recipes:recipe_list' %}"><i class="bi bi-journal-text me-2 text-secondary"></i>Recipe Book</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'recipes:larder_dashboard' %}"><i class="bi bi-box-seam me-2 text-warning"></i>Larder</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'recipes:larder_cook' %}"><i class="bi bi-fire me-2 text-danger"></i>Cook from Larder</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'recipes:meal_plan_list' %}"><i class="bi bi-calendar-week me-2 text-success"></i>Meal Plans</a></li>
+                                    <li><a class="dropdown-item" href="{% url 'recipes:preferences' %}"><i class="bi bi-sliders me-2 text-info"></i>Preferences</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'recipes:market_sources' %}"><i class="bi bi-shop me-2 text-primary"></i>Market Prices</a></li>
+                                </ul>
+                            </li>
+                            {% endcomment %}
+
                             {% if user.is_staff or user.is_superuser %}
                                 <li class="nav-item ms-lg-3">
                                     <a class="nav-link fw-bold {% if request.resolver_match.url_name == 'portfolio_summary' %}active{% endif %}"
@@ -119,6 +140,15 @@
                                     <li>
                                         <a class="dropdown-item {% if 'email_status' in request.path %}active fw-bold{% endif %}"
                                            href="{% url 'core:email_status' %}">Email Status</a>
+                                    </li>
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item {% if 'off-lookup' in request.path %}active fw-bold{% endif %}"
+                                           href="{% url 'larder:off-lookup' %}">
+                                            <i class="bi bi-barcode-scan me-2 text-primary"></i>OpenFoodFacts Lookup
+                                        </a>
                                     </li>
                                 </ul>
                             </li>
@@ -164,6 +194,9 @@
                                     <li class="px-3 py-1 fw-bold text-muted small text-uppercase">Account</li>
                                     <li>
                                         <a class="dropdown-item" href="{% url 'core:update_profile' %}"><i class="bi bi-person-gear me-2 text-muted"></i> Profile</a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'integrations:settings' %}"><i class="bi bi-gear-wide-connected me-2 text-primary"></i> System Settings</a>
                                     </li>
                                     <li>
                                         <a class="dropdown-item" href="{% url 'core:plugin_settings' %}"><i class="bi bi-puzzle me-2 text-warning"></i> Plugin Management</a>

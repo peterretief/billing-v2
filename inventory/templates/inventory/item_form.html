@@ -12,10 +12,49 @@
                 <div class="card-body p-4">
                     <form method="post">
                         {% csrf_token %}
-                        {{ form|crispy }}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.sku|as_crispy_field }}
+                            </div>
+                            {% if barcodes_enabled %}
+                            <div class="col-md-6 mb-3">
+                                {{ form.barcode|as_crispy_field }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.name|as_crispy_field }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.description|as_crispy_field }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                {{ form.unit_of_measure|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.reorder_level|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                {{ form.current_stock|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.buy_price|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.sell_price|as_crispy_field }}
+                            </div>
+                        </div>
+                        
                         <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-success">Save Item</button>
-                            <a href="{% url 'inventory:item_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-circle me-1"></i> Save Item
+                            </button>
+                            <a href="{% url 'inventory:item_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i> Cancel
+                            </a>
                         </div>
                     </form>
                 </div>

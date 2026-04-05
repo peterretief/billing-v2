@@ -22,5 +22,8 @@ urlpatterns = [
     path("__debug__/", include("debug_toolbar.urls")),
     path("scheduler/", include("billing_schedule.urls")),
     path("inventory/", include("inventory.urls")),
+    path("integrations/", include("integrations.urls")),
+    path('larder/', include('larder.urls')),
+    # path("recipes/", include("recipes.urls")),
     # path("ops/", include("ops.urls")),  # Disabled for now, can be re-enabled later if needed
 ]

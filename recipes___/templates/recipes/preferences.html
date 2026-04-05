@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="bi bi-sliders me-2 text-primary"></i>Dietary Preferences
+            </h2>
+            <p class="text-muted mb-0">Control what recipes appear in your meal plans.</p>
+        </div>
+        <div>
+            <a href="{% url 'recipes:meal_plan_generate' %}" class="btn btn-primary">
+                <i class="bi bi-calendar-week me-1"></i> Generate Meal Plan
+            </a>
+        </div>
+    </div>
+
+    {% if pref.active_filters %}
+    <div class="alert alert-info d-flex align-items-center gap-2">
+        <i class="bi bi-funnel-fill"></i>
+        <span>Active filters: <strong>{{ pref.active_filters|join:", " }}</strong></span>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <h5 class="fw-semibold mb-3">Dietary Restrictions</h5>
+                        <div class="row g-3 mb-4">
+                            {% for field in form %}
+                                {% if field.field.widget.input_type == "checkbox" and "excluded" not in field.name %}
+                                <div class="col-6 col-md-4">
+                                    <div class="form-check form-switch p-3 border rounded h-100">
+                                        {{ field }}
+                                        <label class="form-check-label fw-medium ms-2" for="{{ field.id_for_label }}">
+                                            {{ field.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <h5 class="fw-semibold mb-3">Servings</h5>
+                        <div class="mb-4">
+                            <label for="{{ form.servings.id_for_label }}" class="form-label">
+                                Number of people to cook for
+                            </label>
+                            {{ form.servings }}
+                            {% if form.servings.errors %}
+                                <div class="text-danger small mt-1">{{ form.servings.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        <h5 class="fw-semibold mb-3">Cuisine Preferences <span class="text-muted fw-normal">(optional)</span></h5>
+                        <div class="mb-4">
+                            {{ form.preferred_cuisines }}
+                            <div class="form-text">{{ form.preferred_cuisines.help_text }}</div>
+                        </div>
+
+                        <h5 class="fw-semibold mb-3">Excluded Ingredients <span class="text-muted fw-normal">(optional)</span></h5>
+                        <div class="mb-4">
+                            {% if form.excluded_ingredients.field.queryset.exists %}
+                            <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;">
+                                {{ form.excluded_ingredients }}
+                            </div>
+                            <div class="form-text">{{ form.excluded_ingredients.help_text }}</div>
+                            {% else %}
+                            <p class="text-muted small">No ingredients in your library yet.</p>
+                            {% endif %}
+                        </div>
+
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-lg me-1"></i> Save Preferences
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5 mt-4 mt-lg-0">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-primary"></i>How It Works</h6>
+                    <ul class="list-unstyled small text-muted">
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Dietary flags filter which recipes appear in generated meal plans.</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>The <strong>Servings</strong> number scales shopping list quantities.</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Excluded ingredients remove any recipe that contains them.</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Recipe flags are set when you import or scrape a recipe. You can also recompute them from ingredients via the admin.</li>
+                    </ul>
+                    <hr>
+                    <a href="{% url 'recipes:meal_plan_list' %}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-list-ul me-1"></i> View My Meal Plans
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

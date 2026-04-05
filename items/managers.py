@@ -1,12 +1,26 @@
 # items/managers.py
+
+from django.utils import timezone as django_timezone
+
+from django.utils import timezone
+
 from django.db import models
 from django.db.models import F, Sum
 from core.managers import TenantManager
 
 
 class ItemManager(TenantManager):
+
+    def queued_for_billing(self, user):
+        """Recurring items not yet billed this month."""
+        current_month_start = timezone.now().date().replace(day=1)
+        return self.filter(
+            user=user,
+            is_recurring=True,
+        ).exclude(last_billed_date__gte=current_month_start)
+
     def unbilled(self, user):
-        return self.filter(user=user, is_billed=False)
+        return self.filter(user=user, invoice__isnull=True)
 
     def total_unbilled_value(self, user, client=None):
         queryset = self.unbilled(user)

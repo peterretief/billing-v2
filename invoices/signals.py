@@ -11,7 +11,6 @@ from invoices.models import Invoice, Payment
 
 # --- 1. Total Calculations (Standard Only) ---
 
-
 @receiver(post_save, sender=Invoice)
 def update_totals_on_tax_mode_change(sender, instance, created, **kwargs):
     """
@@ -97,18 +96,8 @@ connect_custom_signals()
 
 @receiver(post_save, sender=Invoice)
 def update_items_on_sent(sender, instance, **kwargs):
+    pass
     # Changed from 'SENT' to 'PENDING' to match your Status choices
-    if instance.status == "PENDING":
-        instance.billed_items.all().update(is_billed=True)
-
-        from items.models import Item
-
-        item_descriptions = instance.billed_items.values_list("description", flat=True)
-        Item.objects.filter(
-            user=instance.user, client=instance.client, is_recurring=True, description__in=item_descriptions
-        ).update(last_billed_date=timezone.now().date())
-
-
 # --- 4. Delete Signal Handlers (Critical for Data Integrity) ---
 
 

@@ -41,7 +41,6 @@ class DashboardMetricsTest(TestCase):
             Item.objects.create(
                 user=self.user,
                 client=self.client_obj,
-                is_billed=False,
                 is_recurring=True,
                 quantity=Decimal("2.00"),
                 unit_price=Decimal("100.00"),
@@ -74,7 +73,6 @@ class DashboardMetricsTest(TestCase):
             Item.objects.create(
                 user=self.user,
                 client=self.client_obj,
-                is_billed=False,
                 is_recurring=False,
                 quantity=Decimal("1.00"),
                 unit_price=Decimal("100.00"),

@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
 from django.core.mail import send_mail
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect, render, reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -736,4 +736,92 @@ def plugin_settings(request):
         "page_title": "Plugin Management",
         "profile": profile,
     })
+
+
+@login_required
+def system_settings(request):
+    """
+    Integrated settings view that combines:
+    - Business Profile
+    - Working Hours
+    - Audit & Anomaly Detection
+    - Plugin Management
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    
+    # Identify which form was submitted
+    form_id = request.POST.get("form_id", "")
+    active_tab = request.GET.get("tab", "profile")
+    
+    # Initialize all forms
+    profile_form = UserProfileForm(
+        request.POST if form_id == "profile" else None,
+        request.FILES if form_id == "profile" else None,
+        instance=profile
+    )
+    working_hours_form = WorkingHoursForm(
+        request.POST if form_id == "working_hours" else None,
+        instance=profile
+    )
+    audit_form = AuditSettingsForm(
+        request.POST if form_id == "audit" else None,
+        instance=profile
+    )
+    plugin_form = PluginSettingsForm(
+        request.POST if form_id == "plugins" else None,
+        instance=profile
+    )
+
+    if request.method == "POST":
+        valid = False
+        if form_id == "profile" and profile_form.is_valid():
+            profile_form.save()
+            messages.success(request, "Business profile updated.")
+            valid = True
+            active_tab = "profile"
+        elif form_id == "working_hours" and working_hours_form.is_valid():
+            working_hours_form.save()
+            messages.success(request, "Working hours updated.")
+            valid = True
+            active_tab = "working_hours"
+        elif form_id == "audit" and audit_form.is_valid():
+            audit_form.save()
+            messages.success(request, "Audit settings updated.")
+            valid = True
+            active_tab = "audit"
+        elif form_id == "plugins" and plugin_form.is_valid():
+            plugin_form.save()
+            messages.success(request, "Plugin settings updated.")
+            valid = True
+            active_tab = "plugins"
+
+        if valid:
+            # Trigger real-time updates if necessary
+            response = redirect(f"{reverse('core:system_settings')}?tab={active_tab}")
+            if form_id == "profile":
+                response["HX-Trigger"] = "profileUpdated"
+            return response
+
+    # Pass trigger fields separately for the audit tab (as done in the original view)
+    trigger_fields = [
+        audit_form["detect_zero_total"],
+        audit_form["detect_no_items"],
+        audit_form["detect_statistical_outliers"],
+        audit_form["detect_email_delivery_failure"],
+        audit_form["detect_missing_email"],
+        audit_form["detect_vat_mismatch"],
+        audit_form["detect_duplicate_items"],
+    ]
+
+    context = {
+        "profile_form": profile_form,
+        "working_hours_form": working_hours_form,
+        "audit_form": audit_form,
+        "plugin_form": plugin_form,
+        "trigger_fields": trigger_fields,
+        "active_tab": active_tab,
+        "page_title": "System Settings",
+    }
+    
+    return render(request, "core/system_settings.html", context)
 

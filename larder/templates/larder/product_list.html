@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Master Product List - Billing v2{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-list-check me-2 text-primary"></i>Master Product Registry</h2>
+        <a href="{% url 'larder:off-lookup' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i> Add via Barcode
+        </a>
+    </div>
+
+    <div class="card shadow">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Product</th>
+                        <th>Brand</th>
+                        <th>Barcode</th>
+                        <th>Quality Score</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold">{{ product.name }}</div>
+                                <small class="text-muted">{{ product.metadata.category|join:", " }}</small>
+                            </td>
+                            <td>{{ product.brand }}</td>
+                            <td><code>{{ product.barcode }}</code></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-2" style="height: 10px; min-width: 100px;">
+                                        <div class="progress-bar {% if product.quality_score > 70 %}bg-success{% elif product.quality_score > 40 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                             role="progressbar" style="width: {{ product.quality_score }}%"></div>
+                                    </div>
+                                    <span class="small fw-bold">{{ product.quality_score }}</span>
+                                </div>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'larder:price-comparison' product.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-tags me-1"></i> Prices
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="bi bi-search mb-2 d-block" style="font-size: 2rem;"></i>
+                                No products found. Scan a barcode to get started!
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

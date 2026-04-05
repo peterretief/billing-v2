@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0 fw-bold text-dark"><i class="bi bi-box-seam me-2 text-primary"></i>Item Details</h4>
+                    <div>
+                        <a href="{% url 'inventory:item_update' item.pk %}" class="btn btn-sm btn-outline-primary me-2">
+                            <i class="bi bi-pencil me-1"></i> Edit
+                        </a>
+                        <a href="{% url 'inventory:item_list' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-muted text-uppercase small fw-bold">SKU</h6>
+                            <p class="fs-5 fw-bold mb-0">{{ item.sku }}</p>
+                        </div>
+                        {% if barcodes_enabled %}
+                        <div class="col-md-6">
+                            <h6 class="text-muted text-uppercase small fw-bold">Barcode</h6>
+                            <div class="d-flex align-items-center">
+                                <p class="fs-5 mb-0 me-3">{% if item.barcode %}{{ item.barcode }}{% else %}<span class="text-muted italic">Not set</span>{% endif %}</p>
+                                {% if item.barcode %}
+                                <a href="{% url 'inventory:print_barcode' item.pk %}" target="_blank" class="btn btn-sm btn-outline-dark">
+                                    <i class="bi bi-printer me-1"></i> Print Barcode
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-muted text-uppercase small fw-bold">Item Name</h6>
+                        <p class="fs-4 fw-bold mb-0 text-primary">{{ item.name }}</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-muted text-uppercase small fw-bold">Description</h6>
+                        <p class="mb-0">{% if item.description %}{{ item.description }}{% else %}<span class="text-muted">No description provided.</span>{% endif %}</p>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <h6 class="text-muted text-uppercase small fw-bold">Stock Level</h6>
+                            <p class="fs-4 mb-0 {% if item.current_stock <= item.reorder_level %}text-danger{% else %}text-success{% endif %}">
+                                <span class="fw-bold">{{ item.current_stock }}</span> <span class="small">{{ item.unit_of_measure }}</span>
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted text-uppercase small fw-bold">Reorder Level</h6>
+                            <p class="fs-4 mb-0 text-muted fw-bold">{{ item.reorder_level }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted text-uppercase small fw-bold">Unit of Measure</h6>
+                            <p class="fs-5 mb-0 text-dark fw-bold">{{ item.unit_of_measure }}</p>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted text-uppercase small fw-bold">Buy Price</h6>
+                            <p class="fs-5 mb-0 text-dark fw-bold">
+                                {% if item.buy_price %}{{ GLOBAL_CURRENCY }}{{ item.buy_price|floatformat:2 }}{% else %}-{% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted text-uppercase small fw-bold">Sell Price</h6>
+                            <p class="fs-5 mb-0 text-dark fw-bold">
+                                {% if item.sell_price %}{{ GLOBAL_CURRENCY }}{{ item.sell_price|floatformat:2 }}{% else %}-{% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-light py-3 border-top">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted small">Multi-tenant Isolation: Active</span>
+                        <a href="{% url 'inventory:transaction_create' %}?item_id={{ item.id }}" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-arrow-left-right me-1"></i> Record Movement
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

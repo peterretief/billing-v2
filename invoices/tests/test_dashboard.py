@@ -16,31 +16,30 @@ User = get_user_model()
 class PaymentValidationTest(TestCase):
     """Full test suite for Payment validation and Invoice status synchronization."""
 
+    def setUp(self):
+        self.user = User.objects.create_user(username="test_user", password="password")
+        self.client_obj = Client.objects.create(user=self.user, name="Test", client_code="TST")
 
-def setUp(self):
-    self.user = User.objects.create_user(username="test_user", password="password")
-    self.client_obj = Client.objects.create(user=self.user, name="Test", client_code="TST")
+        # 1. Create the invoice
+        self.invoice = Invoice.objects.create(
+            user=self.user,
+            client=self.client_obj,
+            number="INV-TST-001",
+            status="SENT",
+            date_issued=timezone.now().date(),
+            due_date=timezone.now().date() + timedelta(days=14),
+        )
 
-    # 1. Create the invoice
-    self.invoice = Invoice.objects.create(
-        user=self.user,
-        client=self.client_obj,
-        number="INV-TST-001",
-        status="SENT",
-        date_issued=timezone.now().date(),
-        due_date=timezone.now().date() + timedelta(days=14),
-    )
+        # 2. Add the item
+        Item.objects.create(user=self.user, invoice=self.invoice, quantity=Decimal("5.00"), unit_price=Decimal("100.00"))
 
-    # 2. Add the item
-    Item.objects.create(user=self.user, invoice=self.invoice, quantity=Decimal("5.00"), unit_price=Decimal("100.00"))
+        # 3. THE FIX: Sync totals and REFRESH from the database
+        # This forces the R500.00 to move from the Item into the Invoice record
+        self.invoice.sync_totals()
+        self.invoice.save()
 
-    # 3. THE FIX: Sync totals and REFRESH from the database
-    # This forces the R500.00 to move from the Item into the Invoice record
-    self.invoice.sync_totals()
-    self.invoice.save()
-
-    # This reloads the 'total_amount' field so balance_due is no longer R0.00
-    self.invoice.refresh_from_db()
+        # This reloads the 'total_amount' field so balance_due is no longer R0.00
+        self.invoice.refresh_from_db()
 
     def test_payment_under_balance_succeeds(self):
         """Verify that payments under balance due are accepted."""

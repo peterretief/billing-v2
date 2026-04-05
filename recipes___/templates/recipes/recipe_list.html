@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="bi bi-journal-text me-2 text-primary"></i>Recipe Book
+            </h2>
+            <p class="text-muted mb-0">Manage your menu costs and ingredient requirements.</p>
+        </div>
+        <div class="btn-group shadow-sm">
+            <a href="{% url 'recipes:shopping_list' %}" class="btn btn-outline-success">
+                <i class="bi bi-cart-check me-1"></i> Shopping List
+            </a>
+            <a href="{% url 'recipes:scrape_recipe' %}" class="btn btn-outline-primary">
+                <i class="bi bi-magic me-1"></i> Magic Import
+            </a>
+            <a href="{% url 'recipes:recipe_create' %}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i> New Recipe
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        {% for recipe in recipes %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm hover-shadow transition">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title fw-bold mb-0">{{ recipe.name }}</h5>
+                        <span class="badge bg-light text-dark border">
+                            {{ recipe.servings }} Servings
+                        </span>
+                    </div>
+                    
+                    <p class="card-text text-muted small mb-4">
+                        {{ recipe.description|default:"No description provided."|truncatewords:20 }}
+                    </p>
+
+                    <div class="row g-0 text-center border rounded py-2 bg-light">
+                        <div class="col-6 border-end">
+                            <small class="d-block text-muted text-uppercase" style="font-size: 0.7rem;">Batch Cost</small>
+                            <span class="fw-bold">R {{ recipe.total_cost|floatformat:2 }}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="d-block text-muted text-uppercase" style="font-size: 0.7rem;">Per Person</small>
+                            <span class="fw-bold text-success">R {{ recipe.cost_per_serving|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer bg-white border-0 d-flex gap-2 pb-3">
+                    <a href="{% url 'recipes:recipe_detail' recipe.pk %}" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-eye me-1"></i> View Detail
+                    </a>
+                    <a href="{% url 'recipes:recipe_update' recipe.pk %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5">
+            <div class="mb-3">
+                <i class="bi bi-patch-question fs-1 text-muted"></i>
+            </div>
+            <h4>No recipes created yet.</h4>
+            <p class="text-muted">Once you add recipes, you can track ingredient costs and generate shopping lists.</p>
+            <a href="{% url 'recipes:recipe_create' %}" class="btn btn-primary mt-2">
+                Create Your First Recipe
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .hover-shadow:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .transition {
+        transition: all 0.3s ease;
+    }
+</style>
+{% endblock %}

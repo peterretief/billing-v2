@@ -68,6 +68,8 @@ class IntegrationSettings(TenantModel):
     inventory_enabled = models.BooleanField(default=False, help_text="Inventory linked items")
     timesheets_enabled = models.BooleanField(default=False, help_text="Billable timesheets")
     calendar_events_enabled = models.BooleanField(default=False, help_text="Google Calendar Sync")
+    barcodes_enabled = models.BooleanField(default=False, help_text="Barcode generation and scanning")
+    # recipes_enabled = models.BooleanField(default=False, help_text="Recipe Costing")
 
     class Meta:
         verbose_name = "Integration Setting"

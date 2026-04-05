@@ -230,7 +230,6 @@ class InvoiceDeletionTest(TestCase):
             description="Test Item",
             quantity=1,
             unit_price=Decimal("100.00"),
-            is_billed=True,  # Mark as billed
             invoice=self.invoice  # Link to invoice
         )
         
@@ -249,16 +248,16 @@ class InvoiceDeletionTest(TestCase):
         """Test that deleting invoice resets is_billed on items."""
         # Before deletion
         self.item.refresh_from_db()
-        self.assertTrue(self.item.is_billed)
+        self.assertIsNotNone(self.item.invoice)
         
         # Delete invoice (in real usage this happens via view)
-        self.invoice.billed_items.all().update(is_billed=False)
-        self.invoice.billed_timesheets.all().update(is_billed=False)
+        self.invoice.billed_items.all().update(invoice=None)
+        self.invoice.billed_timesheets.all().update(is_billed=False, invoice=None)
         self.invoice.delete()
         
         # After deletion
         self.item.refresh_from_db()
-        self.assertFalse(self.item.is_billed)
+        self.assertIsNone(self.item.invoice)
 
     def test_deletion_resets_timesheet_is_billed_flag(self):
         """Test that deleting invoice resets is_billed on timesheets."""
@@ -267,8 +266,8 @@ class InvoiceDeletionTest(TestCase):
         self.assertTrue(self.timesheet.is_billed)
         
         # Delete invoice (in real usage this happens via view)
-        self.invoice.billed_items.all().update(is_billed=False)
-        self.invoice.billed_timesheets.all().update(is_billed=False)
+        self.invoice.billed_items.all().update(invoice=None)
+        self.invoice.billed_timesheets.all().update(is_billed=False, invoice=None)
         self.invoice.delete()
         
         # After deletion
@@ -278,14 +277,14 @@ class InvoiceDeletionTest(TestCase):
     def test_deleted_items_available_for_new_invoice(self):
         """Test that items become available for new invoice after deletion."""
         # Delete the invoice
-        self.invoice.billed_items.all().update(is_billed=False)
-        self.invoice.billed_timesheets.all().update(is_billed=False)
+        self.invoice.billed_items.all().update(invoice=None)
+        self.invoice.billed_timesheets.all().update(is_billed=False, invoice=None)
         self.invoice.delete()
         
         # Item should now be available
         available_items = Item.objects.filter(
             user=self.user,
-            is_billed=False
+            invoice__isnull=True
         )
         self.assertIn(self.item, available_items)
 

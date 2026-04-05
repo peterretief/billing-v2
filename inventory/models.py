@@ -13,6 +13,7 @@ class Warehouse(TenantModel):
 class InventoryItem(TenantModel):
     """The physical stock item being tracked."""
     sku = models.CharField(max_length=100, db_index=True)
+    barcode = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     unit_of_measure = models.CharField(max_length=50, default="Units") # e.g., kg, liters, boxes

@@ -12,6 +12,7 @@ CELERY_BEAT_SCHEDULE = {
     "daily-billing-policy-queue": {
         "task": "billing_schedule.tasks.process_daily_billing_queue",
         "schedule": crontab(minute=1, hour=0),  # Run at 00:01 daily
+        #"schedule": crontab(minute='*/5'),  # Runs every 5 minutes for testing  
     },
 }
 
@@ -27,6 +28,9 @@ load_dotenv(BASE_DIR / ".env")
 # --- CORE SETTINGS ---
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-b9=kayw#kvdwn!5mo=7#tsyxph)6j2&gu$nswyx(20deuyt5wl")
 DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
+
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 
 ALLOWED_HOSTS = [
@@ -77,6 +81,9 @@ INSTALLED_APPS = [
     "notifications",
     "integrations",
     "inventory",
+    'rest_framework',  # Add this
+    'larder',
+    #"recipes",
     "widget_tweaks",
     "crispy_forms",
     "crispy_bootstrap5",

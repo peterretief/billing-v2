@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Magic Recipe Import{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="text-center mb-4">
+            <h2 class="fw-bold"><i class="bi bi-magic me-2 text-primary"></i>Magic Recipe Import</h2>
+            <p class="text-muted">Paste a URL from any recipe website, and we'll extract the ingredients and instructions for you.</p>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="url" class="form-label fw-bold small text-muted text-uppercase">Recipe URL</label>
+                        <input type="url" name="url" id="url" class="form-control form-control-lg" 
+                               placeholder="https://www.bbcgoodfood.com/recipes/..." required>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                            <span class="htmx-indicator spinner-border spinner-border-sm me-2"></span>
+                            Extract & Save Recipe
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-light border-0 py-3">
+                <div class="d-flex align-items-center text-muted small">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <div>This uses AI to parse the website content. You can review and edit the recipe after it's imported.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4 text-center">
+            <a href="{% url 'recipes:recipe_list' %}" class="btn btn-link text-decoration-none">
+                <i class="bi bi-arrow-left me-1"></i> Back to Recipe Book
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

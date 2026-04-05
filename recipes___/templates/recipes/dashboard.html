@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Recipe Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-0"><i class="bi bi-speedometer2 me-2 text-primary"></i>Recipe Dashboard</h2>
+        <p class="text-muted">Manage your culinary operations and market price alignment.</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="d-flex gap-2 justify-content-end flex-wrap">
+            <a href="{% url 'recipes:scrape_recipe' %}" class="btn btn-primary">
+                <i class="bi bi-magic me-1"></i> Import Recipe
+            </a>
+            <a href="{% url 'recipes:larder_dashboard' %}" class="btn {% if urgent_larder_count %}btn-danger{% else %}btn-outline-secondary{% endif %}">
+                <i class="bi bi-box-seam me-1"></i> Larder
+                {% if urgent_larder_count %}<span class="badge bg-white text-danger ms-1">{{ urgent_larder_count }}</span>{% endif %}
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row mb-4 g-3">
+    <div class="col-6 col-md-3">
+        <a href="{% url 'recipes:recipe_list' %}" class="text-decoration-none">
+            <div class="card border-0 shadow-sm text-center py-3 h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small fw-bold">Recipes</h6>
+                    <h2 class="fw-bold mb-0">{{ total_recipes }}</h2>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-3">
+        <a href="{% url 'recipes:larder_dashboard' %}" class="text-decoration-none">
+            <div class="card border-0 shadow-sm text-center py-3 h-100 {% if urgent_larder_count %}border-danger border-2{% endif %}">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small fw-bold">Larder Items</h6>
+                    <h2 class="fw-bold mb-0 {% if urgent_larder_count %}text-danger{% endif %}">{{ larder_total }}</h2>
+                    {% if urgent_larder_count %}
+                    <small class="text-danger">{{ urgent_larder_count }} expiring</small>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3 h-100">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase small fw-bold">Market Linked</h6>
+                <h2 class="fw-bold mb-0 text-success">{{ linked_ingredients }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <a href="{% url 'recipes:market_explorer' %}" class="text-decoration-none">
+            <div class="card border-0 shadow-sm text-center py-3 h-100">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small fw-bold">Market Catalog</h6>
+                    <h2 class="fw-bold mb-0 text-primary">{{ market_items_count }}</h2>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Expensive Recipes -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0"><i class="bi bi-graph-up-arrow me-2 text-danger"></i>Highest Cost Recipes</h5>
+                <a href="{% url 'recipes:recipe_list' %}" class="btn btn-sm btn-outline-secondary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Recipe</th>
+                                <th>Servings</th>
+                                <th class="text-end pe-3">Batch Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for recipe in expensive_recipes %}
+                            <tr>
+                                <td class="ps-3">
+                                    <a href="{% url 'recipes:recipe_detail' recipe.pk %}" class="text-decoration-none fw-bold">{{ recipe.name }}</a>
+                                </td>
+                                <td>{{ recipe.servings_yield }}</td>
+                                <td class="text-end pe-3 fw-bold text-danger">R {{ recipe.total_cost|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-muted py-3">No recipes yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-lightning-charge me-2 text-warning"></i>Quick Actions</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+
+                    <!-- Larder — highlighted if urgent -->
+                    <a href="{% url 'recipes:larder_dashboard' %}" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center {% if urgent_larder_count %}list-group-item-danger{% endif %}">
+                        <div>
+                            <i class="bi bi-box-seam me-2 {% if urgent_larder_count %}text-danger{% else %}text-secondary{% endif %}"></i>
+                            <strong>Larder</strong>
+                            <small class="text-muted ms-2">Track pantry stock &amp; expiry dates</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            {% if urgent_larder_count %}
+                            <span class="badge bg-danger">{{ urgent_larder_count }} urgent</span>
+                            {% endif %}
+                            <i class="bi bi-chevron-right small text-muted"></i>
+                        </div>
+                    </a>
+
+                    <a href="{% url 'recipes:larder_cook' %}" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-fire me-2 text-danger"></i>
+                            <strong>Cook from Larder</strong>
+                            <small class="text-muted ms-2">AI recipe from what's expiring</small>
+                        </div>
+                        <i class="bi bi-chevron-right small text-muted"></i>
+                    </a>
+
+                    <a href="{% url 'recipes:meal_plan_list' %}" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-calendar-week me-2 text-primary"></i>
+                            <strong>Meal Plans</strong>
+                            {% if latest_plan %}
+                            <small class="text-muted ms-2">Latest: {{ latest_plan.title }}</small>
+                            {% else %}
+                            <small class="text-muted ms-2">Plan your week or month</small>
+                            {% endif %}
+                        </div>
+                        <i class="bi bi-chevron-right small text-muted"></i>
+                    </a>
+
+                    <a href="{% url 'recipes:meal_plan_generate' %}" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-calendar-plus me-2 text-success"></i>
+                            <strong>Generate Meal Plan</strong>
+                            <small class="text-muted ms-2">Auto-fill based on your preferences</small>
+                        </div>
+                        <i class="bi bi-chevron-right small text-muted"></i>
+                    </a>
+
+                    <a href="{% url 'recipes:preferences' %}" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-sliders me-2 text-info"></i>
+                            <strong>Dietary Preferences</strong>
+                            <small class="text-muted ms-2">Filters for meal plan generation</small>
+                        </div>
+                        <i class="bi bi-chevron-right small text-muted"></i>
+                    </a>
+
+                    <a href="{% url 'recipes:recipe_list' %}" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-journal-text me-2 text-primary"></i>
+                            <strong>Recipe Book</strong>
+                            <small class="text-muted ms-2">Browse all your recipes</small>
+                        </div>
+                        <i class="bi bi-chevron-right small text-muted"></i>
+                    </a>
+
+                    <a href="{% url 'recipes:market_explorer' %}" class="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-shop me-2 text-success"></i>
+                            <strong>Market Prices</strong>
+                            <small class="text-muted ms-2">Browse price catalog</small>
+                        </div>
+                        <i class="bi bi-chevron-right small text-muted"></i>
+                    </a>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

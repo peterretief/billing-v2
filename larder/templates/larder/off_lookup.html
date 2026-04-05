@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}OpenFoodFacts Lookup - Billing v2{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex align-items-center">
+                    <i class="bi bi-barcode-scan me-2"></i>
+                    <h5 class="mb-0">OpenFoodFacts Barcode Lookup</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Enter a barcode to check if the product exists in the OpenFoodFacts database and add it to the local master list.</p>
+                    
+                    <form method="post" class="mb-4">
+                        {% csrf_token %}
+                        <div class="input-group">
+                            <input type="text" name="barcode" class="form-control form-control-lg" placeholder="Enter barcode (e.g., 5449000000996)" value="{{ barcode }}" required autofocus>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-search me-1"></i> Lookup
+                            </button>
+                        </div>
+                    </form>
+
+                    {% if error %}
+                        <div class="alert alert-danger d-flex align-items-center" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <div>{{ error }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if product %}
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <i class="bi bi-check-circle me-1"></i> Product Found
+                                {% if is_new %}
+                                    <span class="badge bg-light text-success ms-2">New Locally</span>
+                                {% else %}
+                                    <span class="badge bg-light text-success ms-2">Existing Locally</span>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 text-center mb-3 mb-md-0">
+                                        {% if product.metadata.image_url %}
+                                            <img src="{{ product.metadata.image_url }}" alt="{{ product.name }}" class="img-fluid rounded shadow-sm" style="max-height: 200px;">
+                                        {% else %}
+                                            <div class="bg-light p-4 rounded d-flex align-items-center justify-content-center" style="height: 150px;">
+                                                <i class="bi bi-box-seam text-secondary" style="font-size: 4rem;"></i>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if product.metadata.nutriscore %}
+                                            <div class="mt-3">
+                                                <span class="badge bg-dark p-2">Nutri-Score: <span class="text-uppercase fw-bold text-info">{{ product.metadata.nutriscore }}</span></span>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-8">
+                                        <h4 class="card-title">{{ product.name }}</h4>
+                                        <p class="text-muted mb-2"><strong>Brand:</strong> {{ product.brand }}</p>
+                                        <p class="mb-2"><strong>Barcode:</strong> <code>{{ product.barcode }}</code></p>
+                                        
+                                        {% if product.nutrition_data %}
+                                            <div class="mt-3">
+                                                <h6>Nutrition Data (per {{ product.nutrition_data.per|default:"100g" }}):</h6>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    {% for key, value in product.nutrition_data.items %}
+                                                        {% if key != 'per' and value != None %}
+                                                            <span class="badge bg-info text-dark">{{ key|title }}: {{ value }}</span>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        {% endif %}
+
+                                        {% if product.metadata.ingredients %}
+                                            <div class="mt-3">
+                                                <h6>Ingredients:</h6>
+                                                <p class="small text-muted" style="max-height: 100px; overflow-y: auto;">
+                                                    {{ product.metadata.ingredients }}
+                                                </p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent border-success d-flex justify-content-between align-items-center">
+                                <span class="text-muted small">Source: {{ product.metadata.source|default:"Local DB" }}</span>
+                                <a href="https://world.openfoodfacts.org/product/{{ product.barcode }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    View on OpenFoodFacts <i class="bi bi-box-arrow-up-right ms-1"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <a href="{% url 'invoices:dashboard' %}" class="btn btn-link">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

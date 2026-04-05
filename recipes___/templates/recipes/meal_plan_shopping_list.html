@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">
+                <i class="bi bi-cart3 me-2 text-success"></i>Shopping List
+            </h2>
+            <p class="text-muted mb-0">
+                <strong>{{ meal_plan.title }}</strong>
+                &nbsp;·&nbsp; {{ meal_plan.start_date }} → {{ meal_plan.end_date }}
+                &nbsp;·&nbsp; {{ meal_plan.total_days }} day{{ meal_plan.total_days|pluralize }}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="regenerate">
+                <button type="submit" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Regenerate
+                </button>
+            </form>
+            <a href="{% url 'recipes:meal_plan_detail' meal_plan.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-calendar-week me-1"></i> View Plan
+            </a>
+        </div>
+    </div>
+
+    <!-- Cost summary cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4">
+            <div class="card border-0 shadow-sm text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small fw-semibold text-uppercase mb-1">
+                        <i class="bi bi-box-seam me-1 text-success"></i>In Your Larder
+                    </div>
+                    <div class="fw-bold fs-4 text-success">R {{ shopping_list.larder_savings|floatformat:2 }}</div>
+                    <small class="text-muted">already stocked — no spend needed</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card border-0 shadow-sm text-center h-100">
+                <div class="card-body py-3">
+                    <div class="text-muted small fw-semibold text-uppercase mb-1">
+                        <i class="bi bi-cart3 me-1 text-primary"></i>Still To Buy
+                    </div>
+                    <div class="fw-bold fs-4 text-primary">R {{ shopping_list.total_cost|floatformat:2 }}</div>
+                    <small class="text-muted">shortfall to purchase</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm text-center h-100 bg-dark text-white">
+                <div class="card-body py-3">
+                    <div class="opacity-75 small fw-semibold text-uppercase mb-1">
+                        <i class="bi bi-calculator me-1"></i>Total Plan Cost
+                    </div>
+                    <div class="fw-bold fs-4">R {{ shopping_list.total_plan_cost|floatformat:2 }}</div>
+                    <small class="opacity-75">at current prices (all ingredients)</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-store purchase cost breakdown -->
+    {% if cost_by_store %}
+    <div class="row g-2 mb-4">
+        {% for store, cost in cost_by_store.items %}
+        {% if cost > 0 %}
+        <div class="col-auto">
+            <div class="badge bg-light text-dark border px-3 py-2" style="font-size: 0.85rem;">
+                <i class="bi bi-shop me-1 text-primary"></i>{{ store }}: <strong>R {{ cost|floatformat:2 }}</strong>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Items grouped by store -->
+    {% for store, items in items_by_store.items %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+            <span class="fw-semibold">
+                <i class="bi bi-shop me-2 text-primary"></i>{{ store }}
+            </span>
+            <span class="text-muted small">
+                R {{ cost_by_store|dictsort:0|first|last|floatformat:2 }}
+                {# fallback – actual value shown in footer #}
+            </span>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-3">Ingredient</th>
+                        <th class="text-end">Need</th>
+                        <th class="text-end text-success">In Larder</th>
+                        <th class="text-end text-primary">To Buy</th>
+                        <th class="text-end">Buy Cost</th>
+                        <th class="text-end pe-3"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr class="{% if item.is_fully_covered %}table-success{% elif item.is_partially_covered %}table-warning{% endif %}">
+                        <td class="ps-3 fw-medium">
+                            {{ item.ingredient.name }}
+                            {% if item.is_fully_covered %}
+                            <span class="badge bg-success ms-1" title="Fully covered by larder">✓</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-muted">
+                            {{ item.total_quantity|floatformat:"-3" }} {{ item.unit }}
+                        </td>
+                        <td class="text-end text-success fw-medium">
+                            {% if item.quantity_in_larder > 0 %}
+                                {{ item.quantity_in_larder|floatformat:"-3" }} {{ item.unit }}
+                                <br><small class="text-muted">(R {{ item.larder_value|floatformat:2 }})</small>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-semibold {% if item.is_fully_covered %}text-muted{% else %}text-primary{% endif %}">
+                            {% if item.is_fully_covered %}
+                                <span class="text-success">Covered</span>
+                            {% else %}
+                                {{ item.quantity_to_buy|floatformat:"-3" }} {{ item.unit }}
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-bold {% if item.is_fully_covered %}text-muted{% else %}text-primary{% endif %}">
+                            {% if item.is_fully_covered %}
+                                —
+                            {% else %}
+                                R {{ item.estimated_cost|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-2">
+                            {% if not item.is_fully_covered %}
+                            <form method="post" action="{% url 'recipes:shopping_list_item_purchased' meal_plan.pk item.pk %}">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="btn btn-xs btn-outline-success"
+                                        style="font-size: 0.72rem; padding: 2px 7px;"
+                                        title="Mark as purchased and add to larder">
+                                    <i class="bi bi-box-arrow-in-down me-1"></i>Bought
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="3" class="ps-3 fw-semibold text-muted">Store subtotal</td>
+                        <td colspan="2" class="text-end fw-bold text-primary">
+                            R {{ cost_by_store|dictsort:0|first|last|floatformat:2 }}
+                            {# real value — template filter limitation, real numbers shown per-item #}
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    {% empty %}
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-cart-check" style="font-size: 2.5rem;"></i>
+        <p class="mt-2 fw-semibold">Everything is covered by your larder!</p>
+        <p class="small">All ingredients needed for this plan are already stocked.</p>
+    </div>
+    {% endfor %}
+
+    <p class="text-muted small mt-2">
+        <i class="bi bi-clock me-1"></i>Generated {{ shopping_list.generated_at|date:"d M Y H:i" }}
+        &nbsp;·&nbsp;
+        <a href="{% url 'recipes:larder_dashboard' %}" class="text-muted">
+            <i class="bi bi-box-seam me-1"></i>View Larder
+        </a>
+    </p>
+
+</div>
+{% endblock %}

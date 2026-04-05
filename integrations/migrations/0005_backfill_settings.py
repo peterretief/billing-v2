@@ -16,7 +16,7 @@ def backfill_integration_settings(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('integrations', '0001_initial'), # Ensure this matches your first migration
+        ('integrations', '0004_integrationsettings'),
     ]
     operations = [
         migrations.RunPython(backfill_integration_settings),

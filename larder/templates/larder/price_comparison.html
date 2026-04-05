@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Price Comparison: {{ product.name }} - Billing v2{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Sidebar: Product Info -->
+        <div class="col-md-4 mb-4">
+            <div class="card shadow">
+                <div class="card-body text-center">
+                    {% if product.metadata.image_url %}
+                        <img src="{{ product.metadata.image_url }}" alt="{{ product.name }}" class="img-fluid rounded mb-3" style="max-height: 150px;">
+                    {% endif %}
+                    <h4>{{ product.name }}</h4>
+                    <p class="text-muted mb-2">{{ product.brand }}</p>
+                    <code>{{ product.barcode }}</code>
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label d-block small fw-bold">Quality Score: {{ product.quality_score }}</label>
+                        <div class="progress" style="height: 15px;">
+                            <div class="progress-bar {% if product.quality_score > 70 %}bg-success{% elif product.quality_score > 40 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                 role="progressbar" style="width: {{ product.quality_score }}%"></div>
+                        </div>
+                    </div>
+                    <a href="{% url 'larder:product-list' %}" class="btn btn-link btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i> Back to Product Registry
+                    </a>
+                </div>
+            </div>
+
+            <!-- Add New Price Card -->
+            <div class="card shadow mt-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-plus-circle me-1"></i> Record New Price</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label small">Store</label>
+                            <select name="store" class="form-select form-select-sm" required>
+                                <option value="">Select Store...</option>
+                                {% for store in stores %}
+                                    <option value="{{ store.id }}">{{ store.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6 mb-3">
+                                <label class="form-label small">Price ({{ GLOBAL_CURRENCY }})</label>
+                                <input type="number" name="price" step="0.01" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label small">Unit Size</label>
+                                <input type="number" name="unit_size" step="0.01" class="form-control form-control-sm" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Unit Type</label>
+                            <select name="unit_type" class="form-select form-select-sm">
+                                <option value="g">Grams (g)</option>
+                                <option value="kg">Kilograms (kg)</option>
+                                <option value="ml">Milliliters (ml)</option>
+                                <option value="l">Liters (l)</option>
+                                <option value="unit">Units</option>
+                            </select>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_on_sale" id="saleCheck">
+                            <label class="form-check-label small" for="saleCheck">Is on Sale?</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Save Price Point</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main: Comparison Table -->
+        <div class="col-md-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Supplier Comparison</h5>
+                    <span class="badge bg-light text-primary">{{ prices.count }} Price Points recorded</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>Shelf Price</th>
+                                    <th>Unit Cost</th>
+                                    <th>Last Updated</th>
+                                    <th>Best Value?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for price in prices %}
+                                    <tr {% if price.is_on_sale %}class="table-warning"{% endif %}>
+                                        <td>
+                                            <span class="fw-bold">{{ price.store.name }}</span>
+                                            {% if price.is_on_sale %}
+                                                <span class="badge bg-danger ms-1">SALE</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ GLOBAL_CURRENCY }} {{ price.price }} <small class="text-muted">({{ price.unit_size }}{{ price.unit_type }})</small></td>
+                                        <td>
+                                            <span class="fw-bold text-success">{{ GLOBAL_CURRENCY }} {{ price.price_per_standard_unit|stringformat:".2f" }}</span>
+                                            <small class="text-muted">/ 100{{ price.unit_type|default:"g" }}</small>
+                                        </td>
+                                        <td><small>{{ price.last_updated|date:"d M Y" }}</small></td>
+                                        <td>
+                                            {% if forloop.first %}
+                                                <i class="bi bi-trophy-fill text-warning" title="Best shelf price"></i>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">No price data available yet. Add your first supplier record on the left.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quality Insight -->
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <i class="bi bi-lightbulb me-2"></i> Quality Breakdown
+                </div>
+                <div class="card-body small">
+                    <div class="row">
+                        <div class="col-sm-6 border-end">
+                            <p class="mb-1"><strong>Nutri-Score:</strong> <span class="text-uppercase">{{ product.metadata.nutriscore|default:"N/A" }}</span></p>
+                            <p class="mb-1"><strong>NOVA Group:</strong> {{ product.metadata.nova_group|default:"N/A" }}</p>
+                            <p class="mb-0 text-muted">A higher Nutri-Score (A) and lower NOVA Group (1) indicate better nutritional quality and less processing.</p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p class="mb-1"><strong>Labels:</strong> {{ product.metadata.labels|join:", "|default:"None" }}</p>
+                            <p class="mb-1"><strong>Ingredients:</strong> {{ product.metadata.ingredients|truncatewords:20|default:"N/A" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

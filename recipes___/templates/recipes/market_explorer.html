@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Market Explorer{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2 class="fw-bold mb-0">
+            <i class="bi bi-shop me-2 text-primary"></i>Market Price Explorer
+        </h2>
+        <p class="text-muted">Browse 700+ daily produce prices from Cape Town Market.</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <form method="GET" class="input-group shadow-sm">
+            <input type="text" name="q" class="form-control" placeholder="Search produce..." value="{{ query }}">
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-search"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th class="ps-4">Commodity</th>
+                    <th>Variety</th>
+                    <th>SKU Key</th>
+                    <th class="text-center">Weight</th>
+                    <th class="text-center">Size</th>
+                    <th class="text-end pe-4">Avg Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td class="ps-4">
+                        <span class="fw-bold text-dark">{{ item.commodity }}</span>
+                    </td>
+                    <td><span class="badge bg-light text-dark border">{{ item.variety }}</span></td>
+                    <td class="text-muted small">{{ item.sku_key }}</td>
+                    <td class="text-center">{{ item.weight }} kg</td>
+                    <td class="text-center"><span class="badge rounded-pill bg-info text-dark">{{ item.class_size }}</span></td>
+                    <td class="text-end pe-4 fw-bold text-success">
+                        R {{ item.total_price|floatformat:2 }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="bi bi-search-heart display-4 text-muted mb-3 d-block"></i>
+                        <p class="text-muted">No market items found matching "{{ query }}".</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
