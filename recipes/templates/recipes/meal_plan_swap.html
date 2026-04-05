@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="mb-4">
+                <h2 class="fw-bold mb-0">
+                    <i class="bi bi-arrow-repeat me-2 text-primary"></i>Swap Meal
+                </h2>
+                <p class="text-muted mb-0">
+                    Replacing <strong>{{ slot|capfirst }}</strong> on <strong>{{ day.date|date:"l, d F Y" }}</strong>
+                </p>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body p-3">
+                    <p class="small text-muted mb-1">Current recipe:</p>
+                    {% if current_recipe %}
+                    <strong>{{ current_recipe.name }}</strong>
+                    <span class="badge bg-light text-dark border ms-2">{{ current_recipe.get_meal_type_display }}</span>
+                    {% else %}
+                    <em class="text-muted">None assigned</em>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-semibold border-bottom">
+                    <i class="bi bi-search me-1"></i> Pick a Replacement
+                </div>
+                <div class="card-body p-0">
+                    <div style="max-height: 500px; overflow-y: auto;">
+                        {% for recipe in available_recipes %}
+                        <form method="post" action="{% url 'recipes:meal_plan_swap' meal_plan.pk day.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="slot" value="{{ slot }}">
+                            <input type="hidden" name="recipe_id" value="{{ recipe.pk }}">
+                            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+                                <div>
+                                    <span class="fw-medium">{{ recipe.name }}</span>
+                                    <span class="badge bg-light text-dark border ms-2 small">{{ recipe.get_meal_type_display }}</span>
+                                    {% if recipe.is_vegetarian %}<span class="badge bg-success ms-1 small">V</span>{% endif %}
+                                    {% if recipe.is_vegan %}<span class="badge bg-success ms-1 small">VG</span>{% endif %}
+                                    {% if recipe.is_gluten_free %}<span class="badge bg-warning text-dark ms-1 small">GF</span>{% endif %}
+                                    <br>
+                                    <small class="text-muted">R {{ recipe.cost_per_serving|floatformat:2 }}/serving · {{ recipe.servings_yield }} servings</small>
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-outline-primary ms-3 flex-shrink-0">
+                                    Select
+                                </button>
+                            </div>
+                        </form>
+                        {% empty %}
+                        <div class="text-center text-muted py-4">No recipes available.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <a href="{% url 'recipes:meal_plan_detail' meal_plan.pk %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Plan
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

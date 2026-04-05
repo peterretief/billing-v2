@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
 from google import genai
+from httpcore import request
 
 from clients.models import Client
 from core.decorators import setup_required
@@ -192,19 +193,25 @@ def dashboard(request):
     unbilled_ts = TimesheetEntry.objects.filter(user=request.user, is_billed=False).aggregate(
         total_value=Sum(F("hours") * F("hourly_rate")),
     )
-    unbilled_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).aggregate(
+    
+    unbilled_items = Item.objects.filter(user=request.user, is_recurring=False, invoice__isnull=True).aggregate(
         total_value=Sum(F("quantity") * F("unit_price"))
     )
-    queued_items = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).aggregate(
+    queued_items = Item.objects.queued_for_billing(request.user).aggregate(
         total_value=Sum(F("quantity") * F("unit_price"))
     )
+
     flagged_count = (
         BillingAuditLog.objects.filter(user=request.user, is_anomaly=True).exclude(invoice__status="PAID").count()
     )
     # Get counts for dashboard cards
-    queued_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).count()
+#    queued_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=True).count()
+    queued_items_count = Item.objects.queued_for_billing(request.user).count()
+
     unbilled_ts_count = TimesheetEntry.objects.filter(user=request.user, is_billed=False).count()
-    unbilled_items_count = Item.objects.filter(user=request.user, is_billed=False, is_recurring=False, invoice__isnull=True).count()
+    
+    unbilled_items_count = Item.objects.filter(user=request.user, is_recurring=False, invoice__isnull=True).count()
+
     total_billed_invoices = invoices.exclude(status__in=["DRAFT", "DISCARDED", "CANCELLED"]).count()
     outstanding_invoices_count = invoices.exclude(status__in=["DRAFT", "PAID", "DISCARDED", "CANCELLED"]).count()
     pending_quotes_count = invoices.filter(is_quote=True).count()
@@ -602,7 +609,6 @@ def duplicate_invoice(request, pk):
                 description=item.description,
                 quantity=item.quantity,
                 unit_price=item.unit_price,
-                is_billed=False,
             )
         Invoice.objects.update_totals(new_invoice)
     messages.success(request, f"Duplicated as Draft #{new_invoice.id}")
@@ -1184,8 +1190,8 @@ def delete_invoice(request, pk):
         return redirect("invoices:invoice_detail", pk=pk)
     if request.method == "POST":
         # Reset is_billed flag on all items/timesheets linked to this invoice
-        invoice.billed_items.all().update(is_billed=False)
-        invoice.billed_timesheets.all().update(is_billed=False)
+        invoice.billed_items.all().update(invoice=None)
+        invoice.billed_timesheets.all().update(is_billed=False, invoice=None)
         invoice.delete()
         return redirect("invoices:invoice_list")
     return render(request, "invoices/invoice_confirm_delete.html", {"invoice": invoice})
