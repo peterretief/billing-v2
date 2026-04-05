@@ -422,3 +422,53 @@ class Order(TenantModel):
         self.status = 'delivered'
         self.delivered_at = timezone.now()
         self.save()
+
+
+class ShoppingListItem(models.Model):
+    """Individual items in a shopping list."""
+    shopping_list = models.ForeignKey(
+        ShoppingList,
+        on_delete=models.CASCADE,
+        related_name='shoppinglistitem_set'
+    )
+    
+    product = models.ForeignKey(
+        ProductMaster,
+        on_delete=models.CASCADE,
+        related_name='shopping_list_items'
+    )
+    
+    quantity = models.DecimalField(max_digits=8, decimal_places=2)
+    unit = models.CharField(
+        max_length=20,
+        default='unit',
+        help_text="g, kg, ml, l, unit, etc."
+    )
+    
+    estimated_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    
+    purchased = models.BooleanField(default=False)
+    purchased_at = models.DateTimeField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['product__name']
+        unique_together = ('shopping_list', 'product')
+    
+    def __str__(self):
+        return f"{self.product.name} ({self.quantity} {self.unit})"
+    
+    def mark_purchased(self):
+        """Mark item as purchased."""
+        from django.utils import timezone
+        self.purchased = True
+        self.purchased_at = timezone.now()
+        self.save()
+        self.save()

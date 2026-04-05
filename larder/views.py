@@ -5,13 +5,15 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.http import HttpResponseForbidden, JsonResponse
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import (
     LarderItem, GroceryStore, ProductMaster, ProductPrice,
-    Recipe, Menu, MealPlan, ShoppingList, Ingredient, Criteria, Order, MealPlanDay
+    Recipe, Menu, MealPlan, ShoppingList, Ingredient, Criteria, Order, MealPlanDay, ShoppingListItem
 )
 from .serializers import (
     LarderItemSerializer,
@@ -25,6 +27,10 @@ from .forms import (
     BulkMenuAssignmentForm
 )
 from .services import get_or_create_global_product
+from .meal_planning_service import (
+    MealPlanGenerator, MealPlanOptimizer, quick_generate_meal_plan,
+    auto_create_shopping_list, bulk_assign_menus_to_days, suggest_recipes_for_menu
+)
 
 class OpenFoodFactsLookupView(View):
     """
@@ -492,6 +498,22 @@ class MenuViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+    
+    @action(detail=True, methods=['get'])
+    def suggest_recipes(self, request, pk=None):
+        """Get recipe suggestions for this menu's meal period."""
+        menu = self.get_object()
+        exclude_ids = request.query_params.getlist('exclude', [])
+        
+        recipes = suggest_recipes_for_menu(
+            user=request.user,
+            meal_period=menu.meal_period,
+            criteria=menu.criteria,
+            exclude_recipes=exclude_ids
+        )
+        
+        serializer = RecipeSerializer(recipes, many=True)
+        return Response(serializer.data)
 
 
 class MealPlanViewSet(viewsets.ModelViewSet):
@@ -507,16 +529,17 @@ class MealPlanViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def generate_quick(self, request):
-        """Quick-generate a meal plan with auto-populated days."""
-        from .services import generate_meal_plan
-        
+        """Quick-generate a meal plan with auto-populated days and menus."""
         name = request.data.get('name')
         days = int(request.data.get('days', 7))
         criteria_id = request.data.get('criteria_id')
         
+        if not name:
+            return Response({'error': 'name required'}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             criteria = Criteria.objects.get(pk=criteria_id, user=request.user) if criteria_id else None
-            meal_plan = generate_meal_plan(
+            meal_plan = quick_generate_meal_plan(
                 user=request.user,
                 name=name,
                 days=days,
@@ -524,6 +547,58 @@ class MealPlanViewSet(viewsets.ModelViewSet):
             )
             serializer = MealPlanSerializer(meal_plan)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def generate_shopping_list(self, request, pk=None):
+        """Generate shopping list from this meal plan."""
+        meal_plan = self.get_object()
+        
+        try:
+            shopping_list = auto_create_shopping_list(meal_plan)
+            from .serializers import ShoppingListSerializer
+            serializer = ShoppingListSerializer(shopping_list)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def suggest_balance(self, request, pk=None):
+        """Get nutrition balance suggestions for this meal plan."""
+        meal_plan = self.get_object()
+        target_calories = int(request.data.get('target_calories', 2000))
+        
+        recommendations = MealPlanOptimizer.balance_nutrition(
+            meal_plan,
+            target_calories=target_calories
+        )
+        return Response({'recommendations': recommendations})
+    
+    @action(detail=True, methods=['post'])
+    def check_variety(self, request, pk=None):
+        """Check for recipe repetition in meal plan."""
+        meal_plan = self.get_object()
+        recommendations = MealPlanOptimizer.maximize_variety(meal_plan)
+        return Response({'recommendations': recommendations})
+    
+    @action(detail=True, methods=['post'])
+    def bulk_assign_menus(self, request, pk=None):
+        """Bulk assign menus to multiple days."""
+        meal_plan = self.get_object()
+        menu_ids = request.data.get('menu_ids', [])
+        day_type = request.data.get('day_type', 'all')  # 'all', 'weekdays', 'weekends'
+        
+        if not menu_ids:
+            return Response({'error': 'menu_ids required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            menus = Menu.objects.filter(pk__in=menu_ids, user=request.user)
+            if not menus.exists():
+                return Response({'error': 'No valid menus found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            bulk_assign_menus_to_days(meal_plan, list(menus), day_type)
+            return Response({'status': 'success', 'message': f'Assigned {menus.count()} menus'})
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -569,6 +644,48 @@ class ShoppingListViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except GroceryStore.DoesNotExist:
             return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=True, methods=['post'])
+    def mark_purchased(self, request, pk=None):
+        """Mark shopping list and all items as purchased."""
+        shopping_list = self.get_object()
+        
+        # Mark all items as purchased
+        shopping_list.shoppinglistitem_set.update(
+            purchased=True,
+            purchased_at=timezone.now()
+        )
+        
+        # Mark shopping list as purchased
+        shopping_list.is_purchased = True
+        shopping_list.purchased_at = timezone.now()
+        shopping_list.save()
+        
+        serializer = ShoppingListSerializer(shopping_list)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def mark_item_purchased(self, request, pk=None):
+        """Mark individual item as purchased."""
+        shopping_list = self.get_object()
+        item_id = request.data.get('item_id')
+        
+        if not item_id:
+            return Response({'error': 'item_id required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            item = ShoppingListItem.objects.get(pk=item_id, shopping_list=shopping_list)
+            item.mark_purchased()
+            
+            # Check if all items purchased
+            if not shopping_list.shoppinglistitem_set.filter(purchased=False).exists():
+                shopping_list.is_purchased = True
+                shopping_list.purchased_at = timezone.now()
+                shopping_list.save()
+            
+            return Response({'status': 'success', 'item_id': item.pk})
+        except ShoppingListItem.DoesNotExist:
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class OrderViewSet(viewsets.ModelViewSet):

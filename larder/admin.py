@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     GroceryStore, ProductMaster, ProductPrice, LarderItem,
     Recipe, Ingredient, Criteria, Menu, MenuRecipe,
-    MealPlan, MealPlanDay, ShoppingList, Order
+    MealPlan, MealPlanDay, ShoppingList, ShoppingListItem, Order
 )
 
 @admin.register(GroceryStore)
@@ -69,15 +69,29 @@ class MealPlanDayAdmin(admin.ModelAdmin):
     search_fields = ('meal_plan__name',)
     filter_horizontal = ('menus',)
 
+class ShoppingListItemInline(admin.TabularInline):
+    model = ShoppingListItem
+    extra = 0
+    fields = ('product', 'quantity', 'unit', 'estimated_cost', 'purchased')
+    readonly_fields = ('created_at',)
+
 @admin.register(ShoppingList)
 class ShoppingListAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'meal_plan', 'is_purchased', 'total_cost')
     list_filter = ('is_purchased', 'user', 'created_at')
     search_fields = ('name', 'user__username', 'meal_plan__name')
+    inlines = [ShoppingListItemInline]
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'shopping_list', 'status', 'store', 'total_amount', 'ordered_at')
     list_filter = ('status', 'user', 'ordered_at', 'store')
     search_fields = ('user__username', 'shopping_list__name', 'notes')
+    readonly_fields = ('created_at', 'updated_at')
+
+@admin.register(ShoppingListItem)
+class ShoppingListItemAdmin(admin.ModelAdmin):
+    list_display = ('product', 'shopping_list', 'quantity', 'unit', 'estimated_cost', 'purchased')
+    list_filter = ('purchased', 'unit', 'shopping_list__user')
+    search_fields = ('product__name', 'shopping_list__name')
     readonly_fields = ('created_at', 'updated_at')
