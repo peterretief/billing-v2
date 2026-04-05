@@ -54,7 +54,6 @@ class MenuAdmin(admin.ModelAdmin):
     list_display = ('name', 'user', 'meal_period')
     list_filter = ('meal_period', 'user')
     search_fields = ('name', 'user__username')
-    filter_horizontal = ('recipes',)
 
 @admin.register(MealPlan)
 class MealPlanAdmin(admin.ModelAdmin):
