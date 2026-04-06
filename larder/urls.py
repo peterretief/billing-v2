@@ -9,8 +9,11 @@ from .views import (
     MealPlanDayUpdateView,
     ShoppingListView, ShoppingListDetailView,
     OrderListView, OrderDetailView, OrderCreateView, OrderUpdateView,
+    IngredientListView, IngredientCreateView, IngredientUpdateView, IngredientDeleteView,
+    CriteriaListView, CriteriaCreateView, CriteriaUpdateView, CriteriaDeleteView, CriteriaDetailView,
     RecipeViewSet, MenuViewSet, MealPlanViewSet, MealPlanDayViewSet,
-    ShoppingListViewSet, OrderViewSet
+    ShoppingListViewSet, OrderViewSet,
+    ProductMasterViewSet, GroceryStoreViewSet, TokenVerifyView,
 )
 
 # Router handles the standard CRUD for your larder
@@ -22,6 +25,10 @@ router.register(r'meal-plans', MealPlanViewSet, basename='mealplan-api')
 router.register(r'meal-plan-days', MealPlanDayViewSet, basename='mealplanday-api')
 router.register(r'shopping-lists', ShoppingListViewSet, basename='shoppinglist-api')
 router.register(r'orders', OrderViewSet, basename='order-api')
+
+# API endpoints for ProductMaster and GroceryStore (used by larder microservice)
+router.register(r'products', ProductMasterViewSet, basename='product-api')
+router.register(r'stores', GroceryStoreViewSet, basename='store-api')
 
 app_name = 'larder'
 
@@ -59,10 +66,24 @@ urlpatterns = [
     # Product Master Views
     path('products/', ProductMasterListView.as_view(), name='product-list'),
     
+    # Ingredient URLs
+    path('ingredients/', IngredientListView.as_view(), name='ingredient-list'),
+    path('ingredients/create/', IngredientCreateView.as_view(), name='ingredient-create'),
+    path('ingredients/<int:pk>/edit/', IngredientUpdateView.as_view(), name='ingredient-update'),
+    path('ingredients/<int:pk>/delete/', IngredientDeleteView.as_view(), name='ingredient-delete'),
+    
+    # Criteria URLs
+    path('criteria/', CriteriaListView.as_view(), name='criteria-list'),
+    path('criteria/create/', CriteriaCreateView.as_view(), name='criteria-create'),
+    path('criteria/<int:pk>/', CriteriaDetailView.as_view(), name='criteria-detail'),
+    path('criteria/<int:pk>/edit/', CriteriaUpdateView.as_view(), name='criteria-update'),
+    path('criteria/<int:pk>/delete/', CriteriaDeleteView.as_view(), name='criteria-delete'),
+    
     # OpenFoodFacts Lookup
     path('off-lookup/', OpenFoodFactsLookupView.as_view(), name='off-lookup'),
 
     # API Routes
     path('api/', include(router.urls)),
     path('api/scan/', BarcodeScanView.as_view(), name='barcode-scan'),
+    path('api/auth/verify/', TokenVerifyView.as_view(), name='token-verify'),
 ]

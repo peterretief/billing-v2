@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}{% if ingredient %}Edit Ingredient{% else %}Add Ingredient{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-basket2 me-2"></i>
+                        {% if ingredient %}Edit Ingredient{% else %}Add New Ingredient{% endif %}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                {{ error }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="needs-validation">
+                        {% csrf_token %}
+
+                        <!-- Product Selection (for packaged items) -->
+                        <div class="mb-3">
+                            <label class="form-label d-block mb-2">
+                                <i class="bi bi-box-seam me-1 text-info"></i>
+                                <strong>Option 1: Select from Catalog</strong>
+                            </label>
+                            <small class="text-muted d-block mb-2">Use for packaged items (with barcode)</small>
+                            {{ form.product }}
+                            {% if form.product.errors %}
+                                <div class="invalid-feedback d-block">{{ form.product.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="d-flex align-items-center my-4">
+                            <hr class="flex-grow-1">
+                            <span class="mx-3 text-muted fw-bold">OR</span>
+                            <hr class="flex-grow-1">
+                        </div>
+
+                        <!-- Free-text Ingredient Name (for market produce) -->
+                        <div class="mb-3">
+                            <label class="form-label d-block mb-2">
+                                <i class="bi bi-leaf me-1 text-success"></i>
+                                <strong>Option 2: Enter Ingredient Name</strong>
+                            </label>
+                            <small class="text-muted d-block mb-2">Use for market produce without barcodes (tomatoes, onions, etc.)</small>
+                            {{ form.ingredient_name }}
+                            <small class="form-text text-muted d-block mt-1">{{ form.ingredient_name.help_text|safe }}</small>
+                            {% if form.ingredient_name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.ingredient_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Quantity and Unit -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ form.quantity.label }}</label>
+                                    {{ form.quantity }}
+                                    {% if form.quantity.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.quantity.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">{{ form.unit.label }}</label>
+                                    {{ form.unit }}
+                                    <small class="text-muted d-block">e.g., g, kg, ml, l, unit</small>
+                                    {% if form.unit.errors %}
+                                        <div class="invalid-feedback d-block">{{ form.unit.errors.0 }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                {% if ingredient %}Update{% else %}Add{% endif %} Ingredient
+                            </button>
+                            <a href="{% url 'larder:ingredient-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Back
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="alert alert-info mt-3 mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                <small>
+                    <strong>Tip:</strong> Use barcode lookup at 
+                    <a href="{% url 'larder:off-lookup' %}">OpenFoodFacts Lookup</a> 
+                    to find packaged items, then reference them here. Market produce (vegetables, fruits) can be entered by name.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control, .form-select {
+        border: 1px solid #dee2e6;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}

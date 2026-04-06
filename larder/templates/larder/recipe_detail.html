@@ -32,21 +32,21 @@
                             <div class="p-3 bg-light rounded">
                                 <i class="bi bi-clock-history text-primary me-2"></i>
                                 <small class="text-muted d-block">Prep Time</small>
-                                <strong>{{ recipe.prep_time }} min</strong>
+                                <strong>{{ recipe.prep_time_minutes }} min</strong>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="p-3 bg-light rounded">
                                 <i class="bi bi-fire text-warning me-2"></i>
                                 <small class="text-muted d-block">Cook Time</small>
-                                <strong>{{ recipe.cook_time }} min</strong>
+                                <strong>{{ recipe.cook_time_minutes }} min</strong>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="p-3 bg-light rounded">
                                 <i class="bi bi-hourglass-split text-danger me-2"></i>
                                 <small class="text-muted d-block">Total Time</small>
-                                <strong>{{ recipe.prep_time|add:recipe.cook_time }} min</strong>
+                                <strong>{{ recipe.prep_time_minutes|add:recipe.cook_time_minutes }} min</strong>
                             </div>
                         </div>
                     </div>

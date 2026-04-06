@@ -6,17 +6,20 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
+from django.db.models import Count
 from datetime import timedelta
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.filters import SearchFilter
 from .models import (
     LarderItem, GroceryStore, ProductMaster, ProductPrice,
     Recipe, Menu, MealPlan, ShoppingList, Ingredient, Criteria, Order, MealPlanDay, ShoppingListItem
 )
 from .serializers import (
-    LarderItemSerializer,
+    LarderItemSerializer, ProductMasterSerializer, GroceryStoreSerializer,
     RecipeSerializer, IngredientSerializer, CriteriaSerializer,
     MenuSerializer, MealPlanSerializer, MealPlanDaySerializer,
     ShoppingListSerializer, OrderSerializer
@@ -140,6 +143,7 @@ class RecipeCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.user = self.request.user
         response = super().form_valid(form)
+        # Ingredients are saved by form.save() method
         messages.success(self.request, f"Recipe '{form.instance.name}' created successfully!")
         return response
     
@@ -147,6 +151,11 @@ class RecipeCreateView(LoginRequiredMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ingredients'] = Ingredient.objects.filter(user=self.request.user).select_related('product')
+        return context
 
 
 class RecipeUpdateView(LoginRequiredMixin, UpdateView):
@@ -167,6 +176,11 @@ class RecipeUpdateView(LoginRequiredMixin, UpdateView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ingredients'] = Ingredient.objects.filter(user=self.request.user).select_related('product')
+        return context
 
 
 class RecipeDeleteView(LoginRequiredMixin, DeleteView):
@@ -428,6 +442,154 @@ class OrderUpdateView(LoginRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Order updated!")
         return super().form_valid(form)
+
+
+# --- Ingredient Management Views ---
+
+class IngredientListView(LoginRequiredMixin, ListView):
+    """List all ingredients."""
+    model = Ingredient
+    template_name = 'larder/ingredient_list.html'
+    context_object_name = 'ingredients'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        return Ingredient.objects.filter(user=self.request.user).select_related('product')
+
+
+class IngredientCreateView(LoginRequiredMixin, CreateView):
+    """Create a new ingredient."""
+    model = Ingredient
+    form_class = IngredientForm
+    template_name = 'larder/ingredient_form.html'
+    success_url = reverse_lazy('larder:ingredient-list')
+    
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        
+        # Handle free-text ingredient name
+        ingredient_name = form.cleaned_data.get('ingredient_name')
+        if ingredient_name:
+            # Auto-create ProductMaster for market produce
+            product, _ = ProductMaster.objects.get_or_create(
+                barcode=ingredient_name.lower().replace(' ', '_'),
+                defaults={'name': ingredient_name}
+            )
+            form.instance.product = product
+        
+        messages.success(self.request, "Ingredient added!")
+        return super().form_valid(form)
+
+
+class IngredientUpdateView(LoginRequiredMixin, UpdateView):
+    """Update an ingredient."""
+    model = Ingredient
+    form_class = IngredientForm
+    template_name = 'larder/ingredient_form.html'
+    success_url = reverse_lazy('larder:ingredient-list')
+    
+    def get_queryset(self):
+        return Ingredient.objects.filter(user=self.request.user)
+    
+    def form_valid(self, form):
+        # Handle free-text ingredient name
+        ingredient_name = form.cleaned_data.get('ingredient_name')
+        if ingredient_name:
+            # Auto-create ProductMaster for market produce
+            product, _ = ProductMaster.objects.get_or_create(
+                barcode=ingredient_name.lower().replace(' ', '_'),
+                defaults={'name': ingredient_name}
+            )
+            form.instance.product = product
+        
+        messages.success(self.request, "Ingredient updated!")
+        return super().form_valid(form)
+
+
+class IngredientDeleteView(LoginRequiredMixin, DeleteView):
+    """Delete an ingredient."""
+    model = Ingredient
+    template_name = 'larder/ingredient_confirm_delete.html'
+    success_url = reverse_lazy('larder:ingredient-list')
+    
+    def get_queryset(self):
+        return Ingredient.objects.filter(user=self.request.user)
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(self.request, "Ingredient deleted!")
+        return super().delete(request, *args, **kwargs)
+
+
+# --- Dietary Criteria Views ---
+
+class CriteriaListView(LoginRequiredMixin, ListView):
+    """List all dietary criteria."""
+    model = Criteria
+    template_name = 'larder/criteria_list.html'
+    context_object_name = 'criteria_list'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        return Criteria.objects.filter(user=self.request.user).annotate(
+            recipe_count=Count('menu__recipes', distinct=True)
+        )
+
+
+class CriteriaCreateView(LoginRequiredMixin, CreateView):
+    """Create dietary criteria."""
+    model = Criteria
+    form_class = CriteriaForm
+    template_name = 'larder/criteria_form.html'
+    success_url = reverse_lazy('larder:criteria-list')
+    
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        messages.success(self.request, "Dietary criteria created!")
+        return super().form_valid(form)
+
+
+class CriteriaUpdateView(LoginRequiredMixin, UpdateView):
+    """Update dietary criteria."""
+    model = Criteria
+    form_class = CriteriaForm
+    template_name = 'larder/criteria_form.html'
+    success_url = reverse_lazy('larder:criteria-list')
+    
+    def get_queryset(self):
+        return Criteria.objects.filter(user=self.request.user)
+    
+    def form_valid(self, form):
+        messages.success(self.request, "Criteria updated!")
+        return super().form_valid(form)
+
+
+class CriteriaDeleteView(LoginRequiredMixin, DeleteView):
+    """Delete dietary criteria."""
+    model = Criteria
+    template_name = 'larder/criteria_confirm_delete.html'
+    success_url = reverse_lazy('larder:criteria-list')
+    
+    def get_queryset(self):
+        return Criteria.objects.filter(user=self.request.user)
+    
+    def delete(self, request, *args, **kwargs):
+        messages.success(self.request, "Criteria deleted!")
+        return super().delete(request, *args, **kwargs)
+
+
+class CriteriaDetailView(LoginRequiredMixin, DetailView):
+    """View criteria and matching recipes."""
+    model = Criteria
+    template_name = 'larder/criteria_detail.html'
+    context_object_name = 'criteria'
+    
+    def get_queryset(self):
+        return Criteria.objects.filter(user=self.request.user)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['matching_recipes'] = self.object.recipe_set.all()
+        return context
 
 # --- Existing Views ---
 
@@ -714,3 +876,77 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.mark_delivered()
         serializer = OrderSerializer(order)
         return Response(serializer.data)
+
+
+# API Endpoints for Larder Microservice Integration
+
+
+class ProductMasterViewSet(viewsets.ModelViewSet):
+    """
+    API endpoints for ProductMaster (OFF products).
+    Used by larder microservice to get and create product nutrition data.
+    
+    GET: List, search, filter products (read-only)
+    POST: Create product from OFF data (from larder microservice)
+    """
+    queryset = ProductMaster.objects.all()
+    serializer_class = ProductMasterSerializer
+    permission_classes = [AllowAny]
+    filter_backends = [SearchFilter]
+    search_fields = ['name', 'brand', 'barcode']
+    
+    def perform_create(self, serializer):
+        """Validate barcode is unique before saving."""
+        barcode = self.request.data.get('barcode')
+        if ProductMaster.objects.filter(barcode=barcode).exists():
+            return Response(
+                {'error': 'Product with this barcode already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        serializer.save()
+    
+    @action(detail=False, methods=['get'])
+    def by_barcode(self, request):
+        """Get product by barcode."""
+        barcode = request.query_params.get('barcode')
+        if not barcode:
+            return Response({'error': 'barcode parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            product = ProductMaster.objects.get(barcode=barcode)
+            serializer = self.get_serializer(product)
+            return Response(serializer.data)
+        except ProductMaster.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class GroceryStoreViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoints for querying GroceryStore.
+    Used by larder microservice for store/location data.
+    """
+    queryset = GroceryStore.objects.all()
+    serializer_class = GroceryStoreSerializer
+    permission_classes = [AllowAny]
+
+
+class TokenVerifyView(APIView):
+    """
+    Verify JWT token and return user information.
+    Used by larder microservice for SSO token validation.
+    
+    Endpoint: GET /api/auth/verify/
+    Header: Authorization: Bearer <jwt_token>
+    
+    Returns: {id, email, first_name, last_name}
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        return Response({
+            'id': user.id,
+            'email': user.email,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'username': user.username,
+        })

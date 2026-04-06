@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}{% if criteria %}Edit Criteria{% else %}Create Dietary Criteria{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-heart-pulse me-2"></i>
+                        {% if criteria %}Edit Criteria{% else %}Create Dietary Criteria{% endif %}
+                    </h4>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        {% for error in form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show">
+                                {{ error }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="post" class="needs-validation">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.name.label }}</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Dietary Restrictions -->
+                        <fieldset class="mb-4">
+                            <legend class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-leaf me-2"></i>Dietary Restrictions
+                            </legend>
+
+                            <div class="form-check mb-2">
+                                {{ form.vegetarian }}
+                                <label class="form-check-label" for="{{ form.vegetarian.id_for_label }}">
+                                    {{ form.vegetarian.label }}
+                                </label>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                {{ form.vegan }}
+                                <label class="form-check-label" for="{{ form.vegan.id_for_label }}">
+                                    {{ form.vegan.label }}
+                                </label>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.exclude_allergens.label }}</label>
+                                {{ form.exclude_allergens }}
+                                <small class="text-muted d-block mt-1">Comma-separated allergens to exclude (e.g., peanuts, shellfish, dairy)</small>
+                                {% if form.exclude_allergens.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.exclude_allergens.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </fieldset>
+
+                        <!-- Nutrition Goals -->
+                        <fieldset class="mb-4">
+                            <legend class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-heart me-2 text-danger"></i>Nutrition Goals
+                            </legend>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.max_calories.label }}</label>
+                                {{ form.max_calories }}
+                                <small class="text-muted d-block">Max calories per day (optional)</small>
+                                {% if form.max_calories.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.max_calories.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.target_protein.label }}</label>
+                                        {{ form.target_protein }}
+                                        <small class="text-muted d-block">grams</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.target_carbs.label }}</label>
+                                        {{ form.target_carbs }}
+                                        <small class="text-muted d-block">grams</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">{{ form.target_fat.label }}</label>
+                                        {{ form.target_fat }}
+                                        <small class="text-muted d-block">grams</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>
+                                {% if criteria %}Update{% else %}Create{% endif %} Criteria
+                            </button>
+                            <a href="{% url 'larder:criteria-list' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Back
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control, .form-select {
+        border: 1px solid #dee2e6;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}

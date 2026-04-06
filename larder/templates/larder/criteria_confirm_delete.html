@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Delete - {{ criteria.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger shadow">
+                <div class="card-body">
+                    <!-- Warning Alert -->
+                    <div class="alert alert-danger mb-4" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>Caution!</strong> This action cannot be undone.
+                    </div>
+
+                    <!-- Criteria Details -->
+                    <div class="card-title mb-4">
+                        <h4 class="mb-2">Delete Dietary Criteria</h4>
+                        <p class="text-muted mb-0">Are you sure you want to delete this criteria?</p>
+                    </div>
+
+                    <div class="bg-light p-3 rounded mb-4">
+                        <div class="row mb-2">
+                            <div class="col-sm-4 text-muted fw-bold">Name:</div>
+                            <div class="col-sm-8">{{ criteria.name }}</div>
+                        </div>
+                        {% if criteria.exclude_allergens %}
+                            <div class="row mb-2">
+                                <div class="col-sm-4 text-muted fw-bold">Allergens:</div>
+                                <div class="col-sm-8">
+                                    {% for allergen in criteria.exclude_allergens %}
+                                        <span class="badge bg-warning">{{ allergen }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                        <div class="row mb-2">
+                            <div class="col-sm-4 text-muted fw-bold">Vegetarian:</div>
+                            <div class="col-sm-8">
+                                {% if criteria.vegetarian %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-sm-4 text-muted fw-bold">Vegan:</div>
+                            <div class="col-sm-8">
+                                {% if criteria.vegan %}
+                                    <span class="badge bg-success">Yes</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">No</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if criteria.max_calories %}
+                            <div class="row">
+                                <div class="col-sm-4 text-muted fw-bold">Max Calories:</div>
+                                <div class="col-sm-8">{{ criteria.max_calories }} cal/day</div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2">
+                        <form method="post" class="mb-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="bi bi-trash me-2"></i>Yes, Delete This Criteria
+                            </button>
+                        </form>
+                        <a href="{% url 'larder:criteria-detail' criteria.pk %}" class="btn btn-secondary btn-lg">
+                            <i class="bi bi-arrow-left me-2"></i>Cancel
+                        </a>
+                    </div>
+
+                    <!-- Info Text -->
+                    <div class="alert alert-info mt-4 mb-0" role="alert">
+                        <small>
+                            <i class="bi bi-info-circle me-2"></i>
+                            This criteria profile will be permanently removed from your meal planning system.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

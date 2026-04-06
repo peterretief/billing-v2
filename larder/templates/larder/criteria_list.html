@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Dietary Criteria - Meal Planning{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-heart-pulse me-2 text-primary"></i>Dietary Criteria</h2>
+        <a href="{% url 'larder:criteria-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Create Criteria
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        {% for criteria in criteria_list %}
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card shadow-sm h-100 hover-card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ criteria.name }}</h5>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {% if criteria.vegetarian %}
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                {% else %}
+                                    <i class="bi bi-circle text-muted me-2"></i>
+                                {% endif %}
+                                <small>Vegetarian</small>
+                            </div>
+                            <div class="form-check">
+                                {% if criteria.vegan %}
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                {% else %}
+                                    <i class="bi bi-circle text-muted me-2"></i>
+                                {% endif %}
+                                <small>Vegan</small>
+                            </div>
+                        </div>
+
+                        {% if criteria.max_calories %}
+                            <div class="alert alert-light py-2 mb-2">
+                                <small class="text-muted d-block">Max Calories</small>
+                                <strong>{{ criteria.max_calories }}/day</strong>
+                            </div>
+                        {% endif %}
+
+                        <div class="alert alert-light py-2 mb-3">
+                            <small class="text-muted d-block">Matching Recipes</small>
+                            <strong>{{ criteria.recipe_count }}</strong>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'larder:criteria-detail' criteria.pk %}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                                <i class="bi bi-eye me-1"></i>View
+                            </a>
+                            <a href="{% url 'larder:criteria-update' criteria.pk %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'larder:criteria-delete' criteria.pk %}" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>No dietary criteria yet. 
+                    <a href="{% url 'larder:criteria-create' %}">Create your first criteria set</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+
+<style>
+    .hover-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .hover-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+</style>
+{% endblock %}

@@ -23,6 +23,18 @@
                             </div>
                         {% endfor %}
                     {% endif %}
+                    
+                    <!-- Debug: Show all form errors -->
+                    {% if form.errors %}
+                        <div class="alert alert-danger mb-3">
+                            <strong>Form Errors:</strong>
+                            <ul class="mb-0">
+                                {% for field, errors in form.errors.items %}
+                                    <li><strong>{{ field }}:</strong> {{ errors|join:", " }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
 
                     <form method="post" class="needs-validation">
                         {% csrf_token %}
@@ -52,15 +64,15 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">{{ form.prep_time.label }}</label>
-                                        {{ form.prep_time }}
+                                        <label class="form-label">{{ form.prep_time_minutes.label }}</label>
+                                        {{ form.prep_time_minutes }}
                                         <small class="text-muted">minutes</small>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">{{ form.cook_time.label }}</label>
-                                        {{ form.cook_time }}
+                                        <label class="form-label">{{ form.cook_time_minutes.label }}</label>
+                                        {{ form.cook_time_minutes }}
                                         <small class="text-muted">minutes</small>
                                     </div>
                                 </div>
@@ -83,8 +95,8 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">{{ form.protein.label }}</label>
-                                        {{ form.protein }}
+                                        <label class="form-label">{{ form.protein_g.label }}</label>
+                                        {{ form.protein_g }}
                                         <small class="text-muted">grams</small>
                                     </div>
                                 </div>
@@ -93,15 +105,15 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">{{ form.carbs.label }}</label>
-                                        {{ form.carbs }}
+                                        <label class="form-label">{{ form.carbs_g.label }}</label>
+                                        {{ form.carbs_g }}
                                         <small class="text-muted">grams</small>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">{{ form.fat.label }}</label>
-                                        {{ form.fat }}
+                                        <label class="form-label">{{ form.fat_g.label }}</label>
+                                        {{ form.fat_g }}
                                         <small class="text-muted">grams</small>
                                     </div>
                                 </div>
@@ -141,12 +153,180 @@
                                 <i class="bi bi-basket me-2"></i>Ingredients
                             </legend>
                             
-                            <div class="mb-3">
-                                <label class="form-label">{{ form.ingredients.label }}</label>
-                                {{ form.ingredients }}
-                                <small class="text-muted d-block mt-1">Select ingredients used in this recipe</small>
+                            <!-- Hidden field for form submission -->
+                            <input type="hidden" id="id_ingredients" name="ingredients">
+                            
+                            <!-- Search and Add -->
+                            <div class="input-group mb-3">
+                                <input type="text" 
+                                       id="ingredient_search" 
+                                       class="form-control" 
+                                       placeholder="Search and select ingredients..."
+                                       autocomplete="off">
+                                <button class="btn btn-primary" type="button" id="add_ingredient_btn">
+                                    <i class="bi bi-plus-lg me-1"></i>Add
+                                </button>
+                            </div>
+                            
+                            <!-- Autocomplete suggestions -->
+                            <div id="ingredient_suggestions" class="list-group mb-3" style="display: none; max-height: 250px; overflow-y: auto;">
+                            </div>
+                            
+                            <!-- Selected ingredients list -->
+                            <div id="selected_ingredients" class="mb-3">
+                                <label class="form-label d-block mb-2">Selected Ingredients:</label>
+                                <div id="ingredients_list" class="d-flex flex-wrap gap-2">
+                                    <!-- Populated by JavaScript -->
+                                </div>
+                                <div id="no_ingredients" class="alert alert-info small" style="margin-bottom: 0;">
+                                    No ingredients selected yet
+                                </div>
                             </div>
                         </fieldset>
+
+                        <!-- JavaScript for autocomplete -->
+                        <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const searchInput = document.getElementById('ingredient_search');
+                            const addBtn = document.getElementById('add_ingredient_btn');
+                            const suggestionsList = document.getElementById('ingredient_suggestions');
+                            const ingredientsList = document.getElementById('ingredients_list');
+                            const noIngredientsMsg = document.getElementById('no_ingredients');
+                            const hiddenField = document.getElementById('id_ingredients');
+                            
+                            // Get all available ingredients (from context)
+                            const allIngredients = [
+                                {% for ing in ingredients %}
+                                    {
+                                        id: {{ ing.id }},
+                                        name: "{{ ing.product.name }}", 
+                                        quantity: "{{ ing.quantity }}{{ ing.unit }}"
+                                    },
+                                {% endfor %}
+                            ];
+                            
+                            console.log('All ingredients:', allIngredients);
+                            
+                            let selectedIds = new Set(
+                                {% if form.instance.pk %}
+                                    [{% for ing in form.instance.ingredients.all %}{{ ing.id }},{% endfor %}]
+                                {% else %}
+                                    []
+                                {% endif %}
+                            );
+                            
+                            // If form has errors and values were submitted, restore them
+                            if (hiddenField.value) {
+                                const values = hiddenField.value.split(',').map(v => parseInt(v.trim())).filter(v => !isNaN(v));
+                                selectedIds = new Set(values);
+                                console.log('Restored from field:', selectedIds);
+                            }
+                            
+                            // Populate initial selected ingredients
+                            renderSelectedIngredients();
+                            
+                            // Search functionality
+                            searchInput.addEventListener('input', function() {
+                                const query = this.value.toLowerCase().trim();
+                                
+                                if (query.length < 1) {
+                                    suggestionsList.style.display = 'none';
+                                    return;
+                                }
+                                
+                                const matches = allIngredients.filter(ing => 
+                                    ing.name.toLowerCase().includes(query) && 
+                                    !selectedIds.has(ing.id)
+                                );
+                                
+                                if (matches.length === 0) {
+                                    suggestionsList.innerHTML = '<div class="list-group-item text-muted">No matches found</div>';
+                                    suggestionsList.style.display = 'block';
+                                    return;
+                                }
+                                
+                                suggestionsList.innerHTML = matches.map(ing => `
+                                    <button type="button" class="list-group-item list-group-item-action" data-id="${ing.id}">
+                                        <strong>${ing.name}</strong>
+                                        <small class="text-muted d-block">${ing.quantity}</small>
+                                    </button>
+                                `).join('');
+                                
+                                suggestionsList.style.display = 'block';
+                                
+                                // Add click handlers to suggestions
+                                suggestionsList.querySelectorAll('button').forEach(btn => {
+                                    btn.addEventListener('click', (e) => {
+                                        e.preventDefault();
+                                        const ingId = parseInt(btn.dataset.id);
+                                        const ingredient = allIngredients.find(i => i.id === ingId);
+                                        if (ingredient) {
+                                            selectedIds.add(ingId);
+                                            renderSelectedIngredients();
+                                            searchInput.value = '';
+                                            suggestionsList.style.display = 'none';
+                                        }
+                                    });
+                                });
+                            });
+                            
+                            // Add button
+                            addBtn.addEventListener('click', function() {
+                                const query = searchInput.value.toLowerCase().trim();
+                                if (!query) return;
+                                
+                                const match = allIngredients.find(ing => 
+                                    ing.name.toLowerCase() === query && 
+                                    !selectedIds.has(ing.id)
+                                );
+                                
+                                if (match) {
+                                    selectedIds.add(match.id);
+                                    renderSelectedIngredients();
+                                    searchInput.value = '';
+                                    suggestionsList.style.display = 'none';
+                                }
+                            });
+                            
+                            // Function to render selected ingredients
+                            function renderSelectedIngredients() {
+                                ingredientsList.innerHTML = Array.from(selectedIds).map(id => {
+                                    const ing = allIngredients.find(i => i.id === id);
+                                    return `
+                                        <div class="badge bg-success p-2">
+                                            <span>${ing.name}</span>
+                                            <button type="button" class="btn-close btn-close-white ms-2" data-id="${id}" aria-label="Remove"></button>
+                                        </div>
+                                    `;
+                                }).join('');
+                                
+                                // Add remove handlers
+                                ingredientsList.querySelectorAll('.btn-close').forEach(btn => {
+                                    btn.addEventListener('click', (e) => {
+                                        e.preventDefault();
+                                        const ingId = parseInt(btn.dataset.id);
+                                        selectedIds.delete(ingId);
+                                        renderSelectedIngredients();
+                                    });
+                                });
+                                
+                                // Update hidden field with comma-separated IDs
+                                const arrayValue = Array.from(selectedIds);
+                                hiddenField.value = arrayValue.join(',');
+                                console.log('Hidden field updated. Name: ingredients, Value:', hiddenField.value);
+                                
+                                // Show/hide "no ingredients" message
+                                noIngredientsMsg.style.display = selectedIds.size === 0 ? 'block' : 'none';
+                            }
+                            
+                            // Hide suggestions when clicking outside
+                            document.addEventListener('click', function(e) {
+                                if (e.target !== searchInput && e.target !== suggestionsList) {
+                                    suggestionsList.style.display = 'none';
+                                }
+                            });
+                        });
+                        </script>
 
                         <!-- Form Actions -->
                         <div class="d-flex gap-2">

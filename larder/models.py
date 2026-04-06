@@ -16,10 +16,10 @@ class ProductMaster(models.Model):
     name = models.CharField(max_length=255)
     brand = models.CharField(max_length=100, blank=True)
     
-    # Flexible storage for health/nutrition (e.g., {"calories": 200, "protein": "10g"})
+    # Flexible storage for nutrition data from OFF (e.g., {"calories_per_100g": 200, "protein_per_100g": 10, "carbs_per_100g": 25, "fat_per_100g": 5})
     nutrition_data = models.JSONField(default=dict, blank=True)
     
-    # Metadata for AI/Categorization (e.g., {"is_staple": True, "category": "Dairy"})
+    # Metadata for AI/Categorization from OFF (e.g., {"is_staple": True, "category": "Dairy", "is_vegetarian": True, "is_vegan": False, "allergens": ["dairy", "lactose"]})
     metadata = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
@@ -129,16 +129,17 @@ class Recipe(TenantModel):
     description = models.TextField(blank=True)
     ingredients = models.ManyToManyField(Ingredient, related_name='recipes')
     
-    # Nutritional info per serving
+    # Nutritional info per serving - optional, auto-computed from ingredients if not set
     calories = models.IntegerField(null=True, blank=True)
     protein_g = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     carbs_g = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     fat_g = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     
-    # Tags/Categories
-    is_vegetarian = models.BooleanField(default=False)
-    is_vegan = models.BooleanField(default=False)
-    allergens = models.JSONField(default=list, help_text="List of allergens: ['nuts', 'dairy', 'gluten', etc]")
+    # Serving size for calculations (default 1, used to scale ingredient nutrition)
+    servings = models.IntegerField(default=1, help_text="Number of servings this recipe makes")
+    
+    # Tags/Categories - can be overridden, but computed from ingredients if not explicitly set
+    allergens = models.JSONField(default=list, blank=True, help_text="List of allergens: ['nuts', 'dairy', 'gluten', etc]. Empty = auto-derived from ingredients")
     
     prep_time_minutes = models.IntegerField(null=True, blank=True)
     cook_time_minutes = models.IntegerField(null=True, blank=True)
@@ -149,8 +150,7 @@ class Recipe(TenantModel):
     class Meta:
         ordering = ['name']
         indexes = [
-            models.Index(fields=['user', 'is_vegetarian']),
-            models.Index(fields=['user', 'is_vegan']),
+            models.Index(fields=['user', 'created_at']),
         ]
     
     def __str__(self):
@@ -162,17 +162,121 @@ class Recipe(TenantModel):
         cook = self.cook_time_minutes or 0
         return prep + cook
     
+    @property
+    def computed_calories(self):
+        """Auto-compute calories from ingredients using ProductMaster nutrition data (per 100g basis)."""
+        if not self.ingredients.exists():
+            return None
+        total = 0
+        for ingredient in self.ingredients.all():
+            nutrition = ingredient.product.nutrition_data.get('calories_per_100g')
+            if nutrition is not None:
+                # Calculate: (quantity in g) * (calories per 100g) / 100
+                quantity_g = self._convert_to_grams(ingredient.quantity, ingredient.unit)
+                total += (quantity_g * float(nutrition)) / 100
+        return int(total) if total > 0 else None
+    
+    @property
+    def computed_protein_g(self):
+        """Auto-compute protein from ingredients."""
+        if not self.ingredients.exists():
+            return None
+        total = 0
+        for ingredient in self.ingredients.all():
+            nutrition = ingredient.product.nutrition_data.get('protein_per_100g')
+            if nutrition is not None:
+                quantity_g = self._convert_to_grams(ingredient.quantity, ingredient.unit)
+                total += (quantity_g * float(nutrition)) / 100
+        return round(total, 1) if total > 0 else None
+    
+    @property
+    def computed_carbs_g(self):
+        """Auto-compute carbs from ingredients."""
+        if not self.ingredients.exists():
+            return None
+        total = 0
+        for ingredient in self.ingredients.all():
+            nutrition = ingredient.product.nutrition_data.get('carbs_per_100g')
+            if nutrition is not None:
+                quantity_g = self._convert_to_grams(ingredient.quantity, ingredient.unit)
+                total += (quantity_g * float(nutrition)) / 100
+        return round(total, 1) if total > 0 else None
+    
+    @property
+    def computed_fat_g(self):
+        """Auto-compute fat from ingredients."""
+        if not self.ingredients.exists():
+            return None
+        total = 0
+        for ingredient in self.ingredients.all():
+            nutrition = ingredient.product.nutrition_data.get('fat_per_100g')
+            if nutrition is not None:
+                quantity_g = self._convert_to_grams(ingredient.quantity, ingredient.unit)
+                total += (quantity_g * float(nutrition)) / 100
+        return round(total, 1) if total > 0 else None
+    
+    @property
+    def computed_allergens(self):
+        """Auto-derive allergens from ProductMaster metadata of all ingredients."""
+        allergens = set()
+        for ingredient in self.ingredients.all():
+            if 'allergens' in ingredient.product.metadata:
+                allergens.update(ingredient.product.metadata['allergens'])
+        return list(allergens)
+    
+    @property
+    def get_allergens(self):
+        """Return manually set allergens, or auto-computed if empty."""
+        if self.allergens:
+            return self.allergens
+        return self.computed_allergens
+    
+    @property
+    def is_vegetarian(self):
+        """Check if all ingredients are vegetarian."""
+        for ingredient in self.ingredients.all():
+            is_veg = ingredient.product.metadata.get('is_vegetarian', True)
+            if not is_veg:
+                return False
+        return True
+    
+    @property
+    def is_vegan(self):
+        """Check if all ingredients are vegan."""
+        for ingredient in self.ingredients.all():
+            is_vegan_ing = ingredient.product.metadata.get('is_vegan', False)
+            if not is_vegan_ing:
+                return False
+        return self.ingredients.exists()
+    
+    @staticmethod
+    def _convert_to_grams(quantity, unit):
+        """Convert various units to grams/ml for nutrition calculations."""
+        conversions = {
+            'g': 1,
+            'kg': 1000,
+            'ml': 1,  # ml ≈ g for food density purposes
+            'l': 1000,
+            'tbsp': 15,
+            'tsp': 5,
+            'cup': 240,
+            'unit': 100,  # Default assumption for whole units
+        }
+        return float(quantity) * conversions.get(unit, 100)
+    
     def matches_criteria(self, max_calories=None, vegetarian=False, vegan=False, exclude_allergens=None):
         """Check if recipe matches dietary criteria."""
-        if max_calories and self.calories and self.calories > max_calories:
+        cal = self.calories or self.computed_calories
+        if max_calories and cal and cal > max_calories:
             return False
         if vegetarian and not self.is_vegetarian:
             return False
         if vegan and not self.is_vegan:
             return False
         if exclude_allergens:
+            allergens_to_check = self.get_allergens
             for allergen in exclude_allergens:
-                if allergen in self.allergens:
+                if allergen in allergens_to_check:
                     return False
         return True
 

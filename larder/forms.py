@@ -12,49 +12,102 @@ User = get_user_model()
 
 class RecipeForm(forms.ModelForm):
     """Form for creating/editing recipes."""
-    ingredients = forms.ModelMultipleChoiceField(
-        queryset=Ingredient.objects.none(),
-        widget=forms.CheckboxSelectMultiple,
+    ingredients = forms.CharField(
+        widget=forms.HiddenInput(),
         required=False,
-        help_text="Select ingredients for this recipe"
+        help_text="Comma-separated ingredient IDs"
+    )
+    allergens = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter allergens as comma-separated list (e.g., nuts, dairy)'}),
+        required=False,
+        help_text="Optional: comma-separated allergens"
     )
     
     class Meta:
         model = Recipe
         fields = [
             'name', 'description', 'calories', 'protein_g', 'carbs_g',
-            'fat_g', 'is_vegetarian', 'is_vegan', 'allergens',
+            'fat_g', 'servings', 'allergens',
             'prep_time_minutes', 'cook_time_minutes'
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Recipe name'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Recipe description'}),
-            'calories': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Calories per serving'}),
-            'protein_g': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Protein (g)'}),
-            'carbs_g': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Carbs (g)'}),
-            'fat_g': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Fat (g)'}),
-            'is_vegetarian': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'is_vegan': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'allergens': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter allergens as comma-separated list (e.g., nuts, dairy)'}),
+            'calories': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Calories per serving (optional - auto-calculated from ingredients)'}),
+            'protein_g': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Protein (g) - optional'}),
+            'carbs_g': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Carbs (g) - optional'}),
+            'fat_g': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Fat (g) - optional'}),
+            'servings': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Number of servings', 'value': 1}),
             'prep_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Prep time (minutes)'}),
             'cook_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Cook time (minutes)'}),
         }
     
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if user:
-            self.fields['ingredients'].queryset = Ingredient.objects.filter(user=user)
+        self.user = user  # Store user for later use
     
     def clean_allergens(self):
         """Convert comma-separated allergens to list."""
         allergens = self.cleaned_data.get('allergens', '')
         if isinstance(allergens, str):
-            return [a.strip().lower() for a in allergens.split(',') if a.strip()]
-        return allergens
+            # Convert to list, or return empty list if empty
+            if allergens.strip():
+                return [a.strip().lower() for a in allergens.split(',') if a.strip()]
+            else:
+                return []  # Return empty list instead of empty string
+        return allergens if isinstance(allergens, list) else []
+    
+    def clean_ingredients(self):
+        """Handle comma-separated ingredient IDs from hidden field."""
+        raw_data = self.data.get('ingredients', '')
+        
+        # Parse comma-separated IDs
+        if isinstance(raw_data, str) and raw_data.strip():
+            try:
+                ingredient_ids = [int(id.strip()) for id in raw_data.split(',') if id.strip()]
+                # Get the user (from instance if it exists, otherwise from self.user)
+                user = self.instance.user if (self.instance and self.instance.user) else self.user
+                
+                if user:
+                    user_ingredients = Ingredient.objects.filter(
+                        user=user,
+                        id__in=ingredient_ids
+                    )
+                    return user_ingredients
+            except (ValueError, AttributeError) as e:
+                pass
+        
+        return []
+    
+    def save(self, commit=True):
+        """Handle ManyToMany ingredients after instance save and set user."""
+        instance = self.instance
+        
+        # For new instances, set the user
+        if not instance.pk and self.user:
+            instance.user = self.user
+        
+        instance = super().save(commit=commit)
+        if commit:
+            # Get ingredient objects from cleaned data
+            ingredients = self.clean_ingredients()
+            instance.ingredients.set(ingredients)
+        return instance
 
 
 class IngredientForm(forms.ModelForm):
     """Form for creating/editing ingredients."""
+    # Optional: either select a product OR enter free-text name
+    ingredient_name = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Or enter ingredient name (for market produce)'
+        }),
+        help_text="Leave blank if selecting a product, or enter a name for items without barcodes"
+    )
+    
     class Meta:
         model = Ingredient
         fields = ['product', 'quantity', 'unit']
@@ -63,6 +116,30 @@ class IngredientForm(forms.ModelForm):
             'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Quantity'}),
             'unit': forms.Select(attrs={'class': 'form-control'}),
         }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make product field optional
+        self.fields['product'].required = False
+        self.fields['product'].empty_label = "-- Select a product (or enter name below) --"
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        product = cleaned_data.get('product')
+        ingredient_name = cleaned_data.get('ingredient_name')
+        
+        # Ensure either product is selected OR ingredient_name is provided
+        if not product and not ingredient_name:
+            raise forms.ValidationError(
+                "Please either select a product or enter an ingredient name."
+            )
+        
+        if product and ingredient_name:
+            raise forms.ValidationError(
+                "Please select either a product OR enter a name, not both."
+            )
+        
+        return cleaned_data
 
 
 class CriteriaForm(forms.ModelForm):

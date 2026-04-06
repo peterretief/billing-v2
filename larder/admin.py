@@ -14,7 +14,21 @@ class GroceryStoreAdmin(admin.ModelAdmin):
 class ProductMasterAdmin(admin.ModelAdmin):
     list_display = ('barcode', 'name', 'brand')
     search_fields = ('barcode', 'name', 'brand')
-    readonly_fields = ('nutrition_data', 'metadata')
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('barcode', 'name', 'brand'),
+        }),
+        ('Nutrition Data (JSON)', {
+            'fields': ('nutrition_data',),
+            'classes': ('collapse',),
+            'description': 'Example: {"calories_per_100g": 63, "protein_per_100g": 3.2, "carbs_per_100g": 4.8, "fat_per_100g": 3.5}',
+        }),
+        ('Metadata (JSON)', {
+            'fields': ('metadata',),
+            'classes': ('collapse',),
+            'description': 'Example: {"is_vegetarian": true, "is_vegan": false, "allergens": ["dairy"], "estimated_price_local": 35.99}',
+        }),
+    )
 
 @admin.register(ProductPrice)
 class ProductPriceAdmin(admin.ModelAdmin):
@@ -38,8 +52,8 @@ class IngredientAdmin(admin.ModelAdmin):
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'is_vegetarian', 'is_vegan', 'calories')
-    list_filter = ('is_vegetarian', 'is_vegan', 'user')
+    list_display = ('name', 'user', 'is_vegetarian', 'is_vegan', 'calories', 'created_at')
+    list_filter = ('user', 'created_at')
     search_fields = ('name', 'user__username')
     filter_horizontal = ('ingredients',)
 
