@@ -56,6 +56,15 @@ class Client(TenantModel):
     monthly_target_hours = models.DecimalField(
         max_digits=6, decimal_places=2, default=0.00, help_text="Target hours per month for this client."
     )
+    
+    # External system identifiers (e.g., MealShare organisation ID)
+    external_id = models.CharField(
+        max_length=255, 
+        blank=True,
+        null=True,
+        unique=True,
+        help_text="External system identifier (e.g., MealShare organisation ID for API integration)"
+    )
 
     def save(self, *args, **kwargs):
         if not self.client_code:

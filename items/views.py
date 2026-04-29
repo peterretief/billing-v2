@@ -99,15 +99,10 @@ class ItemCreateView(LoginRequiredMixin, CreateView):
         form.instance.user = self.request.user
         return super().form_valid(form)
 
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Filter Clients
-        form.fields["client"].queryset = form.fields["client"].queryset.filter(user=self.request.user)
-        # Filter Billing Policies
-        from billing_schedule.models import BillingPolicy
-
-        form.fields["billing_policy"].queryset = BillingPolicy.objects.filter(user=self.request.user)
-        return form
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
 
 
 class ItemUpdateView(LoginRequiredMixin, UpdateView):
@@ -119,15 +114,10 @@ class ItemUpdateView(LoginRequiredMixin, UpdateView):
     def get_queryset(self):
         return Item.objects.filter(user=self.request.user)
 
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        # Filter Clients
-        form.fields["client"].queryset = form.fields["client"].queryset.filter(user=self.request.user)
-        # Filter Billing Policies
-        from billing_schedule.models import BillingPolicy
-
-        form.fields["billing_policy"].queryset = BillingPolicy.objects.filter(user=self.request.user)
-        return form
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
 
 
 class ItemDeleteView(LoginRequiredMixin, DeleteView):

@@ -3,7 +3,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from core import views as core_views
-from core.views import brevo_webhook  # Import the view from your core app
+from core.views import brevo_webhook, custom_logout  # Import the view from your core app
 from larder.views import ProductMasterViewSet, GroceryStoreViewSet, TokenVerifyView
 
 # API Router for larder microservice integration
@@ -16,7 +16,9 @@ urlpatterns = [
     path("", include("core.urls")),  # Set landing page as the entry point
     path("admin/dashboard/", core_views.superuser_dashboard, name="admin_dashboard"),
     path("admin/", admin.site.urls),
-    # This includes all built-in login/logout views
+    # Custom logout that bypasses CSRF (since middleware is disabled)
+    path("accounts/logout/", custom_logout, name="logout"),
+    # This includes all built-in login/logout views (logout will use our custom one above)
     path("accounts/", include("django.contrib.auth.urls")),
     # django-select2 URLs
     path("select2/", include("django_select2.urls")),

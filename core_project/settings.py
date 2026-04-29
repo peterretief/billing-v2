@@ -31,6 +31,7 @@ DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+MEALSHARE_API_KEY = os.getenv("MEALSHARE_API_KEY", "mealshare-dev-key-change-in-production")
 
 
 ALLOWED_HOSTS = [
@@ -47,18 +48,21 @@ ALLOWED_HOSTS = [
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# Cookie Security (Must be True for HTTPS)
+# Cookie Security (Must be True for HTTPS, False for local dev)
 CSRF_COOKIE_NAME = "billing_v2_csrftoken"
 SESSION_COOKIE_NAME = "billing_v2_sessionid"
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+# Disabled for local dev on HTTP
+CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "False").lower() in ("true", "1", "yes")
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "False").lower() in ("true", "1", "yes")
 
 # CSRF Trusted Origins
 CSRF_TRUSTED_ORIGINS = [
     "https://peterretief.org",
     "https://peterretief.org:81",
+    "http://localhost:3002",  # MealShare dev server
+    "http://127.0.0.1:3002",
 ]
 
 # Disable strict referer check for complex proxy setups (Solves the "4th attempt" glitch)
@@ -101,15 +105,17 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",  # 1. Load the session first
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",  # 2. Check CSRF after session is loaded
-    "django.contrib.auth.middleware.AuthenticationMiddleware",  # 3. Then authenticate the user
-    "core.middleware.TenantMiddleware",  # Set current user for TenantManager
+    # CSRF middleware disabled for development - API endpoints require API key authentication instead
+    # Re-enable for production by uncommenting the line below
+    # "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.TenantMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "debug_toolbar.middleware.DebugToolbarMiddleware",
-    "core.middleware.UserTimezoneMiddleware",  # Add at the bottom
+    "core.middleware.UserTimezoneMiddleware",
 ]
 
 

@@ -7,6 +7,7 @@ app_name = "core"
 
 urlpatterns = [
     path("", views.landing_page, name="landing_page"),
+    path("logout/", views.custom_logout, name="custom_logout"),
     path("admin/create_user/", views.admin_create_user, name="admin_create_user"),
     # Dashboard and Main Lists
     path("profile/edit/", views.edit_profile, name="edit_profile"),

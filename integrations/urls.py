@@ -4,5 +4,6 @@ from . import views
 app_name = 'integrations'
 
 urlpatterns = [
-    path('settings/', views.settings_view, name='settings'),
+    # Note: System Settings moved to core:system_settings for unified configuration
+    # Plugin management is at core:plugin_settings
 ]

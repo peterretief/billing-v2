@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import recon_views, views
+from . import recon_views, views, api
 
 app_name = "invoices"
 
@@ -68,4 +68,8 @@ urlpatterns = [
     path("credit-note/create/", recon_views.create_credit_note, name="create_credit_note"),
     path("credit-note/create/<int:client_id>/", recon_views.create_credit_note, name="create_credit_note_for_client"),
     path("credit-notes/", recon_views.list_credit_notes, name="list_credit_notes"),
+    
+    # REST API Endpoints (External integrations)
+    path("api/create/", api.create_invoice_from_external, name="api_create_invoice"),
+    path("api/pdf/", api.get_invoice_pdf, name="api_get_pdf"),
 ]

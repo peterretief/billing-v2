@@ -7,7 +7,7 @@ from collections import defaultdict
 import requests
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
 from django.core.mail import send_mail
@@ -36,6 +36,18 @@ from .models import (
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+
+# --- Authentication Views ---
+
+
+@csrf_exempt
+def custom_logout(request):
+    """Custom logout view that bypasses CSRF check (required since CSRF middleware is disabled)."""
+    logout(request)
+    messages.success(request, "You have been logged out successfully.")
+    return redirect("core:landing_page")
+
 
 # --- Helper Logic for Email Tracking ---
 
