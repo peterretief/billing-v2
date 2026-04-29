@@ -31,29 +31,31 @@
 \end{tikzpicture}
 {% endif %}
 \noindent
-\begin{minipage}[t]{0.4\textwidth}
-    \vspace{0pt} % Sets top anchor for alignment
-    {% if logo_path %}
-        \includegraphics[width=4.5cm, height=2.5cm, keepaspectratio]{ {{ logo_path }} }
-    {% else %}
-        % Native Muted Box Icon with First Letter
-        \begin{tikzpicture}
-            \fill[blue!30!gray!40] (0,0) rectangle (1.2,1.2);
-            \node[white] at (0.6,0.6) {\fontsize{18}{22}\selectfont \textbf{\textsf{ {{ company_name|slice:":1"|upper }} }} };
-        \end{tikzpicture}
-    {% endif %}
-\end{minipage}
 \begin{minipage}[t]{0.6\textwidth}
     \vspace{0pt} % Sets top anchor for alignment
-    \begin{flushright}
+    \begin{flushleft}
         {\Huge \textbf{ {{ company_name }} }} \par \vspace{0.4cm}
-        \begin{tabular}{r@{}}
+        \begin{tabular}{l@{}}
             {{ profile_address_safe }} \\
             {% if phone %}\textbf{Phone:} {{ phone }} \\{% endif %}
             {% if vat_number %}\textbf{VAT:} {{ vat_number }} \\{% endif %}
             {% if tax_number %}\textbf{Tax Ref:} {{ tax_number }} \\{% endif %}
             {% if vendor_number %}\textbf{Vendor:} {{ vendor_number }}{% endif %}
         \end{tabular}
+    \end{flushleft}
+\end{minipage}
+\begin{minipage}[t]{0.4\textwidth}
+    \vspace{0pt} % Sets top anchor for alignment
+    \begin{flushright}
+        {% if logo_path %}
+            \includegraphics[width=4.5cm, height=2.5cm, keepaspectratio]{ {{ logo_path }} }
+        {% else %}
+            % Native Muted Box Icon with First Letter
+            \begin{tikzpicture}
+                \fill[blue!30!gray!40] (0,0) rectangle (1.2,1.2);
+                \node[white] at (0.6,0.6) {\fontsize{18}{22}\selectfont \textbf{\textsf{ {{ company_name|slice:":1"|upper }} }} };
+            \end{tikzpicture}
+        {% endif %}
     \end{flushright}
 \end{minipage}
 
@@ -62,8 +64,9 @@
 % 2. CLIENT & INVOICE DETAILS
 \noindent
 \begin{minipage}[t]{0.5\textwidth}
+    \vspace{0pt}
     \lightheader{BILL TO:} \par \vspace{0.1cm}
-    \noindent\textbf{\ignorespaces {{client_name}}}\\
+    \textbf{ {{ client_name }} }\\
     {{ client_address_safe }}
     {% if client_vat_number %}
     \textbf{VAT Number:} {{ client_vat_number }} \\
@@ -72,8 +75,8 @@
     \textbf{Phone:} {{ client_phone }} \\
     {% endif %}
 \end{minipage}
-\hfill
-\begin{minipage}[t]{0.4\textwidth}
+\begin{minipage}[t]{0.5\textwidth}
+    \vspace{0pt}
     \raggedleft
     {% if is_quote %}
     \lightheader{QUOTE DETAILS:} \par \vspace{0.1cm}

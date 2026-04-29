@@ -1,0 +1,36 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{longtable}
+
+\raggedright
+
+\begin{document}
+
+\textbf{\Large Time Detail Report}
+
+Reference Invoice: \#{{ invoice_number }}
+
+Client: {{ client_name }}
+
+Date Generated: {{ date_generated }}
+
+\vspace{0.5cm}
+
+\begin{longtable}{llll}
+\toprule
+\textbf{Date} & \textbf{Description} & \textbf{Category} & \textbf{Hours} \\
+\midrule
+{% for entry in flat_entries %}
+{{ entry.date|date:"d M Y" }} & {% if entry.metadata %}{{ entry.formatted_metadata }}{% else %}Standard work{% endif %} & {{ entry.category|default:"General" }} & {{ entry.hours }}h \\
+{% endfor %}
+\bottomrule
+\end{longtable}
+
+\vspace{0.5cm}
+
+Detailed time report for Invoice \#{{ invoice_number }}.
+
+\end{document}

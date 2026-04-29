@@ -2,46 +2,35 @@
 \usepackage[utf8]{inputenc}
 \usepackage[margin=1in]{geometry}
 \usepackage{booktabs}
-\usepackage{xcolor}
 \usepackage{longtable}
-
-\definecolor{primary}{RGB}{40, 40, 40}
 
 \begin{document}
 
-\begin{flushleft}
-    {\huge \textbf{Time Detail Report}} \\
-    \vspace{2mm}
-    \large \textcolor{primary}{Reference Invoice: \#{{ invoice_number }}} \\
-    \large Client: {{ client_name }} \\
-    \large Date Generated: {{ date_generated }}
-\end{flushleft}
+\centering
 
-\vspace{10mm}
+\textbf{\Large Time Detail Report}
 
-{% for category, entries in grouped_data.items %}
-    \section*{ {{ category }} }
-    \begin{longtable}{lp{8cm}r}
-        \toprule
-        \textbf{Date} & \textbf{Details} & \textbf{Hours} \\
-        \midrule
-        {% for entry in entries %}
-            {{ entry.date|date:"d M Y" }} & 
-            {% if entry.metadata %}
-                {{ entry.formatted_metadata }}
-            {% else %}
-                Standard work
-            {% endif %}
-            & {{ entry.hours }}h \\
-        {% endfor %}
-        \bottomrule
-    \end{longtable}
-    \vspace{5mm}
+Reference Invoice: \#{{ invoice_number }}
+
+Client: {{ client_name }}
+
+Date Generated: {{ date_generated }}
+
+\vspace{0.5cm}
+
+% Table columns: Date (left-aligned), Category (left-aligned), Description (left-aligned, 5cm width with text wrapping), Hours (left-aligned)
+\begin{longtable}{llp{5cm}l}
+\toprule
+\textbf{Date} & \textbf{Category} & \textbf{Description} & \textbf{Hours} \\
+\midrule
+{% for entry in flat_entries %}
+{{ entry.date|date:"d M Y" }} & {{ entry.category|default:"General" }} & {% if entry.metadata %}{{ entry.formatted_metadata }}{% else %}Standard work{% endif %} & {{ entry.hours }}h \\
 {% endfor %}
+\bottomrule
+\end{longtable}
 
-\vfill
-\begin{center}
-    \footnotesize Detailed time report for Invoice \#{{ invoice_number }}.
-\end{center}
+\vspace{0.5cm}
+
+Detailed time report for Invoice \#{{ invoice_number }}.
 
 \end{document}

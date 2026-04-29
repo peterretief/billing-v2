@@ -57,8 +57,8 @@ def export_metadata_pdf(request, invoice_id):
             messages.error(request, "No timesheet entries found for this invoice.")
             return redirect("invoices:invoice_detail", pk=invoice_id)
 
-        # Group by Category Name
-        grouped_entries = defaultdict(list)
+        # Prepare flat list with category info for each entry
+        flat_entries = []
         for entry in entries:
             cat_name = entry.category.name if entry.category else "General"
             # Escape LaTeX special characters in category name
@@ -70,13 +70,28 @@ def export_metadata_pdf(request, invoice_id):
                 .replace("^", r"\textasciicircum{}")
                 .replace("~", r"\textasciitilde{}")
             )
-            grouped_entries[cat_name].append(entry)
+            
+            # Get formatted metadata and remove text before colon (e.g., "Description: Test" -> "Test")
+            # This works with any work category label, not just "Description"
+            formatted = entry.formatted_metadata if hasattr(entry, 'formatted_metadata') else ''
+            if formatted and ':' in formatted:
+                formatted = formatted.split(':', 1)[1].strip()
+            
+            entry_data = {
+                'date': entry.date,
+                'metadata': entry.metadata,
+                'formatted_metadata': formatted,
+                'category': cat_name,
+                'work_category_name': entry.category.name if entry.category else '',
+                'hours': entry.hours,
+            }
+            flat_entries.append(entry_data)
 
         context = {
             "invoice_number": invoice.number,
             "client_name": invoice.client.name,
             "date_generated": timezone.now().strftime("%d %b %Y"),
-            "grouped_data": dict(grouped_entries),  # Pass the dictionary
+            "flat_entries": flat_entries,
             "total_hours": sum(e.hours for e in entries),
         }
 
